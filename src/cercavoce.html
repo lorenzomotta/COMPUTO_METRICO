@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <title>Cerca voce — Prezziario</title>
+    <style>
+      :root {
+        --bg: #f4f5f7;
+        --card: #fff;
+        --border: #d8dde4;
+        --text: #1a1d23;
+        --muted: #5c6570;
+        --accent: #2563eb;
+        --accent-hover: #1d4ed8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, Segoe UI, Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.45;
+        font-size: 15px;
+      }
+      .wrap {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 1rem 1.25rem 2rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 0.35rem;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin: 0 0 1rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: flex-end;
+        margin-bottom: 0.75rem;
+      }
+      label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 0.25rem;
+      }
+      select,
+      input[type="search"],
+      textarea,
+      button {
+        font: inherit;
+      }
+      select,
+      input[type="search"] {
+        padding: 0.45rem 0.6rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--card);
+      }
+      .field-prezziario select {
+        width: 100%;
+        min-width: 280px;
+        max-width: 100%;
+      }
+      .field-ricerca input[type="search"] {
+        width: 100%;
+        min-width: 280px;
+        max-width: 100%;
+      }
+      .row-prezziari .field-prezziario {
+        flex: 1 1 42%;
+        min-width: min(100%, 320px);
+      }
+      .row-prezziari .field-file-xml {
+        flex: 1 1 38%;
+        min-width: min(100%, 240px);
+      }
+      .row-ricerca .field-ricerca {
+        flex: 1 1 auto;
+        min-width: min(100%, 400px);
+      }
+      .btn {
+        padding: 0.45rem 0.9rem;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: #eef1f6;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .btn-primary:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+      .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      #status {
+        font-size: 0.85rem;
+        color: var(--muted);
+        min-height: 1.4em;
+        margin: 0.25rem 0 0.75rem;
+      }
+      #status.err {
+        color: #b91c1c;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+      @media (max-width: 800px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .panel {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+      }
+      .panel h2 {
+        font-size: 0.95rem;
+        margin: 0 0 0.5rem;
+      }
+      #results {
+        max-height: 420px;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #fafbfc;
+      }
+      .hit {
+        padding: 0.5rem 0.65rem;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        text-align: left;
+        width: 100%;
+        background: transparent;
+        font: inherit;
+      }
+      .hit:hover,
+      .hit:focus-visible {
+        background: #e8f0fe;
+        outline: none;
+      }
+      .hit.is-active {
+        background: #dbeafe;
+      }
+      .hit-code {
+        font-size: 0.8rem;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .hit-snippet {
+        font-size: 0.85rem;
+        color: var(--text);
+        margin-top: 0.15rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .detail-meta {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 0.5rem;
+      }
+      .detail-desc {
+        font-size: 0.9rem;
+        margin-bottom: 0.75rem;
+        white-space: pre-wrap;
+      }
+      .subs {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .subs li {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-start;
+        padding: 0.35rem 0;
+        border-top: 1px solid var(--border);
+      }
+      .subs input {
+        margin-top: 0.2rem;
+      }
+      .subs span {
+        font-size: 0.85rem;
+      }
+      textarea#riepilogo {
+        width: 100%;
+        min-height: 140px;
+        padding: 0.6rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        resize: vertical;
+      }
+      .riep-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+      }
+      .hint {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 0.5rem;
+      }
+      .page-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.25rem;
+      }
+      .page-head h1 {
+        margin-bottom: 0.35rem;
+      }
+      .btn-torna-voci {
+        text-decoration: none;
+        white-space: nowrap;
+        align-self: flex-start;
+      }
+      .chk-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        cursor: pointer;
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--text);
+        max-width: 52rem;
+      }
+      .chk-row input {
+        margin-top: 0.2rem;
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="page-head">
+        <div>
+          <h1>Cerca voce (prezziario)</h1>
+          <p class="sub">
+            A <strong>sinistra</strong> le voci trovate; a <strong>destra</strong> le sottovoci dopo il clic. Componi il
+            riepilogo e copialo nel campo <strong>VOCE</strong> del Computo.
+          </p>
+        </div>
+        <a href="index.html" class="btn btn-torna-voci" id="btn-torna-voci">← Torna alle voci</a>
+        <button type="button" class="btn btn-torna-voci" id="btn-torna-nuova-voce" hidden>
+          ← Torna
+        </button>
+      </div>
+
+      <div class="row row-prezziari">
+        <div class="field-prezziario">
+          <label for="prezziario-select">Prezziario</label>
+          <select id="prezziario-select" disabled></select>
+        </div>
+        <div class="field-file-xml">
+          <label for="file-fallback">Oppure carica file (.xml, .xlsx o .html)</label>
+          <input
+            id="file-fallback"
+            type="file"
+            accept=".xml,application/xml,text/xml,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.html,text/html"
+          />
+        </div>
+      </div>
+
+      <p id="status"></p>
+
+      <div class="row row-ricerca">
+        <div class="field-ricerca">
+          <label for="search-input">Ricerca</label>
+          <input
+            id="search-input"
+            type="search"
+            placeholder="Codice o parole nella descrizione…"
+            disabled
+            autocomplete="off"
+          />
+        </div>
+        <button type="button" class="btn" id="btn-clear-search" disabled>Svuota ricerca</button>
+      </div>
+
+      <div class="row" style="align-items: flex-start; flex-direction: column; gap: 0.5rem">
+        <label class="chk-row">
+          <input type="checkbox" id="ricerca-inizio-testo" checked />
+          <span
+            ><strong>Solo inizio testo</strong> (dopo il codice): il testo cercato deve coincidere con l’inizio della
+            descrizione breve o lunga — non cerca nel codice né nel resto del paragrafo</span
+          >
+        </label>
+      </div>
+      <p class="hint" id="ricerca-modo-hint" style="margin-top: 0.35rem; margin-bottom: 0">
+        Modalità attuale: <strong>solo inizio</strong> del testo descrittivo (breve o lungo), senza cercare nel codice né
+        nel testo centrale/finale.
+      </p>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Risultati</h2>
+          <div id="results" aria-live="polite"></div>
+          <p class="hint" id="results-hint"></p>
+        </div>
+
+        <div class="panel">
+          <h2>Dettaglio e sottovoci</h2>
+          <div id="detail-empty" class="detail-meta">Seleziona una voce nell’elenco a sinistra per vedere le sue sottovoci.</div>
+          <div id="detail-content" hidden>
+            <div class="detail-meta" id="detail-code"></div>
+            <div class="detail-desc" id="detail-main"></div>
+            <div id="subs-block" hidden>
+              <strong style="font-size: 0.85rem">Includi nel riepilogo:</strong>
+              <ul class="subs" id="subs-list"></ul>
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-apply-riepilogo">Aggiorna riepilogo</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top: 1rem">
+        <h2>Testo voce (riepilogo)</h2>
+        <p class="hint">Modifica liberamente prima di copiare nel Computo.</p>
+        <textarea id="riepilogo" placeholder="Il testo composto apparirà qui…"></textarea>
+        <div class="riep-actions">
+          <button type="button" class="btn btn-primary" id="btn-copy">Copia negli appunti</button>
+          <button type="button" class="btn" id="btn-clear-riepilogo">Svuota</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./vendor/xlsx.full.min.js"></script>
+    <script>
+      (function () {
+        const INDEX_URL = "./prezziari/prezziari-index.json";
+        const statusEl = document.getElementById("status");
+        const selectEl = document.getElementById("prezziario-select");
+        const fileEl = document.getElementById("file-fallback");
+        const searchEl = document.getElementById("search-input");
+        const btnClearSearch = document.getElementById("btn-clear-search");
+        const resultsEl = document.getElementById("results");
+        const resultsHint = document.getElementById("results-hint");
+        const detailEmpty = document.getElementById("detail-empty");
+        const detailContent = document.getElementById("detail-content");
+        const detailCode = document.getElementById("detail-code");
+        const detailMain = document.getElementById("detail-main");
+        const subsBlock = document.getElementById("subs-block");
+        const subsList = document.getElementById("subs-list");
+        const btnApply = document.getElementById("btn-apply-riepilogo");
+        const riepilogoEl = document.getElementById("riepilogo");
+        const btnCopy = document.getElementById("btn-copy");
+        const btnClearRiepilogo = document.getElementById("btn-clear-riepilogo");
+        const ricercaInizioTestoEl = document.getElementById("ricerca-inizio-testo");
+        const ricercaModoHintEl = document.getElementById("ricerca-modo-hint");
+
+        /** Righe prodotto indicizzate dal prezziario */
+        let prodotti = [];
+        let unitaMap = new Map();
+        let voceMainIds = new Set();
+        const byPrdId = new Map();
+        const mainIdByGroupKey = new Map();
+
+        let searchTimer = null;
+        let activeHitPrdId = null;
+        const MAX_RESULTS = 250;
+        const CUSTOM_FILE_OPTION_VALUE = "__uploaded_file__";
+        let uploadedDataset = null;
+
+        function setStatus(msg, isErr) {
+          statusEl.textContent = msg || "";
+          statusEl.classList.toggle("err", !!isErr);
+        }
+
+        function escapeRegExp(s) {
+          return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        }
+
+        function parseXml(text) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(text, "text/xml");
+          const err = doc.querySelector("parsererror");
+          if (err) throw new Error("XML non valido.");
+          return doc;
+        }
+
+        function parseHtml(text) {
+          const parser = new DOMParser();
+          return parser.parseFromString(text, "text/html");
+        }
+
+        function loadUnita(doc) {
+          const map = new Map();
+          const nodes = doc.getElementsByTagName("unitaDiMisura");
+          for (let i = 0; i < nodes.length; i++) {
+            const el = nodes[i];
+            const id = el.getAttribute("unitaDiMisuraId");
+            const sim = el.getAttribute("simbolo");
+            if (id && sim) map.set(id, sim);
+          }
+          return map;
+        }
+
+        /** True se l'elemento XML ha voce="true" (compatibile con parser che espongono attributi in modo diverso). */
+        function leggiVocePrincipale(el) {
+          const v = el.getAttribute("voce");
+          if (v === "true") return true;
+          if (el.attributes) {
+            for (let i = 0; i < el.attributes.length; i++) {
+              const a = el.attributes[i];
+              if ((a.localName || a.name) === "voce" && String(a.value).toLowerCase() === "true") return true;
+            }
+          }
+          return false;
+        }
+
+        /**
+         * Codice "capitolato" senza suffissi tipo .A / .B delle sottovoci (fallback se voce="" non viene letto dal DOM).
+         */
+        function canonicalCapitolatoId(prdId) {
+          let id = prdId;
+          while (id.length > 0) {
+            const m = id.match(/^(.+)\.([A-Z])$/);
+            if (!m) break;
+            id = m[1];
+          }
+          return id;
+        }
+
+        function stripGeneratedDuplicateSuffix(prdId) {
+          return String(prdId || "")
+            .trim()
+            .replace(/\s+\[\d+\]$/g, "");
+        }
+
+        function getGroupKeyFromRow(rowOrPrdId) {
+          if (rowOrPrdId && typeof rowOrPrdId === "object") {
+            if (rowOrPrdId.groupKey) return String(rowOrPrdId.groupKey);
+            const raw = rowOrPrdId.rawPrdId || rowOrPrdId.prdId || "";
+            return canonicalCapitolatoId(stripGeneratedDuplicateSuffix(raw));
+          }
+          return canonicalCapitolatoId(stripGeneratedDuplicateSuffix(String(rowOrPrdId || "")));
+        }
+
+        function parentPrdIdOf(prdId) {
+          const s = String(prdId || "").trim();
+          if (!s || !s.includes(".")) return "";
+          const parts = s.split(".");
+          if (parts.length <= 1) return "";
+          parts.pop();
+          return parts.join(".");
+        }
+
+        function canonicalSegmentCount(prdId) {
+          const base = canonicalCapitolatoId(prdId);
+          if (!base) return 0;
+          return base
+            .split(".")
+            .map((p) => p.trim())
+            .filter(Boolean).length;
+        }
+
+        function loadProdotti(doc) {
+          const list = [];
+          const nodes = doc.getElementsByTagName("prodotto");
+          const mains = new Set();
+          for (let i = 0; i < nodes.length; i++) {
+            const el = nodes[i];
+            const prdId = el.getAttribute("prdId") || "";
+            if (!prdId) continue;
+            const voceAttr = leggiVocePrincipale(el);
+            const desc = el.getElementsByTagName("prdDescrizione")[0];
+            const breve = desc ? desc.getAttribute("breve") || "" : "";
+            const estesa = desc ? desc.getAttribute("estesa") || "" : "";
+            const um = el.getAttribute("unitaDiMisuraId");
+            const quot = el.getElementsByTagName("prdQuotazione")[0];
+            const prezzo = quot ? quot.getAttribute("valore") || "" : "";
+            const searchBlob = [prdId, breve, estesa].join(" ").toLowerCase();
+            list.push({
+              prdId,
+              voce: voceAttr,
+              breve,
+              estesa,
+              unitaDiMisuraId: um,
+              prezzo,
+              searchBlob,
+            });
+            if (voceAttr) mains.add(prdId);
+          }
+          return { list, mains };
+        }
+
+        function findMainPrdId(prdId) {
+          if (voceMainIds.has(prdId)) return prdId;
+          const row = byPrdId.get(prdId);
+          const groupKey = getGroupKeyFromRow(row || prdId);
+          if (groupKey && mainIdByGroupKey.has(groupKey)) return mainIdByGroupKey.get(groupKey);
+          const parts = prdId.split(".");
+          while (parts.length > 1) {
+            parts.pop();
+            const cand = parts.join(".");
+            if (voceMainIds.has(cand)) return cand;
+          }
+          return canonicalCapitolatoId(prdId);
+        }
+
+        /**
+         * Anteprima in elenco risultati: il breve spesso non include la parola cercata
+         * (es. "demolizione" solo nel testo lungo esteso) — mostra un estratto dove compare il match.
+         */
+        function anteprimaVocePerRicerca(p, query) {
+          const q = (query || "").trim().toLowerCase();
+          const breve = (p.breve || "").trim();
+          const estesa = (p.estesa || "").trim();
+          if (!q || q.length < 2) {
+            if (breve) return breve;
+            if (estesa.length <= 280) return estesa || "(senza descrizione)";
+            return estesa.slice(0, 280).trim() + "…";
+          }
+          if (breve.toLowerCase().includes(q)) return breve;
+          const ei = estesa.toLowerCase().indexOf(q);
+          if (ei >= 0) {
+            const start = Math.max(0, ei - 55);
+            const end = Math.min(estesa.length, ei + q.length + 130);
+            const chunk = estesa.slice(start, end).replace(/\s+/g, " ").trim();
+            return (start > 0 ? "… " : "") + chunk + (end < estesa.length ? " …" : "");
+          }
+          if ((p.prdId || "").toLowerCase().includes(q)) {
+            return (breve || estesa.slice(0, 200) + (estesa.length > 200 ? "…" : "")) + " (match sul codice)";
+          }
+          return breve || estesa.slice(0, 280) + (estesa.length > 280 ? "…" : "");
+        }
+
+        function getDirectSubVoci(mainId) {
+          const mainRow = byPrdId.get(mainId);
+          const baseMain = String(mainId || "").trim().toUpperCase();
+          const mainGroupKey = String(getGroupKeyFromRow(mainRow || mainId) || "").toUpperCase();
+          const re = new RegExp("^" + escapeRegExp(baseMain) + "\\.[^.]+$");
+          return prodotti.filter((p) => {
+            if (!p || !p.prdId || p.prdId === mainId) return false;
+            const cand = String(p.prdId || "").trim().toUpperCase();
+            if (!cand || cand === baseMain) return false;
+            // Caso standard XML: figlio diretto "mainId.X"
+            if (re.test(cand)) return true;
+            // Varianti Excel: suffisso senza punto o con separatori/spazi.
+            // Esempi tipici: A.02.04.0005A / A.02.04.0005 A / A.02.04.0005 [A]
+            if (cand.startsWith(baseMain)) {
+              const suffix = cand.slice(baseMain.length).trim();
+              if (/^[A-Z]$/.test(suffix)) return true;
+              if (/^[\[\(]?[A-Z][\]\)]?$/.test(suffix)) return true;
+              if (/^[._\- ]+[A-Z]$/.test(suffix)) return true;
+            }
+            const candGroupKey = String(getGroupKeyFromRow(p) || "").toUpperCase();
+            if (candGroupKey && mainGroupKey && candGroupKey === mainGroupKey) {
+              // Nel parser Excel i duplicati vengono salvati come "... [2]": trattiamoli come opzioni figlie.
+              return true;
+            }
+            // Fallback Excel: collega sottovoci tramite codice capitolato canonico
+            // (es. A.02.04.0005.A -> A.02.04.0005).
+            return canonicalCapitolatoId(cand) === baseMain;
+          });
+        }
+
+        function extractSubVociFromMainText(main) {
+          const text = String(main && (main.estesa || main.breve) ? main.estesa || main.breve : "").replace(/\s+/g, " ").trim();
+          if (!text) return [];
+          const matches = Array.from(text.matchAll(/([a-z])\)\s*(.*?)(?=(?:\s+[a-z]\)\s)|$)/gi));
+          if (matches.length < 2) return [];
+          return matches
+            .map((m) => {
+              const letter = String(m[1] || "").toUpperCase();
+              const desc = String(m[2] || "").trim().replace(/\s+/g, " ");
+              if (!letter || !desc) return null;
+              return {
+                prdId: `${main.prdId}.${letter}`,
+                voce: false,
+                breve: `${m[1].toLowerCase()}) ${desc}`,
+                estesa: desc,
+                unitaDiMisuraId: null,
+                prezzo: "",
+                searchBlob: `${main.prdId}.${letter} ${desc}`.toLowerCase(),
+              };
+            })
+            .filter(Boolean);
+        }
+
+        /** True se la riga prodotto soddisfa la query (intera voce vs solo inizio testo dopo il codice). */
+        function prodottoMatchQuery(p, q) {
+          const qn = (q || "").trim().toLowerCase();
+          if (!qn || qn.length < 2) return false;
+          const soloInizio = ricercaInizioTestoEl && ricercaInizioTestoEl.checked;
+          if (soloInizio) {
+            const b = (p.breve || "").trim().toLowerCase();
+            const e = (p.estesa || "").trim().toLowerCase();
+            return b.startsWith(qn) || e.startsWith(qn);
+          }
+          return p.searchBlob.includes(qn);
+        }
+
+        function aggiornaHintModalitaRicerca() {
+          if (!ricercaModoHintEl) return;
+          const soloInizio = ricercaInizioTestoEl && ricercaInizioTestoEl.checked;
+          ricercaModoHintEl.innerHTML = soloInizio
+            ? 'Modalità attuale: <strong>solo inizio</strong> del testo descrittivo (breve o lungo), <strong>senza</strong> cercare nel codice né nel testo centrale/finale.'
+            : 'Modalità attuale: ricerca nell’<strong>intera voce</strong> (descrizione completa e codice).';
+        }
+
+        function rebuildMaps() {
+          byPrdId.clear();
+          mainIdByGroupKey.clear();
+          prodotti.forEach((p) => byPrdId.set(p.prdId, p));
+          prodotti.forEach((p) => {
+            if (!p || !p.voce) return;
+            const key = getGroupKeyFromRow(p);
+            if (key && !mainIdByGroupKey.has(key)) mainIdByGroupKey.set(key, p.prdId);
+          });
+        }
+
+        function applyDatasetToState(dataset, statusText) {
+          unitaMap = dataset.unitaMap || new Map();
+          prodotti = Array.isArray(dataset.prodotti) ? dataset.prodotti : [];
+          voceMainIds = dataset.voceMainIds instanceof Set ? dataset.voceMainIds : new Set();
+          rebuildMaps();
+          setStatus(statusText, false);
+          searchEl.disabled = false;
+          btnClearSearch.disabled = false;
+          runSearch();
+        }
+
+        function upsertUploadedOption(label) {
+          let opt = selectEl.querySelector(`option[value="${CUSTOM_FILE_OPTION_VALUE}"]`);
+          if (!opt) {
+            opt = document.createElement("option");
+            opt.value = CUSTOM_FILE_OPTION_VALUE;
+            opt.dataset.source = "upload";
+            selectEl.appendChild(opt);
+          }
+          opt.textContent = "File caricato: " + label;
+          selectEl.disabled = false;
+          selectEl.value = CUSTOM_FILE_OPTION_VALUE;
+        }
+
+        function normalizeUploadedPath(rawPath, fileName) {
+          const p = String(rawPath || "").trim();
+          if (p) return p;
+          return String(fileName || "").trim();
+        }
+
+        function buildUploadedStatusText(dataset) {
+          const shownPath = dataset && dataset.sourcePath ? dataset.sourcePath : "(percorso non disponibile)";
+          return "Usando file caricato dal computer: " + shownPath;
+        }
+
+        function cellToStringX(v) {
+          if (v === null || v === undefined) return "";
+          if (typeof v === "number" && Number.isFinite(v)) return String(v);
+          return String(v).trim();
+        }
+
+        function sembraCodicePrezziario(s) {
+          const t = String(s).trim();
+          if (t.length === 0 || t.length > 96) return false;
+          if (/^[A-Z]{1,5}(\.[A-Z0-9]+)+$/i.test(t)) return true;
+          if (/^[A-Z]{1,4}[\w./-]+$/i.test(t) && t.length <= 40 && !/\s/.test(t)) return true;
+          if (/^\d{1,4}(\.\d+)+$/i.test(t)) return true;
+          return false;
+        }
+
+        function sembraIntestazioneFoglio(rowCells) {
+          const u = rowCells.join(" ").toLowerCase();
+          if (rowCells.filter(Boolean).length < 2) return false;
+          return /codice|descriz|prezz|unit|u\.?\s*m\.?|importo|€|euro|qty/.test(u);
+        }
+
+        function sembraSoloPrezzo(s) {
+          const raw = String(s).trim();
+          if (!raw) return false;
+          const norm = raw.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+          return /^-?\d+(\.\d+)?$/.test(norm);
+        }
+
+        /**
+         * Parsing HTML prezziario:
+         * - cerca prima righe tabellari (<tr>)
+         * - poi prova fallback su <li> / <p>
+         * - converte tutto nel formato interno "prodotti"
+         */
+        function parseHtmlPrezziario(doc) {
+          const list = [];
+          const mains = new Set();
+          const usedIds = new Set();
+
+          /** @type {string[][]} */
+          const rows = [];
+          doc.querySelectorAll("table tr").forEach((tr) => {
+            const cells = Array.from(tr.querySelectorAll("th,td"))
+              .map((cell) => cellToStringX(cell.textContent))
+              .filter((v) => v !== "");
+            if (cells.length > 0) rows.push(cells);
+          });
+
+          if (!rows.length) {
+            doc.querySelectorAll("li, p").forEach((el) => {
+              const t = cellToStringX(el.textContent);
+              if (t) rows.push([t]);
+            });
+          }
+
+          if (!rows.length) throw new Error("HTML senza contenuto utile per il parser.");
+
+          let headerGiaSaltato = false;
+          rows.forEach((row, rowIndex) => {
+            if (!headerGiaSaltato && sembraIntestazioneFoglio(row)) {
+              headerGiaSaltato = true;
+              return;
+            }
+
+            let codeIdx = -1;
+            for (let c = 0; c < Math.min(row.length, 10); c++) {
+              if (sembraCodicePrezziario(row[c])) {
+                codeIdx = c;
+                break;
+              }
+            }
+            if (codeIdx < 0 && row.length > 1) codeIdx = 0;
+
+            let prdId = codeIdx >= 0 ? row[codeIdx] || "" : "";
+            const altre = [];
+            row.forEach((value, c) => {
+              if (c !== codeIdx && value) altre.push(value);
+            });
+
+            if (!prdId) {
+              const unicoTesto = row.join(" ").trim();
+              if (!unicoTesto || unicoTesto.length < 4) return;
+              prdId = "HTML-" + (rowIndex + 1);
+              altre.length = 0;
+              altre.push(unicoTesto);
+            }
+
+            let prezzoVal = "";
+            if (altre.length >= 2 && sembraSoloPrezzo(altre[altre.length - 1])) {
+              prezzoVal = altre.pop();
+            } else if (altre.length === 1 && sembraSoloPrezzo(altre[0])) {
+              prezzoVal = altre[0];
+              altre.length = 0;
+            }
+
+            const breve = altre[0] || prdId;
+            const estesa = altre.join(" ").trim() || breve;
+            if (!breve && !estesa) return;
+
+            let idFinale = prdId;
+            let nDup = 2;
+            while (usedIds.has(idFinale)) {
+              idFinale = prdId + " [" + nDup + "]";
+              nDup++;
+            }
+            usedIds.add(idFinale);
+
+            list.push({
+              prdId: idFinale,
+              voce: true,
+              breve,
+              estesa,
+              unitaDiMisuraId: null,
+              prezzo: prezzoVal,
+              searchBlob: [idFinale, breve, estesa].join(" ").toLowerCase(),
+            });
+            mains.add(idFinale);
+          });
+
+          if (!list.length) throw new Error("Nessuna riga valida trovata nel file HTML.");
+          return { list, mains };
+        }
+
+        /**
+         * Converte il primo foglio Excel in righe compatibili con la ricerca (codice + testi + prezzo opzionale).
+         */
+        function parseWorkbookXlsx(workbook) {
+          if (typeof XLSX === "undefined") throw new Error("Libreria Excel non caricata (xlsx).");
+          const nomeFoglio = workbook.SheetNames[0];
+          if (!nomeFoglio) throw new Error("File Excel senza fogli.");
+          const ws = workbook.Sheets[nomeFoglio];
+          const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+          if (!aoa || !aoa.length) throw new Error("Foglio vuoto.");
+
+          const rawRows = [];
+          const usedIds = new Set();
+          let saltaPrimaRigaDati = true;
+          let lastMainRawCode = "";
+
+          for (let r = 0; r < aoa.length; r++) {
+            const rawRow = aoa[r] || [];
+            const row = rawRow.map(cellToStringX);
+            if (row.every((c) => !c)) continue;
+
+            if (saltaPrimaRigaDati && sembraIntestazioneFoglio(row)) {
+              saltaPrimaRigaDati = false;
+              continue;
+            }
+            saltaPrimaRigaDati = false;
+
+            // Formato Excel utente: codice in colonna A.
+            // Se colonna A e' vuota, la riga puo' essere un'opzione (a), b), c)...) in altre colonne.
+            const codeColA = String(row[0] || "").trim();
+            const codeIdx = sembraCodicePrezziario(codeColA) ? 0 : -1;
+            if (codeIdx < 0) {
+              const optionCell = row.find((v) => /^\s*([a-z])\)\s*(.+)$/i.test(String(v || ""))) || "";
+              const optionMatch = String(optionCell).match(/^\s*([a-z])\)\s*(.+)$/i);
+              if (optionMatch && lastMainRawCode) {
+                const optionLetter = String(optionMatch[1] || "").toUpperCase();
+                const optionDesc = String(optionMatch[2] || "").trim();
+                let syntheticId = `${lastMainRawCode}.${optionLetter}`;
+                let nDupSub = 2;
+                while (usedIds.has(syntheticId)) {
+                  syntheticId = `${lastMainRawCode}.${optionLetter} [${nDupSub}]`;
+                  nDupSub++;
+                }
+                usedIds.add(syntheticId);
+                rawRows.push({
+                  prdId: syntheticId,
+                  rawPrdId: `${lastMainRawCode}.${optionLetter}`,
+                  groupKey: canonicalCapitolatoId(lastMainRawCode),
+                  breve: `${optionLetter.toLowerCase()}) ${optionDesc}`,
+                  estesa: optionDesc,
+                  unitaDiMisuraId: null,
+                  prezzo: "",
+                  searchBlob: `${syntheticId} ${optionDesc}`.toLowerCase(),
+                });
+                continue;
+              }
+              continue;
+            }
+
+            let prdId = row[codeIdx] || "";
+            if (!prdId) continue;
+            lastMainRawCode = String(prdId).trim();
+
+            const altre = [];
+            for (let c = 1; c < row.length; c++) {
+              if (row[c]) altre.push(row[c]);
+            }
+
+            let prezzoVal = "";
+            if (altre.length >= 2 && sembraSoloPrezzo(altre[altre.length - 1])) {
+              prezzoVal = altre.pop();
+            } else if (altre.length === 1 && sembraSoloPrezzo(altre[0])) {
+              prezzoVal = altre[0];
+              altre.length = 0;
+            }
+
+            const breve = altre[0] || prdId;
+            const estesa = altre.join(" ").trim() || breve;
+            const searchBlob = [prdId, breve, estesa].join(" ").toLowerCase();
+
+            let idFinale = prdId;
+            let nDup = 2;
+            while (usedIds.has(idFinale)) {
+              idFinale = prdId + " [" + nDup + "]";
+              nDup++;
+            }
+            usedIds.add(idFinale);
+
+            rawRows.push({
+              prdId: idFinale,
+              rawPrdId: prdId,
+              groupKey: canonicalCapitolatoId(prdId),
+              breve,
+              estesa,
+              unitaDiMisuraId: null,
+              prezzo: prezzoVal,
+              searchBlob,
+            });
+          }
+
+          if (!rawRows.length) throw new Error("Nessuna riga utile nel foglio Excel.");
+
+          // Evita le righe "macro-categoria" (es. DEMOLIZIONI, A.01, A.02):
+          // manteniamo i codici al livello piu' dettagliato disponibile nel foglio.
+          const candidateCounts = rawRows
+            .map((r) => canonicalSegmentCount(r.prdId))
+            .filter((n) => Number.isFinite(n) && n > 0);
+          const maxSegments = candidateCounts.length ? Math.max(...candidateCounts) : 0;
+          const minDetailSegments = maxSegments >= 4 ? 4 : Math.max(1, maxSegments);
+          const filteredRows = rawRows.filter((r) => canonicalSegmentCount(r.prdId) >= minDetailSegments);
+          const normalizedRows = filteredRows.length ? filteredRows : rawRows;
+
+          const idSet = new Set(normalizedRows.map((r) => r.prdId));
+          const mains = new Set();
+          const list = normalizedRows.map((row) => {
+            const parentId = parentPrdIdOf(row.prdId);
+            const hasParent = !!parentId && idSet.has(parentId);
+            if (!hasParent) mains.add(row.prdId);
+            return {
+              ...row,
+              voce: !hasParent,
+            };
+          });
+
+          return { list, mains };
+        }
+
+        async function applyXlsxArrayBuffer(buf, sourceLabel, sourcePath) {
+          const wb = XLSX.read(buf, { type: "array" });
+          const parsed = parseWorkbookXlsx(wb);
+          const dataset = {
+            unitaMap: new Map(),
+            prodotti: parsed.list,
+            voceMainIds: parsed.mains,
+            sourcePath: normalizeUploadedPath(sourcePath, sourceLabel || "file Excel"),
+          };
+          uploadedDataset = dataset;
+          upsertUploadedOption(sourceLabel || "file Excel");
+          applyDatasetToState(
+            dataset,
+            "Caricato (Excel): " + (sourceLabel || "file") + " — " + dataset.prodotti.length + " righe.",
+          );
+        }
+
+        async function applyHtmlText(text, sourceLabel, sourcePath) {
+          const doc = parseHtml(text);
+          const parsed = parseHtmlPrezziario(doc);
+          const dataset = {
+            unitaMap: new Map(),
+            prodotti: parsed.list,
+            voceMainIds: parsed.mains,
+            sourcePath: normalizeUploadedPath(sourcePath, sourceLabel || "file HTML"),
+          };
+          uploadedDataset = dataset;
+          upsertUploadedOption(sourceLabel || "file HTML");
+          applyDatasetToState(
+            dataset,
+            "Caricato (HTML): " + (sourceLabel || "file") + " — " + dataset.prodotti.length + " righe.",
+          );
+        }
+
+        async function loadPrezziarioFromUrl(url, label) {
+          setStatus("Caricamento " + (label || url) + "…");
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("Impossibile leggere il file (" + res.status + ").");
+          const text = await res.text();
+          await applyXmlText(text, label || url, false, "");
+        }
+
+        async function applyXmlText(text, sourceLabel, isUploadedFile, sourcePath) {
+          const doc = parseXml(text);
+          const { list, mains } = loadProdotti(doc);
+          const dataset = {
+            unitaMap: loadUnita(doc),
+            prodotti: list,
+            voceMainIds: mains,
+            sourcePath: isUploadedFile ? normalizeUploadedPath(sourcePath, sourceLabel || "file XML") : "",
+          };
+          if (isUploadedFile) {
+            uploadedDataset = dataset;
+            upsertUploadedOption(sourceLabel);
+          }
+          applyDatasetToState(
+            dataset,
+            "Caricato: " + (sourceLabel || "prezziario") + " — " + dataset.prodotti.length + " righe prodotto.",
+          );
+        }
+
+        async function initIndex() {
+          try {
+            const res = await fetch(INDEX_URL);
+            if (!res.ok) throw new Error("Indice non trovato.");
+            const data = await res.json();
+            const items = data.prezziari || [];
+            selectEl.innerHTML = "";
+            items.forEach((item) => {
+              const opt = document.createElement("option");
+              opt.value = item.file;
+              opt.textContent = item.label || item.file;
+              opt.dataset.id = item.id || item.file;
+              selectEl.appendChild(opt);
+            });
+            if (items.length === 0) {
+              setStatus('Nessun prezziario in prezziari-index.json. Usa "Carica file" (.xml, .xlsx o .html).', true);
+            } else {
+              setStatus("Seleziona un prezziario o carica un file XML / Excel / HTML.", false);
+            }
+            selectEl.disabled = items.length === 0;
+            selectEl.addEventListener("change", onSelectChange);
+            if (items.length > 0) {
+              await loadPrezziarioFromUrl("./prezziari/" + selectEl.value, selectEl.options[selectEl.selectedIndex].text);
+            }
+          } catch (e) {
+            setStatus(
+              "Indice non caricato: apri la pagina tramite app Tauri o server locale, oppure usa «Carica file» (.xml / .xlsx / .html). (" +
+                (e && e.message ? e.message : e) +
+                ")",
+              true,
+            );
+            selectEl.disabled = true;
+          }
+        }
+
+        async function onSelectChange() {
+          const opt = selectEl.options[selectEl.selectedIndex];
+          if (!opt) return;
+          if (opt.value === CUSTOM_FILE_OPTION_VALUE) {
+            if (!uploadedDataset) {
+              setStatus("Nessun file caricato disponibile.", true);
+              return;
+            }
+            applyDatasetToState(uploadedDataset, buildUploadedStatusText(uploadedDataset));
+            return;
+          }
+          const url = "./prezziari/" + opt.value;
+          try {
+            await loadPrezziarioFromUrl(url, opt.textContent);
+          } catch (e) {
+            setStatus(e && e.message ? e.message : String(e), true);
+          }
+        }
+
+        fileEl.addEventListener("change", async function () {
+          const f = fileEl.files && fileEl.files[0];
+          if (!f) return;
+          const nome = (f.name || "").toLowerCase();
+          const sourcePath = normalizeUploadedPath(fileEl.value, f.name);
+          try {
+            if (nome.endsWith(".xlsx") || nome.endsWith(".xls")) {
+              if (typeof XLSX === "undefined") {
+                throw new Error(
+                  "Libreria Excel non disponibile. Verifica che esista src/vendor/xlsx.full.min.js",
+                );
+              }
+              const buf = await f.arrayBuffer();
+              await applyXlsxArrayBuffer(buf, f.name, sourcePath);
+              return;
+            }
+            if (nome.endsWith(".html") || nome.endsWith(".htm")) {
+              const text = await f.text();
+              await applyHtmlText(text, f.name, sourcePath);
+              return;
+            }
+            const text = await f.text();
+            await applyXmlText(text, f.name, true, sourcePath);
+          } catch (e) {
+            setStatus(e && e.message ? e.message : String(e), true);
+          }
+        });
+
+        function runSearch() {
+          const q = searchEl.value.trim().toLowerCase();
+          resultsEl.innerHTML = "";
+          activeHitPrdId = null;
+          detailEmpty.hidden = false;
+          detailContent.hidden = true;
+
+          if (!prodotti.length) {
+            resultsHint.textContent = "";
+            return;
+          }
+
+          if (!q) {
+            resultsHint.textContent = "Digita almeno 2 caratteri per cercare.";
+            return;
+          }
+
+          if (q.length < 2) {
+            resultsHint.textContent = "Almeno 2 caratteri.";
+            return;
+          }
+
+          const seen = new Set();
+          const hits = [];
+          for (let i = 0; i < prodotti.length && hits.length < MAX_RESULTS; i++) {
+            const p = prodotti[i];
+            if (!prodottoMatchQuery(p, q)) continue;
+            const mainId = findMainPrdId(p.prdId);
+            if (seen.has(mainId)) continue;
+            seen.add(mainId);
+            const row = byPrdId.get(mainId) || p;
+            hits.push(row);
+          }
+          const soloInizio = ricercaInizioTestoEl && ricercaInizioTestoEl.checked;
+          if (soloInizio) {
+            resultsHint.textContent =
+              hits.length >= MAX_RESULTS
+                ? "Prime " + MAX_RESULTS + " voci il cui testo inizia come richiesto."
+                : hits.length +
+                  " voc" +
+                  (hits.length === 1 ? "e" : "i") +
+                  " con inizio testo corrispondente (una riga per capitolato). Clicca per le sottovoci a destra.";
+          } else {
+            resultsHint.textContent =
+              hits.length >= MAX_RESULTS
+                ? "Prime " + MAX_RESULTS + " voci che contengono il testo. Affina la ricerca."
+                : hits.length +
+                  " voc" +
+                  (hits.length === 1 ? "e" : "i") +
+                  " che contengono la ricerca (una riga per capitolato). Clicca per le sottovoci a destra.";
+          }
+
+          hits.forEach((p) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "hit";
+            btn.dataset.prdId = p.prdId;
+            const code = document.createElement("div");
+            code.className = "hit-code";
+            code.textContent = p.prdId + (p.voce ? " · voce" : "");
+            const sn = document.createElement("div");
+            sn.className = "hit-snippet";
+            sn.textContent = anteprimaVocePerRicerca(p, q);
+            btn.appendChild(code);
+            btn.appendChild(sn);
+            btn.addEventListener("click", () => selectHit(p.prdId));
+            resultsEl.appendChild(btn);
+          });
+        }
+
+        searchEl.addEventListener("input", function () {
+          if (searchTimer) clearTimeout(searchTimer);
+          searchTimer = setTimeout(runSearch, 200);
+        });
+
+        btnClearSearch.addEventListener("click", function () {
+          searchEl.value = "";
+          runSearch();
+        });
+
+        ricercaInizioTestoEl.addEventListener("change", function () {
+          aggiornaHintModalitaRicerca();
+          runSearch();
+        });
+
+        aggiornaHintModalitaRicerca();
+
+        function selectHit(prdId) {
+          activeHitPrdId = prdId;
+          document.querySelectorAll(".hit").forEach((b) => {
+            b.classList.toggle("is-active", b.dataset.prdId === prdId);
+          });
+
+          const mainId = findMainPrdId(prdId);
+          const main = byPrdId.get(mainId);
+          if (!main) {
+            detailEmpty.textContent = "Voce non trovata.";
+            detailEmpty.hidden = false;
+            detailContent.hidden = true;
+            return;
+          }
+
+          detailEmpty.hidden = true;
+          detailContent.hidden = false;
+          const um =
+            main.unitaDiMisuraId && unitaMap.get(main.unitaDiMisuraId)
+              ? " · U.M. " + unitaMap.get(main.unitaDiMisuraId)
+              : "";
+          detailCode.textContent = main.prdId + um + (main.prezzo ? " · € " + main.prezzo : "");
+          detailMain.textContent = (main.estesa || main.breve).trim();
+
+          const subs = getDirectSubVoci(mainId)
+            .filter((s) => s.prdId !== mainId)
+            .sort(function (a, b) {
+              return a.prdId.localeCompare(b.prdId, "it");
+            });
+          const subsFinal = subs.length ? subs : extractSubVociFromMainText(main);
+          subsList.innerHTML = "";
+          if (subsFinal.length) {
+            subsBlock.hidden = false;
+            subsFinal.forEach((s) => {
+              const li = document.createElement("li");
+              const cb = document.createElement("input");
+              cb.type = "checkbox";
+              cb.dataset.prdId = s.prdId;
+              cb.dataset.text = (s.breve || s.estesa || "").trim();
+              cb.checked = s.prdId === prdId;
+              cb.addEventListener("change", function () {
+                buildRiepilogoFromDetail();
+              });
+              const span = document.createElement("span");
+              const sum =
+                s.unitaDiMisuraId && unitaMap.get(s.unitaDiMisuraId)
+                  ? " [" + unitaMap.get(s.unitaDiMisuraId) + "]"
+                  : "";
+              span.textContent = s.prdId + sum + " — " + (s.breve || s.estesa).trim();
+              li.appendChild(cb);
+              li.appendChild(span);
+              subsList.appendChild(li);
+            });
+          } else {
+            subsBlock.hidden = true;
+          }
+
+          buildRiepilogoFromDetail();
+        }
+
+        /** Interpreta stringa prezzo (XML con punto decimale, Excel/IT con virgola). */
+        function parsePrezzoListino(raw) {
+          const s = String(raw ?? "").trim().replace(/\s/g, "");
+          if (!s) return NaN;
+          if (s.includes(",")) {
+            const norm = s.replace(/\./g, "").replace(",", ".");
+            return parseFloat(norm);
+          }
+          return parseFloat(s);
+        }
+
+        /** True se il valore prezzo è diverso da zero (nasconde 0 tipici della voce “capo” nel listino XML). */
+        function prezzoListinoSignificativo(raw) {
+          const s = String(raw ?? "").trim();
+          if (!s) return false;
+          const n = parsePrezzoListino(raw);
+          if (Number.isNaN(n)) return true;
+          return Math.abs(n) > 1e-9;
+        }
+
+        /** Riga testuale con prezzo unitario e U.M. dal prezziario (XML o Excel). */
+        function rigaPrezzoUnitarioRiepilogo(p) {
+          if (!p || !prezzoListinoSignificativo(p.prezzo)) return "";
+          const um =
+            p.unitaDiMisuraId && unitaMap.get(p.unitaDiMisuraId)
+              ? " / " + unitaMap.get(p.unitaDiMisuraId)
+              : "";
+          return "Prezzo unitario (prezziario): " + String(p.prezzo).trim() + " €" + um;
+        }
+
+        function buildRiepilogoFromDetail() {
+          if (!activeHitPrdId) return;
+          const mainId = findMainPrdId(activeHitPrdId);
+          const main = byPrdId.get(mainId);
+          if (!main) return;
+          const lines = [];
+          const mainText = (main.estesa || main.breve).trim();
+          lines.push(mainText);
+          const mainPrezzo = rigaPrezzoUnitarioRiepilogo(main);
+          if (mainPrezzo) lines.push(mainPrezzo);
+
+          subsList.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+            if (!cb.checked) return;
+            const p = byPrdId.get(cb.dataset.prdId);
+            if (!p && !cb.dataset.text) return;
+            const riga = p ? (p.breve || p.estesa).trim() : cb.dataset.text;
+            lines.push("- " + riga);
+            if (!p) return;
+            const subPrezzo = rigaPrezzoUnitarioRiepilogo(p);
+            if (subPrezzo) lines.push("  " + subPrezzo);
+          });
+
+          riepilogoEl.value = lines.join("\n\n");
+        }
+
+        btnApply.addEventListener("click", function () {
+          buildRiepilogoFromDetail();
+        });
+
+        btnCopy.addEventListener("click", async function () {
+          const t = riepilogoEl.value.trim();
+          if (!t) {
+            setStatus("Niente da copiare.", true);
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(riepilogoEl.value);
+            setStatus("Copiato negli appunti.", false);
+          } catch {
+            riepilogoEl.select();
+            document.execCommand("copy");
+            setStatus("Copiato (metodo alternativo).", false);
+          }
+        });
+
+        btnClearRiepilogo.addEventListener("click", function () {
+          riepilogoEl.value = "";
+        });
+
+        (function setupNavDaNuovaVoce() {
+          const params = new URLSearchParams(window.location.search);
+          const fromNuovaVoce = params.get("from") === "nuova-voce";
+          const btnTornaVoci = document.getElementById("btn-torna-voci");
+          const btnTornaNuovaVoce = document.getElementById("btn-torna-nuova-voce");
+          if (fromNuovaVoce) {
+            if (btnTornaVoci) btnTornaVoci.hidden = true;
+            if (btnTornaNuovaVoce) btnTornaNuovaVoce.hidden = false;
+          }
+          btnTornaNuovaVoce?.addEventListener("click", function () {
+            window.location.href = "index.html?openVoceDialog=1";
+          });
+        })();
+
+        initIndex();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "prezziari": [
+    {
+      "id": "mi320",
+      "label": "Prezzario MI320 (esempio)",
+      "file": "Prezzario_MI320.xml"
+    }
+  ]
+}

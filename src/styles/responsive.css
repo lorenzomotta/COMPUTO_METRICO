@@ -1,0 +1,31 @@
+@media (max-width: 920px) {
+  .piano-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mur-form {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .aperture-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .app {
+    padding: 16px;
+  }
+
+  .piano-form {
+    grid-template-columns: 1fr;
+  }
+
+  .mur-form {
+    grid-template-columns: 1fr;
+  }
+
+  .aperture-form {
+    grid-template-columns: 1fr;
+  }
+}

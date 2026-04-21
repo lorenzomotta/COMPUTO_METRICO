@@ -1,0 +1,882 @@
+:root {
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 400;
+  color: #10233f;
+  background: linear-gradient(145deg, #eef3fb 0%, #f8fbff 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.app {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 20px 18px 26px;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 240px;
+  gap: 16px;
+  align-items: start;
+  width: 100%;
+}
+
+.app-content {
+  display: grid;
+  gap: 16px;
+  /* Consente alla colonna centrale di restringersi sotto la min-width delle tabelle:
+     altrimenti il contenuto spinge la griglia e si sovrappone alla sidebar destra. */
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  justify-items: stretch;
+}
+
+.view {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  justify-items: stretch;
+}
+
+.sub-block {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.sub-block > .table-wrap {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.view[hidden] {
+  display: none;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  letter-spacing: 0.01em;
+}
+
+.app-header p {
+  margin: 4px 0 0;
+  color: #4b5f7c;
+}
+
+.sidebar {
+  position: sticky;
+  top: 20px;
+}
+
+.sidebar-right {
+  z-index: 1;
+}
+
+.sidebar-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #dbe5f2;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(26, 44, 71, 0.08);
+}
+
+.sidebar-title {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  color: #1a3558;
+}
+
+.sidebar-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #000;
+}
+
+.sidebar-actions {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #dbe5f2;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 8px 24px rgba(26, 44, 71, 0.08);
+}
+
+.piano-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.mur-form {
+  grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;
+  margin-bottom: 12px;
+}
+
+.aperture-form {
+  grid-template-columns: repeat(8, minmax(64px, 1fr)) auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.aperture-form .field {
+  min-width: 0;
+}
+
+.aperture-form input,
+.aperture-form select {
+  min-height: 34px;
+  padding: 7px 8px;
+  font-size: 0.86rem;
+}
+
+.aperture-form button[type="submit"] {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.scavo-form,
+.corsello-form,
+.camminamenti-form {
+  grid-template-columns: repeat(9, minmax(100px, 1fr)) auto;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.scavo-form .field,
+.corsello-form .field,
+.camminamenti-form .field {
+  min-width: 0;
+}
+
+.scavo-form input,
+.scavo-form button[type="submit"],
+.corsello-form input,
+.corsello-form button[type="submit"],
+.camminamenti-form input,
+.camminamenti-form button[type="submit"] {
+  min-height: 34px;
+  padding: 7px 8px;
+  font-size: 0.84rem;
+}
+
+.voce-form {
+  grid-template-columns: 180px 220px;
+  gap: 10px;
+  align-items: start;
+  margin-top: 6px;
+}
+
+.voce-form-riga-uno {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: flex-end;
+}
+
+.voce-form-riga-uno .voce-field-compatta {
+  min-width: 0;
+  gap: 4px;
+}
+
+.voce-form-riga-uno .voce-field-compatta label {
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.voce-form-riga-uno #voce-id {
+  width: 3.1rem;
+  max-width: 100%;
+  padding: 5px 6px;
+  min-height: 30px;
+  font-size: 0.84rem;
+}
+
+.voce-form-riga-uno #voce-posizione {
+  width: 3.35rem;
+  max-width: 100%;
+  padding: 5px 6px;
+  min-height: 30px;
+  font-size: 0.84rem;
+}
+
+.voce-form-riga-uno #voce-prezzo {
+  width: 6.4rem;
+  max-width: 100%;
+  padding: 5px 6px;
+  min-height: 30px;
+  font-size: 0.84rem;
+}
+
+.voce-form-riga-uno .voce-field-tipo-misura {
+  flex: 1 1 130px;
+  max-width: 200px;
+}
+
+.voce-form-riga-uno #voce-tipo-misura {
+  width: 100%;
+  padding: 5px 8px;
+  min-height: 30px;
+  font-size: 0.8rem;
+}
+
+.voce-form-riga-uno .voce-form-cerca-wrap {
+  margin-left: auto;
+  align-self: flex-end;
+  flex: 0 0 auto;
+}
+
+.voce-form-riga-uno .voce-btn-cerca {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 0.76rem;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.voce-form .voce-field-full {
+  grid-column: 1 / -1;
+}
+
+.voce-um-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 150px) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.voce-um-row .btn-action {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.voce-form textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid #c8d6ea;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 0.92rem;
+}
+
+.collapsible-block {
+  border: 1px solid #dbe5f2;
+  border-radius: 10px;
+  padding: 8px 10px 10px;
+  background: #fbfdff;
+}
+
+.collapsible-summary {
+  cursor: pointer;
+  list-style: none;
+  margin-bottom: 8px;
+  justify-content: flex-start;
+}
+
+.collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-summary::before {
+  content: "▾";
+  margin-right: 8px;
+  color: #1a3558;
+}
+
+.collapsible-block:not([open]) .collapsible-summary {
+  margin-bottom: 0;
+}
+
+.collapsible-block:not([open]) .collapsible-summary::before {
+  content: "▸";
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #405776;
+}
+
+input,
+select,
+button {
+  border: 1px solid #c8d6ea;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 0.92rem;
+  min-height: 38px;
+  background: #fff;
+  color: inherit;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  padding: 0;
+  margin: 0;
+  justify-self: start;
+}
+
+.checkbox-wrap {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+}
+
+.field-sottrai label {
+  text-align: center;
+}
+
+.field-sottrai .checkbox-wrap {
+  justify-content: center;
+}
+
+.formula-input-row {
+  display: grid;
+  grid-template-columns: auto;
+  gap: 6px;
+  align-items: center;
+  justify-content: start;
+}
+
+.formula-input-row .btn-action {
+  min-height: 28px;
+  font-size: 0.72rem;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.formula-state-button.state-inserisci {
+  background: linear-gradient(135deg, #b83737 0%, #d14f4f 100%);
+}
+
+.formula-state-button.state-modifica {
+  background: linear-gradient(135deg, #1f8d63 0%, #2eaf7d 100%);
+}
+
+.formula-dialog {
+  border: 1px solid #dbe5f2;
+  border-radius: 12px;
+  padding: 14px;
+  width: min(640px, 92vw);
+}
+
+#voce-dialog.formula-dialog {
+  width: min(980px, 96vw);
+  max-height: min(92vh, 900px);
+  overflow-y: auto;
+}
+
+.voce-misurazioni-manuali-wrap {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #dbe5f2;
+}
+
+.voce-misurazioni-manuali-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.voce-misurazioni-manuali-title {
+  margin: 0;
+  font-size: 1rem;
+  color: #1a3558;
+}
+
+.voce-misurazioni-manuali-idvoce {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #405776;
+}
+
+.voce-misurazioni-manuali-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px 10px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.voce-mm-field-compact label {
+  font-size: 0.75rem;
+}
+
+.voce-mm-field-compact input,
+.voce-mm-field-compact select {
+  padding: 6px 8px;
+  min-height: 32px;
+  font-size: 0.86rem;
+}
+
+.voce-mm-editor-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.voce-mm-table-wrap {
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid #dbe5f2;
+  border-radius: 10px;
+}
+
+.table-voce-mm {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.table-voce-mm th,
+.table-voce-mm td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e8eef6;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table-voce-mm th {
+  background: #eef3fa;
+  color: #1a3558;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.table-voce-mm .actions-cell {
+  white-space: nowrap;
+}
+
+/* Misurazioni manuali inline nella vista VOCI (tabella compatta + popup riga) */
+.voci-row-mm-nested td {
+  padding: 0 8px 8px;
+  background: linear-gradient(180deg, #f6f9fd 0%, #fff 28px);
+  border-bottom: 1px solid #e2eaf4;
+}
+
+.voci-mm-nested-wrap {
+  padding: 4px 0 2px;
+}
+
+.voci-mm-table-wrap {
+  max-height: 200px;
+  overflow: auto;
+  border: 1px solid #dbe5f2;
+  border-radius: 8px;
+}
+
+.table-voce-mm-inline {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.table-voce-mm-inline th,
+.table-voce-mm-inline td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #e8eef6;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table-voce-mm-inline th {
+  background: #eef3fa;
+  color: #1a3558;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* ID/N/SEGNO stretti al minimo; FORMULA usa lo spazio liberato */
+.table-voce-mm-inline th:nth-child(1),
+.table-voce-mm-inline td:nth-child(1),
+.table-voce-mm-inline th:nth-child(2),
+.table-voce-mm-inline td:nth-child(2),
+.table-voce-mm-inline th:nth-child(6),
+.table-voce-mm-inline td:nth-child(6),
+.table-voce-mm-inline th:nth-child(7),
+.table-voce-mm-inline td:nth-child(7) {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+.table-voce-mm-inline th:nth-child(5),
+.table-voce-mm-inline td:nth-child(5) {
+  width: 100%;
+  min-width: 15rem;
+}
+
+.table-voce-mm-inline .actions-cell {
+  width: auto;
+  min-width: 4.5rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex-wrap: nowrap;
+}
+
+.table-voce-mm-inline .btn-mm-dup {
+  font-size: 0.82rem;
+  padding: 2px 5px;
+  min-height: 24px;
+  min-width: 26px;
+  background: linear-gradient(180deg, #f0f7ff 0%, #e4eef9 100%);
+  border: 1px solid #7aa3d6;
+  color: #1a3558;
+}
+
+.table-voce-mm-inline .btn-mm-dup:hover {
+  filter: brightness(1.04);
+}
+
+.table-voce-mm-inline .btn-mm-del {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  min-height: 24px;
+}
+
+tr.voce-mm-data-row {
+  cursor: pointer;
+}
+
+tr.voce-mm-data-row:hover {
+  background: #f0f5fb;
+}
+
+.table-voce-mm-inline tr.voce-mm-subtotal-row td {
+  border-bottom: 1px solid #d8e4f2;
+}
+
+.table-voce-mm-inline .voce-mm-subtotal-label {
+  text-align: right;
+  font-weight: 600;
+  color: #1a3558;
+  background: #f4f8fe;
+}
+
+.table-voce-mm-inline .voce-mm-subtotal-value {
+  text-align: right;
+  font-weight: 700;
+  color: #10365f;
+  background: #f4f8fe;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-voce-mm-inline .voce-mm-subtotal-actions {
+  background: #f4f8fe;
+}
+
+.table-voce-mm-inline tr.voce-mm-subtotal-piano .voce-mm-subtotal-label,
+.table-voce-mm-inline tr.voce-mm-subtotal-piano .voce-mm-subtotal-value,
+.table-voce-mm-inline tr.voce-mm-subtotal-piano .voce-mm-subtotal-actions {
+  background: #e8f1fc;
+}
+
+.voci-mm-totale {
+  margin: 6px 0 0;
+  text-align: right;
+  font-size: 0.82rem;
+  color: #1a3558;
+}
+
+.voci-mm-totale strong {
+  font-variant-numeric: tabular-nums;
+}
+
+#vista-voci.voce-focus-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: #f5f8fc;
+  overflow: hidden;
+  padding: 10px 12px 12px;
+}
+
+#vista-voci.voce-focus-mode .card {
+  height: calc(100vh - 22px);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#vista-voci.voce-focus-mode .table-wrap {
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+#vista-voci.voce-focus-mode #voce-focus-close-floating {
+  position: fixed;
+  top: 12px;
+  right: 14px;
+  z-index: 1210;
+}
+
+#vista-voci.voce-focus-mode .voci-mm-nested-wrap {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#vista-voci.voce-focus-mode .voci-mm-table-wrap {
+  flex: 1 1 auto;
+  max-height: calc(100vh - 215px);
+  overflow: auto;
+}
+
+#vista-voci.voce-focus-mode .voci-mm-totale {
+  margin-top: 8px;
+}
+
+.voce-mm-riga-dialog {
+  width: min(780px, 97vw);
+  box-sizing: border-box;
+}
+
+/* Solo flex: NON usare .piano-form qui (la sua griglia globale rompe le due righe interne). */
+.voce-mm-riga-dialog .voce-mm-riga-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.voce-mm-riga-r1 {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr auto;
+  gap: 8px 14px;
+  align-items: end;
+  width: 100%;
+}
+
+.voce-mm-riga-idvoce-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: flex-end;
+  padding-bottom: 2px;
+  min-width: 4.5rem;
+}
+
+.voce-mm-riga-idvoce-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #405776;
+  text-transform: uppercase;
+}
+
+.voce-mm-riga-idvoce-value {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: #1a3558;
+}
+
+.voce-mm-riga-r1 .voce-mm-riga-segno-field {
+  min-width: 7.5rem;
+}
+
+.voce-mm-riga-r1 .field {
+  min-width: 0;
+}
+
+.voce-mm-riga-r2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(6.75rem, 9rem);
+  gap: 8px 14px;
+  align-items: end;
+  width: 100%;
+}
+
+.voce-mm-riga-formula-field {
+  min-width: 0;
+}
+
+.voce-mm-riga-formula-field input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+  font-size: 0.9rem;
+}
+
+.voce-mm-riga-actions {
+  margin-top: 14px;
+  padding-top: 4px;
+}
+
+.voce-misurazioni-manuali-totale {
+  margin: 10px 0 0;
+  text-align: right;
+  font-size: 0.95rem;
+  color: #1a3558;
+}
+
+.voce-misurazioni-manuali-totale strong {
+  font-variant-numeric: tabular-nums;
+}
+
+#voce-dialog .voce-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+#voce-dialog .formula-dialog-actions {
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.formula-dialog::backdrop {
+  background: rgba(16, 35, 63, 0.45);
+}
+
+.formula-dialog h3 {
+  margin: 0 0 8px;
+  color: #1a3558;
+}
+
+.formula-dialog p {
+  margin: 0 0 10px;
+  color: #000;
+  font-size: 0.9rem;
+}
+
+.formula-dialog textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid #c8d6ea;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 0.92rem;
+}
+
+.formula-dialog-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+input:focus,
+select:focus,
+button:focus {
+  outline: 2px solid #83a9ff;
+  outline-offset: 1px;
+}
+
+button {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button {
+  background: linear-gradient(135deg, #2f66d0 0%, #4f85ee 100%);
+  color: #fff;
+  border: none;
+  padding-inline: 16px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+thead th {
+  text-align: left;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  color: #5d708d;
+  background: #f3f7fd;
+  padding: 8px 10px;
+  border-bottom: 1px solid #dbe5f2;
+}
+
+tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #ebf1f9;
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+tbody tr:hover td {
+  background: #f8fbff;
+}
+
+td.voci-cell-open-focus {
+  cursor: pointer;
+}

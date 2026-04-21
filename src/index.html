@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Computo Metrico - Piani</title>
+    <script type="module" src="/js/main.js" defer></script>
+  </head>
+
+  <body>
+    <main class="app">
+      <div class="app-layout">
+        <aside class="sidebar sidebar-left" aria-label="Sidebar sinistra">
+          <div class="sidebar-card">
+            <h2 class="sidebar-title">Sidebar Sinistra</h2>
+            <div class="sidebar-actions">
+              <button id="btn-gestione-piani" type="button" class="btn-action btn-back">GESTIONE PIANI</button>
+            </div>
+            <button id="btn-sidebar-esterni-vari" type="button" class="btn-action btn-secondary">
+              ESTERNI VARI
+            </button>
+            <p class="sidebar-text">Area pronta per menu e strumenti.</p>
+          </div>
+        </aside>
+
+        <div class="app-content">
+          <section id="vista-piani" class="view">
+            <header class="app-header">
+              <h1>Computo Metrico Estimativo</h1>
+              <p>Gestione tipologia piani dell'edificio</p>
+            </header>
+
+            <section class="card">
+              <form id="piano-form" class="piano-form">
+                <div class="field">
+                  <label for="tipologia">Tipologia</label>
+                  <select id="tipologia" required>
+                    <option value="" disabled selected>Seleziona tipologia</option>
+                    <option value="Interrato">Interrato</option>
+                    <option value="Terra">Terra</option>
+                    <option value="Altro">Altro</option>
+                    <option value="Tetto">Tetto</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label for="edificio">Edificio</label>
+                  <input id="edificio" type="text" placeholder="Es: Blocco A" required />
+                </div>
+
+                <div class="field">
+                  <label for="piano">Piano</label>
+                  <input id="piano" type="text" placeholder="Es: Piano 1" required />
+                </div>
+
+                <button type="submit">Aggiungi Piano</button>
+              </form>
+            </section>
+
+            <section class="card">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>IDPIANO</th>
+                      <th>TIPOLOGIA</th>
+                      <th>EDIFICIO</th>
+                      <th>PIANO</th>
+                      <th>AZIONI</th>
+                    </tr>
+                  </thead>
+                  <tbody id="piani-body"></tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+
+          <section id="vista-compilazione" class="view" hidden>
+        <section id="compilazione-interrato" class="card compilazione-panel">
+          <div class="compilazione-topbar">
+            <button id="btn-torna-piani" type="button" class="btn-action btn-back">← Torna ai Piani</button>
+          </div>
+
+          <header class="section-header section-header-inline">
+            <h2 id="compilazione-interrato-titolo">PIANO INTERRATO</h2>
+            <p id="compilazione-interrato-sottotitolo">
+              Seleziona <strong>Compila</strong> su un piano Interrato nella tabella sopra.
+            </p>
+          </header>
+
+          <div class="sub-block">
+            <div class="sub-block-header-inline">
+              <h3 class="sub-block-title">
+                MURI ELEVAZIONE <span id="count-murielevazioni" class="sub-block-count">(0)</span>
+              </h3>
+              <button id="btn-nuova-elevazione" type="button" class="btn-action btn-secondary">
+                AGGIUNGI ELEVAZIONE
+              </button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IDELEVAZIONE</th>
+                    <th>RIFERIMENTO</th>
+                    <th>SPESSORE</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="murielevazione-ele-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <hr class="section-divider" />
+
+          <div class="sub-block">
+            <div class="sub-block-header-inline">
+              <h3 class="sub-block-title">
+                STRATIMURIELEVAZIONE <span id="count-strati" class="sub-block-count">(0)</span>
+              </h3>
+              <p class="sub-block-desc">
+                Strati collegati all'elevazione attiva:
+                <strong>
+                  IDELEVAZIONE <span id="id-elevazione-attiva" class="id-elevazione-attiva-inline">—</span> -
+                  RIFERIMENTO
+                  <span id="riferimento-elevazione-attiva" class="riferimento-elevazione-attiva-inline">—</span>
+                </strong>
+              </p>
+            </div>
+
+            <form id="strati-mur-form" class="piano-form mur-form">
+              <div class="field">
+                <label for="idstrato">IDSTRATO</label>
+                <input id="idstrato" type="text" placeholder="Automatico" readonly />
+              </div>
+
+              <div class="field">
+                <label for="lunghezza">Lunghezza</label>
+                <input id="lunghezza" type="number" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+
+              <div class="field">
+                <label for="altezza">Altezza</label>
+                <input id="altezza" type="number" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+
+              <div class="field">
+                <label for="spessore">Spessore</label>
+                <input id="spessore" type="number" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+
+              <div class="field">
+                <label for="idvocecapitolato">IDVOCECAPITOLATO</label>
+                <input id="idvocecapitolato" type="text" placeholder="Opzionale" />
+              </div>
+
+              <button type="submit">Aggiungi strato</button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IDSTRATMUR</th>
+                    <th>IDELEVAZIONE</th>
+                    <th>IDSTRATO</th>
+                    <th>LUNGHEZZA</th>
+                    <th>ALTEZZA</th>
+                    <th>SPESSORE</th>
+                    <th>IDVOCECAPITOLATO</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="strati-mur-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <hr class="section-divider" />
+
+          <div class="sub-block">
+            <div class="sub-block-header-inline">
+              <h3 class="sub-block-title">
+                APERTUREELEVAZIONE <span id="count-aperture" class="sub-block-count">(0)</span>
+              </h3>
+              <p class="sub-block-desc">
+                Aperture collegate all'elevazione attiva:
+                <strong>
+                  IDELEVAZIONE <span class="id-elevazione-attiva-inline">—</span> - RIFERIMENTO
+                  <span class="riferimento-elevazione-attiva-inline">—</span>
+                </strong>
+              </p>
+            </div>
+
+            <form id="aperture-elev-form" class="piano-form aperture-form">
+              <div class="field">
+                <label for="ap-locale">LOCALE</label>
+                <input id="ap-locale" type="text" placeholder="Es: Cucina" required />
+              </div>
+
+              <div class="field">
+                <label for="ap-lunghezza">LUNGHEZZA</label>
+                <input id="ap-lunghezza" type="number" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+
+              <div class="field">
+                <label for="ap-altezza">ALTEZZA</label>
+                <input id="ap-altezza" type="number" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+
+              <div class="field">
+                <label for="ap-ante">ANTE</label>
+                <input id="ap-ante" type="number" step="1" min="0" placeholder="0" required />
+              </div>
+
+              <div class="field">
+                <label for="ap-tipologia">TIPOLOGIA</label>
+                <select id="ap-tipologia" required>
+                  <option value="" disabled selected>Seleziona</option>
+                  <option value="FINESTRA">FINESTRA</option>
+                  <option value="BOCCA DI LUPO">BOCCA DI LUPO</option>
+                  <option value="CARRAIA">CARRAIA</option>
+                  <option value="PORTA">PORTA</option>
+                  <option value="TAGLIAFUOCO">TAGLIAFUOCO</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="ap-falsotelai">FALSOTELAIO</label>
+                <select id="ap-falsotelai" required>
+                  <option value="no">No</option>
+                  <option value="si">Si</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="ap-h-davanzale">H DAVANZALE</label>
+                <input id="ap-h-davanzale" type="number" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+
+              <div class="field">
+                <label for="ap-idvocecapitolato">IDVOCECAPITOLATO</label>
+                <input id="ap-idvocecapitolato" type="text" placeholder="Opzionale" />
+              </div>
+
+              <button type="submit">Aggiungi apertura</button>
+            </form>
+
+            <div class="table-wrap table-wrap-aperture">
+              <table class="table-aperture">
+                <colgroup>
+                  <col class="table-aperture-col" style="width: 7%" />
+                  <col class="table-aperture-col" style="width: 7%" />
+                  <col class="table-aperture-col" style="width: 13%" />
+                  <col class="table-aperture-col" style="width: 7%" />
+                  <col class="table-aperture-col" style="width: 7%" />
+                  <col class="table-aperture-col" style="width: 5%" />
+                  <col class="table-aperture-col" style="width: 11%" />
+                  <col class="table-aperture-col" style="width: 6%" />
+                  <col class="table-aperture-col" style="width: 7%" />
+                  <col class="table-aperture-col" style="width: 22%" />
+                  <col class="table-aperture-col table-aperture-col-actions" style="width: 8%" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th title="IDAPERTURAELEV">ID APERT.</th>
+                    <th title="IDELEVAZIONE">ID ELEV.</th>
+                    <th>LOCALE</th>
+                    <th title="Lunghezza">LUNG.</th>
+                    <th title="Altezza">ALT.</th>
+                    <th>ANTE</th>
+                    <th>TIPOLOGIA</th>
+                    <th title="Falsotelai">FALSO<br />TEL.</th>
+                    <th title="Altezza davanzale" class="th-aperture-hdav">H DAVANZ.</th>
+                    <th title="IDVOCECAPITOLATO">ID VOCE<br />CAP.</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="aperture-elev-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <hr class="section-divider" />
+
+          <div class="sub-block">
+            <div class="sub-block-header-inline">
+              <h3 class="sub-block-title">Calcolo strati netti</h3>
+              <p class="sub-block-desc">
+                Calcolo collegato all'elevazione attiva:
+                <strong>
+                  IDELEVAZIONE <span class="id-elevazione-attiva-inline">—</span> - RIFERIMENTO
+                  <span class="riferimento-elevazione-attiva-inline">—</span>
+                </strong>
+              </p>
+            </div>
+            <p class="sub-block-desc">
+              Per ogni strato <strong>LORDO</strong> e <strong>NETTO strato</strong> compaiono una sola volta; ogni
+              apertura ha una riga con LOCALE, misure e m² di pertinenza. Altezza inclusa =
+              min(Altezza apertura, max(0, Altezza strato − H DAVANZALE)). <strong>m² apertura</strong> = L × H inclusa.
+              <strong>NETTO strato</strong> = LORDO − somma m² aperture.
+            </p>
+            <div class="table-wrap">
+              <table class="table-strati-netti">
+                <thead>
+                  <tr>
+                    <th>IDSTRATO</th>
+                    <th>LORDO</th>
+                    <th>LOCALE</th>
+                    <th>TIPO</th>
+                    <th>L apertura</th>
+                    <th>H inclusa</th>
+                    <th>m² apertura</th>
+                    <th>SPESSORE strato</th>
+                    <th>MQ STRATO</th>
+                    <th>MC STRATO</th>
+                  </tr>
+                </thead>
+                <tbody id="strati-netti-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="compilazione-esterni-vari" class="card compilazione-panel" hidden>
+          <div class="compilazione-topbar">
+            <button id="btn-torna-piani-esterni" type="button" class="btn-action btn-back">
+              ← Torna ai Piani
+            </button>
+          </div>
+
+          <header class="section-header section-header-inline">
+            <h2>ESTERNI VARI</h2>
+            <p id="compilazione-esterni-sottotitolo">
+              Seleziona <strong>Compila</strong> su un piano di tipo <strong>Altro</strong>.
+            </p>
+          </header>
+
+          <details class="sub-block collapsible-block" open>
+            <summary class="sub-block-header-inline collapsible-summary">
+              <h3 class="sub-block-title">
+                MISURAZIONI VARIE <span id="count-misurazioni" class="sub-block-count">(0)</span>
+              </h3>
+            </summary>
+
+            <form id="misurazioni-form" class="piano-form misurazioni-form">
+              <div class="field">
+                <label for="idmisurazione">IDMISURAZIONE</label>
+                <input id="idmisurazione" type="text" readonly placeholder="Automatico" />
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-idvoce">IDVOCE</label>
+                <input id="misurazioni-idvoce" type="text" placeholder="Opzionale" />
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-piano">PIANO</label>
+                <input id="misurazioni-piano" type="text" placeholder="Es: ESTERNO NORD" required />
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-riferimento">RIFERIMENTO</label>
+                <input id="misurazioni-riferimento" type="text" placeholder="Es: Dettaglio misura" required />
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-formula">FORMULA</label>
+                <div class="formula-input-row">
+                  <input id="misurazioni-formula" type="text" readonly hidden />
+                  <button id="btn-apri-formula-misurazioni" type="button" class="btn-action formula-state-button">
+                    INSERISCI
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-numero">NUMERO</label>
+                <input
+                  id="misurazioni-numero"
+                  type="number"
+                  step="1"
+                  min="0"
+                  placeholder="0"
+                  required
+                />
+              </div>
+
+              <div class="field field-sottrai">
+                <label for="misurazioni-segno">SEGNO (negativo)</label>
+                <div class="checkbox-wrap">
+                  <input id="misurazioni-segno" type="checkbox" />
+                </div>
+              </div>
+
+              <button type="submit">Aggiungi misurazione</button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IDMISURAZIONE</th>
+                    <th>IDVOCE</th>
+                    <th>PIANO</th>
+                    <th>RIFERIMENTO</th>
+                    <th>FORMULA</th>
+                    <th>NUMERO</th>
+                    <th>SEGNO</th>
+                    <th>RISULTATO</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="misurazioni-body"></tbody>
+              </table>
+            </div>
+          </details>
+
+          <hr class="section-divider" />
+
+          <details class="sub-block collapsible-block" open>
+            <summary class="sub-block-header-inline collapsible-summary">
+              <h3 class="sub-block-title">
+                SCAVO
+                <span id="count-scavi" class="sub-block-count">(0)</span>
+                <span id="sum-area-scavi" class="sub-block-count">Mq. 0.00</span>
+                <span id="sum-volume-scavi" class="sub-block-count">Mc. 0.00</span>
+              </h3>
+            </summary>
+
+            <form id="scavo-form" class="piano-form scavo-form">
+              <div class="field">
+                <label for="idplscavo">IDPLSCAVO</label>
+                <input id="idplscavo" type="text" readonly placeholder="Automatico" />
+              </div>
+
+              <div class="field">
+                <label for="scavo-piano">PIANO</label>
+                <input id="scavo-piano" type="text" placeholder="Es: ESTERNO NORD" required />
+              </div>
+
+              <div class="field">
+                <label for="scavo-riferimento">RIFERIMENTO</label>
+                <input id="scavo-riferimento" type="text" placeholder="Es: Area cortile" required />
+              </div>
+
+              <div class="field field-sottrai">
+                <label for="scavo-sottrai">SOTTRAI</label>
+                <div class="checkbox-wrap">
+                  <input id="scavo-sottrai" type="checkbox" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="scavo-misura1">MISURA1</label>
+                <input id="scavo-misura1" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="scavo-misura2">MISURA2</label>
+                <input id="scavo-misura2" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="scavo-formula">FORMULA</label>
+                <div class="formula-input-row">
+                  <input
+                    id="scavo-formula"
+                    type="text"
+                    placeholder="Clicca su Modifica formula"
+                    readonly
+                    hidden
+                  />
+                  <button id="btn-apri-formula-scavo" type="button" class="btn-action formula-state-button">
+                    INSERISCI
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="scavo-altezza">ALTEZZA</label>
+                <input id="scavo-altezza" type="number" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+
+              <div class="field">
+                <label for="scavo-idvoce">IDVOCE</label>
+                <input id="scavo-idvoce" type="text" placeholder="Opzionale" />
+              </div>
+
+              <button type="submit">Aggiungi scavo</button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IDPLSCAVO</th>
+                    <th>PIANO</th>
+                    <th>RIFERIMENTO</th>
+                    <th>MISURA1</th>
+                    <th>MISURA2</th>
+                    <th>FORMULA</th>
+                    <th>AREA</th>
+                    <th>ALTEZZA</th>
+                    <th>VOLUME</th>
+                    <th>IDVOCE</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="scavo-body"></tbody>
+              </table>
+            </div>
+          </details>
+
+          <hr class="section-divider" />
+
+          <details class="sub-block collapsible-block" open>
+            <summary class="sub-block-header-inline collapsible-summary">
+              <h3 class="sub-block-title">
+                CORSELLO <span id="count-corselli" class="sub-block-count">(0)</span>
+                <span id="sum-area-corselli" class="sub-block-count">Mq. 0.00</span>
+                <span id="sum-volume-corselli" class="sub-block-count">Mc. 0.00</span>
+              </h3>
+            </summary>
+
+            <form id="corsello-form" class="piano-form corsello-form">
+              <div class="field">
+                <label for="idplcors">IDPLCORS</label>
+                <input id="idplcors" type="text" readonly placeholder="Automatico" />
+              </div>
+
+              <div class="field">
+                <label for="corsello-piano">PIANO</label>
+                <input id="corsello-piano" type="text" placeholder="Es: ESTERNO SUD" required />
+              </div>
+
+              <div class="field">
+                <label for="corsello-riferimento">RIFERIMENTO</label>
+                <input id="corsello-riferimento" type="text" placeholder="Es: Corsello principale" required />
+              </div>
+
+              <div class="field field-sottrai">
+                <label for="corsello-sottrai">SOTTRAI</label>
+                <div class="checkbox-wrap">
+                  <input id="corsello-sottrai" type="checkbox" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="corsello-misura1">MISURA1</label>
+                <input id="corsello-misura1" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="corsello-misura2">MISURA2</label>
+                <input id="corsello-misura2" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="corsello-formula">FORMULA</label>
+                <div class="formula-input-row">
+                  <input id="corsello-formula" type="text" readonly hidden />
+                  <button id="btn-apri-formula-corsello" type="button" class="btn-action formula-state-button">
+                    INSERISCI
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="corsello-altezza">SPESSORE</label>
+                <input id="corsello-altezza" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="corsello-idvoce">IDVOCE</label>
+                <input id="corsello-idvoce" type="text" placeholder="Opzionale" />
+              </div>
+
+              <button type="submit">Aggiungi corsello</button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IDPLCORS</th>
+                    <th>PIANO</th>
+                    <th>RIFERIMENTO</th>
+                    <th>MISURA1</th>
+                    <th>MISURA2</th>
+                    <th>FORMULA</th>
+                    <th>AREA</th>
+                    <th>SPESSORE</th>
+                    <th>VOLUME</th>
+                    <th>IDVOCE</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="corsello-body"></tbody>
+              </table>
+            </div>
+          </details>
+
+          <hr class="section-divider" />
+
+          <details class="sub-block collapsible-block" open>
+            <summary class="sub-block-header-inline collapsible-summary">
+              <h3 class="sub-block-title">
+                CAMMINAMENTI <span id="count-camminamenti" class="sub-block-count">(0)</span>
+                <span id="sum-area-camminamenti" class="sub-block-count">Mq. 0.00</span>
+                <span id="sum-volume-camminamenti" class="sub-block-count">Mc. 0.00</span>
+              </h3>
+            </summary>
+
+            <form id="camminamenti-form" class="piano-form camminamenti-form">
+              <div class="field">
+                <label for="idplcamm">IDPLCAMM</label>
+                <input id="idplcamm" type="text" readonly placeholder="Automatico" />
+              </div>
+
+              <div class="field">
+                <label for="camminamenti-piano">PIANO</label>
+                <input id="camminamenti-piano" type="text" placeholder="Es: ESTERNO OVEST" required />
+              </div>
+
+              <div class="field">
+                <label for="camminamenti-riferimento">RIFERIMENTO</label>
+                <input
+                  id="camminamenti-riferimento"
+                  type="text"
+                  placeholder="Es: Camminamento principale"
+                  required
+                />
+              </div>
+
+              <div class="field field-sottrai">
+                <label for="camminamenti-sottrai">SOTTRAI</label>
+                <div class="checkbox-wrap">
+                  <input id="camminamenti-sottrai" type="checkbox" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="camminamenti-misura1">MISURA1</label>
+                <input id="camminamenti-misura1" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="camminamenti-misura2">MISURA2</label>
+                <input id="camminamenti-misura2" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="camminamenti-formula">FORMULA</label>
+                <div class="formula-input-row">
+                  <input id="camminamenti-formula" type="text" readonly hidden />
+                  <button id="btn-apri-formula-camminamenti" type="button" class="btn-action formula-state-button">
+                    INSERISCI
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="camminamenti-altezza">SPESSORE</label>
+                <input
+                  id="camminamenti-altezza"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div class="field">
+                <label for="camminamenti-idvoce">IDVOCE</label>
+                <input id="camminamenti-idvoce" type="text" placeholder="Opzionale" />
+              </div>
+
+              <button type="submit">Aggiungi camminamento</button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IDPLCAMM</th>
+                    <th>PIANO</th>
+                    <th>RIFERIMENTO</th>
+                    <th>MISURA1</th>
+                    <th>MISURA2</th>
+                    <th>FORMULA</th>
+                    <th>AREA</th>
+                    <th>SPESSORE</th>
+                    <th>VOLUME</th>
+                    <th>IDVOCE</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="camminamenti-body"></tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+
+        <dialog id="formula-dialog" class="formula-dialog">
+          <form id="formula-dialog-form" method="dialog">
+            <h3>FORMULA</h3>
+            <p>Inserisci una espressione matematica (numeri, +, -, *, /, parentesi).</p>
+            <textarea id="formula-dialog-text" rows="5" placeholder="Es: (2+1)/3"></textarea>
+            <div class="formula-dialog-actions">
+              <button id="formula-dialog-cancel" type="button" class="btn-action btn-delete">Annulla</button>
+              <button id="formula-dialog-save" type="submit" class="btn-action btn-secondary">Salva formula</button>
+            </div>
+          </form>
+        </dialog>
+          </section>
+
+          <section id="compilazione-altre-tipologie" class="card compilazione-placeholder" hidden>
+            <h2>Compilazione tipologia</h2>
+            <p id="compilazione-altre-testo">
+              Per questa tipologia la schermata di compilazione sara' aggiunta a breve.
+            </p>
+          </section>
+
+          <section id="vista-voci" class="view" hidden>
+            <section class="card">
+              <header class="section-header section-header-inline">
+                <div class="voci-header-left">
+                  <h2>VOCI</h2>
+                  <button type="button" id="btn-apri-tutte-voci" class="btn-action btn-secondary" title="Apri tutte le voci">
+                    ▾
+                  </button>
+                  <button type="button" id="btn-chiudi-tutte-voci" class="btn-action btn-secondary" title="Chiudi tutte le voci">
+                    ▴
+                  </button>
+                </div>
+                <p id="voci-totale-computo">TOTALE COMPUTO: €. 0,00</p>
+              </header>
+              <div class="table-wrap">
+                <table class="table-voci">
+                  <thead>
+                    <tr>
+                      <th>IDVOCE</th>
+                      <th>POSIZIONE</th>
+                      <th>VOCE ABBREVIATA</th>
+                      <th>UNITA' MISURA</th>
+                      <th>PREZZO</th>
+                      <th>TIPOMISURA</th>
+                      <th>NOTE</th>
+                      <th>AZIONI</th>
+                    </tr>
+                  </thead>
+                  <tbody id="voci-body"></tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+
+          <section id="vista-bim" class="view" hidden>
+            <section class="card bim-viewer-card">
+              <header class="section-header section-header-inline">
+                <h2>MODELLO BIM IFC</h2>
+                <p>Importa un file IFC e naviga il modello 3D.</p>
+              </header>
+              <div class="bim-viewer-toolbar">
+                <button id="btn-importa-ifc" type="button" class="btn-action btn-secondary">IMPORTA FILE IFC</button>
+                <button id="btn-esporta-ifc-json" type="button" class="btn-action btn-secondary">
+                  ESPORTA DATI IFC (JSON)
+                </button>
+                <button id="btn-ifc-to-misure" type="button" class="btn-action btn-secondary">
+                  IFC -> MISURAZIONI
+                </button>
+                <span id="bim-viewer-status" class="bim-viewer-status">Nessun file IFC caricato.</span>
+              </div>
+              <div class="bim-viewer-layout">
+                <div
+                  id="bim-viewer-container"
+                  class="bim-viewer-container"
+                  aria-label="Visualizzatore modello 3D IFC"
+                ></div>
+                <aside class="bim-props-panel" aria-label="Proprieta BIM selezionate">
+                  <h3 class="bim-props-title">Proprieta elemento</h3>
+                  <p id="bim-props-empty" class="bim-props-empty">
+                    Clicca un oggetto nel modello per vedere le sue proprietà BIM.
+                  </p>
+                  <div id="bim-props-content" class="bim-props-content" hidden>
+                    <div id="bim-props-meta" class="bim-props-meta"></div>
+                    <div class="bim-props-tabs" role="tablist" aria-label="Sezioni dati BIM">
+                      <button type="button" id="bim-tab-proprieta" class="bim-tab is-active" data-bim-tab="proprieta">
+                        Proprieta
+                      </button>
+                      <button type="button" id="bim-tab-posizione" class="bim-tab" data-bim-tab="posizione">
+                        Posizione
+                      </button>
+                      <button
+                        type="button"
+                        id="bim-tab-classificazione"
+                        class="bim-tab"
+                        data-bim-tab="classificazione"
+                      >
+                        Classificazione
+                      </button>
+                      <button type="button" id="bim-tab-relazioni" class="bim-tab" data-bim-tab="relazioni">
+                        Relazioni
+                      </button>
+                    </div>
+                    <div id="bim-props-table" class="bim-props-table"></div>
+                    <details class="bim-props-raw-wrap">
+                      <summary>Vedi JSON completo</summary>
+                      <pre id="bim-props-json" class="bim-props-json"></pre>
+                    </details>
+                  </div>
+                </aside>
+              </div>
+            </section>
+          </section>
+        </div>
+
+        <aside class="sidebar sidebar-right" aria-label="Sidebar destra">
+          <div class="sidebar-card">
+            <h2 class="sidebar-title">Sidebar Destra</h2>
+            <div class="sidebar-actions">
+              <a href="cercavoce.html?v=9" class="btn-action btn-secondary sidebar-link-btn">CERCA VOCE</a>
+              <button id="btn-aggiungi-voce" type="button" class="btn-action btn-secondary">AGGIUNGI VOCE</button>
+              <button id="btn-vedi-voci" type="button" class="btn-action btn-compila">VEDI VOCI</button>
+              <button id="btn-apri-pdf-voci" type="button" class="btn-action btn-secondary">
+                APRI PDF VOCI (COMPLETO)
+              </button>
+              <button id="btn-apri-pdf-voci-quantita" type="button" class="btn-action btn-secondary">
+                APRI PDF VOCI (SOLO QUANTITA)
+              </button>
+              <button id="btn-esporta-xls" type="button" class="btn-action btn-secondary">ESPORTA XLS</button>
+              <button id="btn-esporta-json" type="button" class="btn-action btn-secondary">ESPORTA COMPUTO</button>
+              <button id="btn-importa-computo" type="button" class="btn-action btn-secondary">IMPORTA COMPUTO</button>
+              <button id="btn-vista-bim" type="button" class="btn-action btn-secondary">VISTA BIM 3D</button>
+            </div>
+            <p class="sidebar-text">Area pronta per riepiloghi e dettagli.</p>
+          </div>
+        </aside>
+      </div>
+
+      <dialog id="voce-dialog" class="formula-dialog">
+        <form id="voce-dialog-form" method="dialog">
+          <h3>NUOVA VOCE</h3>
+          <div class="piano-form voce-form">
+            <div class="voce-form-riga-uno">
+              <div class="field voce-field-compatta">
+                <label for="voce-id">IDVOCE</label>
+                <input id="voce-id" type="text" readonly />
+              </div>
+              <div class="field voce-field-compatta">
+                <label for="voce-posizione">POSIZIONE</label>
+                <input id="voce-posizione" type="number" step="1" min="0" required />
+              </div>
+              <div class="field voce-field-compatta voce-field-tipo-misura">
+                <label for="voce-tipo-misura">TIPOMISURA</label>
+                <select id="voce-tipo-misura" required>
+                  <option value="AUTOMATICA">AUTOMATICA</option>
+                  <option value="MANUALE">MANUALE</option>
+                </select>
+              </div>
+              <div class="field voce-field-compatta">
+                <label for="voce-prezzo">PREZZO (&euro;)</label>
+                <input id="voce-prezzo" type="number" step="0.01" min="0" placeholder="0,00" required />
+              </div>
+              <div class="voce-form-cerca-wrap">
+                <button type="button" id="voce-btn-cerca" class="btn-action btn-secondary voce-btn-cerca">
+                  CERCA VOCE
+                </button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="voce-abbreviata">VOCE ABBREVIATA</label>
+              <input id="voce-abbreviata" type="text" placeholder="Testo breve (opzionale)" />
+            </div>
+            <div class="field">
+              <label for="voce-unita-misura">UNITA' MISURA</label>
+              <div class="voce-um-row">
+                <select id="voce-unita-misura"></select>
+                <input id="voce-unita-nuova" type="text" placeholder="Nuova opzione" />
+                <button id="voce-unita-add" type="button" class="btn-action btn-secondary">Aggiungi</button>
+              </div>
+            </div>
+            <div class="field voce-field-full">
+              <label for="voce-testo">VOCE</label>
+              <textarea id="voce-testo" rows="4" placeholder="Inserisci testo voce..." required></textarea>
+            </div>
+            <div class="field voce-field-full">
+              <label for="voce-note">NOTE</label>
+              <textarea id="voce-note" rows="4" placeholder="Note (opzionale)"></textarea>
+            </div>
+          </div>
+          <div class="formula-dialog-actions">
+            <button id="voce-dialog-cancel" type="button" class="btn-action btn-delete">Annulla</button>
+            <button id="voce-dialog-save" type="submit" class="btn-action btn-secondary">Salva voce</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="voce-mm-riga-dialog" class="formula-dialog voce-mm-riga-dialog">
+        <form id="voce-mm-riga-dialog-form" method="dialog">
+          <h3 id="voce-mm-riga-dialog-title">Misurazione manuale</h3>
+          <div class="voce-mm-riga-form">
+            <div class="voce-mm-riga-r1">
+              <div class="voce-mm-riga-idvoce-cell">
+                <span class="voce-mm-riga-idvoce-label">IDVOCE</span>
+                <strong id="voce-mm-riga-idvoce" class="voce-mm-riga-idvoce-value">—</strong>
+              </div>
+              <div class="field">
+                <label for="voce-mm-riga-piano">PIANO</label>
+                <input id="voce-mm-riga-piano" type="text" placeholder="Es: FONDAZIONI" autocomplete="off" required />
+              </div>
+              <div class="field">
+                <label for="voce-mm-riga-riferimento">RIFERIMENTO</label>
+                <input id="voce-mm-riga-riferimento" type="text" placeholder="Es: SUD" autocomplete="off" required />
+              </div>
+              <div class="field field-sottrai voce-mm-riga-segno-field">
+                <label for="voce-mm-riga-segno">SEGNO (negativo)</label>
+                <div class="checkbox-wrap">
+                  <input id="voce-mm-riga-segno" type="checkbox" />
+                </div>
+              </div>
+            </div>
+            <div class="voce-mm-riga-r2">
+              <div class="field voce-mm-riga-formula-field">
+                <label for="voce-mm-riga-formula">FORMULA</label>
+                <input
+                  id="voce-mm-riga-formula"
+                  type="text"
+                  placeholder="Es: 2.5 oppure (10+5)*2"
+                  autocomplete="off"
+                />
+              </div>
+              <div class="field voce-mm-riga-numero-field">
+                <label for="voce-mm-riga-numero">NUMERO</label>
+                <input id="voce-mm-riga-numero" type="number" step="1" min="0" placeholder="0" required />
+              </div>
+            </div>
+          </div>
+          <div class="formula-dialog-actions voce-mm-riga-actions">
+            <button id="voce-mm-riga-cancel" type="button" class="btn-action btn-delete">Annulla</button>
+            <button id="voce-mm-riga-save" type="submit" class="btn-action btn-secondary">Salva</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="voce-delete-dialog" class="formula-dialog">
+        <form id="voce-delete-dialog-form" method="dialog">
+          <h3>CONFERMA ELIMINAZIONE</h3>
+          <p>Vuoi eliminare questa voce?</p>
+          <div class="formula-dialog-actions">
+            <button id="voce-delete-cancel" type="button" class="btn-action btn-secondary">Annulla</button>
+            <button id="voce-delete-confirm" type="submit" class="btn-action btn-delete">Elimina</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="voce-mm-delete-dialog" class="formula-dialog">
+        <form id="voce-mm-delete-dialog-form" method="dialog">
+          <h3>CONFERMA ELIMINAZIONE</h3>
+          <p>Vuoi eliminare questa misurazione manuale? L’operazione non può essere annullata.</p>
+          <div class="formula-dialog-actions">
+            <button id="voce-mm-delete-cancel" type="button" class="btn-action btn-secondary">Annulla</button>
+            <button id="voce-mm-delete-confirm" type="submit" class="btn-action btn-delete">Elimina</button>
+          </div>
+        </form>
+      </dialog>
+    </main>
+  </body>
+</html>
