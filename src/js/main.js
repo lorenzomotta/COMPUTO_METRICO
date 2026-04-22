@@ -72,6 +72,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const esportaXlsButtonEl = document.querySelector("#btn-esporta-xls");
   const esportaJsonButtonEl = document.querySelector("#btn-esporta-json");
   const importaComputoButtonEl = document.querySelector("#btn-importa-computo");
+  const chiudiAppButtonEl = document.querySelector("#btn-chiudi-app");
   const vistaBimButtonEl = document.querySelector("#btn-vista-bim");
   const importaIfcButtonEl = document.querySelector("#btn-importa-ifc");
   const exportIfcJsonButtonEl = document.querySelector("#btn-esporta-ifc-json");
@@ -165,6 +166,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const voceMmDeleteDialogEl = document.querySelector("#voce-mm-delete-dialog");
   const voceMmDeleteDialogFormEl = document.querySelector("#voce-mm-delete-dialog-form");
   const voceMmDeleteCancelEl = document.querySelector("#voce-mm-delete-cancel");
+  const chiusuraAppDialogEl = document.querySelector("#chiusura-app-dialog");
+  const chiusuraAppDialogMsgEl = document.querySelector("#chiusura-app-dialog-msg");
   const voceIdEl = document.querySelector("#voce-id");
   const vocePosizioneEl = document.querySelector("#voce-posizione");
   const voceAbbreviataEl = document.querySelector("#voce-abbreviata");
@@ -190,6 +193,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const vociTotaleComputoEl = document.querySelector("#voci-totale-computo");
   const btnApriTutteVociEl = document.querySelector("#btn-apri-tutte-voci");
   const btnChiudiTutteVociEl = document.querySelector("#btn-chiudi-tutte-voci");
+  const vociCercaAbbrevInputEl = document.querySelector("#voci-cerca-abbrev");
 
   const STORAGE_PIANI = "computo_metrico_piani";
   const STORAGE_MUR_LEGACY = "computo_metrico_murielevazione";
@@ -276,7 +280,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let ifcDataCache = null;
   /** @type {any | null} */
   let bimSelectedElementCache = null;
-  let bimActiveTab = "posizione";
+  let bimActiveTab = "computolore";
   /** @type {{ loadIfcFile: (file: File) => Promise<any>, getIfcData: () => any } | null} */
   let bimViewer = null;
   /** @type {Promise<any> | null} */
@@ -325,6 +329,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function buildBimSectionsByTab(selection, tab) {
     const proprietaSections = [];
+    const computoloreSections = [];
     const baseRows = normalizeRows([
       { name: "IfcType", value: selection.ifcType || "" },
       { name: "ExpressID", value: selection.expressID ?? "" },
@@ -334,7 +339,15 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const psetRows = extractPropertySetRows(selection.propertySets);
     psetRows.forEach((item) => {
-      if (item.rows.length) proprietaSections.push({ name: item.name, rows: normalizeRows(item.rows) });
+      if (!item.rows.length) return;
+      const normalizedRows = normalizeRows(item.rows);
+      const normalizedGroupName = String(item.name || "").trim().toLowerCase();
+      // Alcuni IFC esportano il gruppo come "Pset_COMPUTOLORE" o con prefissi/suffissi.
+      if (normalizedGroupName.includes("computolore")) {
+        computoloreSections.push({ name: item.name, rows: normalizedRows });
+        return;
+      }
+      proprietaSections.push({ name: item.name, rows: normalizedRows });
     });
 
     const quantityRows = normalizeRows(extractQuantityRows(selection));
@@ -357,6 +370,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const mapByTab = {
       proprieta: proprietaSections,
+      computolore: computoloreSections,
       posizione: posizioneSections,
       classificazione: classificazioneSections,
       relazioni: relazioniSections,
@@ -409,12 +423,52 @@ window.addEventListener("DOMContentLoaded", () => {
   function extractPropertySetRows(propertySets) {
     const found = [];
     const seenGroups = new Set();
+    const IFC_TYPE_TOKEN_RE = /^IFC[A-Z0-9_]+$/;
 
     function normalizeValue(v) {
+      function isIfcTypeToken(text) {
+        const s = String(text || "").trim().toUpperCase();
+        return IFC_TYPE_TOKEN_RE.test(s);
+      }
+
+      function cleanScalar(value) {
+        if (value === null || value === undefined) return "";
+        const out = String(value).trim();
+        if (!out) return "";
+        return out;
+      }
+
       if (v === null || v === undefined) return "";
       if (Array.isArray(v)) return v.map((x) => normalizeValue(x)).filter(Boolean).join(", ");
       if (typeof v === "object") {
-        if ("value" in v && Object.keys(v).length <= 3) return normalizeValue(v.value);
+        // IFC spesso incapsula il valore "umano" dentro oggetti complessi.
+        // Priorita': valore effettivo -> fallback etichette/nomi
+        if ("_internalValue" in v && v._internalValue !== null && v._internalValue !== undefined) {
+          const internal = cleanScalar(v._internalValue);
+          if (internal !== "") return internal;
+        }
+        if ("wrappedValue" in v && v.wrappedValue !== null && v.wrappedValue !== undefined)
+          return normalizeValue(v.wrappedValue);
+        if ("value" in v && v.value !== null && v.value !== undefined) return normalizeValue(v.value);
+        if ("Value" in v && v.Value !== null && v.Value !== undefined) return normalizeValue(v.Value);
+        if ("displayValue" in v && v.displayValue !== null && v.displayValue !== undefined)
+          return normalizeValue(v.displayValue);
+        if ("label" in v && v.label !== null && v.label !== undefined) {
+          const candidate = normalizeValue(v.label);
+          if (!isIfcTypeToken(candidate)) return candidate;
+        }
+        if ("Label" in v && v.Label !== null && v.Label !== undefined) {
+          const candidate = normalizeValue(v.Label);
+          if (!isIfcTypeToken(candidate)) return candidate;
+        }
+        if ("name" in v && v.name !== null && v.name !== undefined) {
+          const candidate = normalizeValue(v.name);
+          if (!isIfcTypeToken(candidate)) return candidate;
+        }
+        if ("Name" in v && v.Name !== null && v.Name !== undefined) {
+          const candidate = normalizeValue(v.Name);
+          if (!isIfcTypeToken(candidate)) return candidate;
+        }
         try {
           return JSON.stringify(v);
         } catch {
@@ -422,6 +476,92 @@ window.addEventListener("DOMContentLoaded", () => {
         }
       }
       return String(v);
+    }
+
+    function scoreDisplayValue(text) {
+      const t = String(text || "").trim();
+      if (!t) return -1000;
+      if (IFC_TYPE_TOKEN_RE.test(t.toUpperCase())) return -500;
+      if (/^\{.*\}$/.test(t)) return -50; // JSON tecnico: poco leggibile
+      if (/^[+-]?\d+(?:[.,]\d+)?$/.test(t)) {
+        if (t === "0" || t === "0." || t === "0,0") return 1;
+        return 5;
+      }
+      if (/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(t)) return 50;
+      return 10;
+    }
+
+    function extractNumericIndex(value) {
+      if (value === null || value === undefined) return null;
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const idx = extractNumericIndex(item);
+          if (idx !== null) return idx;
+        }
+        return null;
+      }
+      if (typeof value === "number" && Number.isFinite(value)) {
+        if (value >= 0) return Math.trunc(value);
+        return null;
+      }
+      if (typeof value === "object") {
+        if ("_internalValue" in value) return extractNumericIndex(value._internalValue);
+        if ("wrappedValue" in value) return extractNumericIndex(value.wrappedValue);
+        if ("value" in value) return extractNumericIndex(value.value);
+        if ("Value" in value) return extractNumericIndex(value.Value);
+        return null;
+      }
+      const text = String(value).trim().replace(",", ".");
+      if (!text) return null;
+      const parsed = Number.parseFloat(text);
+      if (!Number.isFinite(parsed) || parsed < 0) return null;
+      return Math.trunc(parsed);
+    }
+
+    function extractEnumOptions(prop) {
+      const optionsRaw =
+        prop?.EnumerationReference?.EnumerationValues ??
+        prop?.EnumerationReference?.enumerationValues ??
+        prop?.enumerationReference?.EnumerationValues ??
+        prop?.enumerationReference?.enumerationValues ??
+        [];
+      if (!Array.isArray(optionsRaw)) return [];
+      return optionsRaw.map((opt) => normalizeValue(opt)).filter((text) => scoreDisplayValue(text) >= 10);
+    }
+
+    function resolveEnumeratedDisplayValue(prop) {
+      const selectedRaw = prop?.EnumerationValues ?? prop?.enumerationValues;
+      if (selectedRaw === null || selectedRaw === undefined) return "";
+      const options = extractEnumOptions(prop);
+      const selectedIndex = extractNumericIndex(selectedRaw);
+      if (selectedIndex !== null && options[selectedIndex]) return options[selectedIndex];
+      return "";
+    }
+
+    function pickBestPropertyValue(prop) {
+      const enumDisplayValue = resolveEnumeratedDisplayValue(prop);
+      if (enumDisplayValue) return enumDisplayValue;
+
+      const candidates = [
+        prop?.NominalValue,
+        prop?.nominalValue,
+        prop?.Value,
+        prop?.value,
+        prop?.EnumerationValues,
+        prop?.enumerationValues,
+      ];
+
+      let best = "";
+      let bestScore = -1000;
+      candidates.forEach((candidate) => {
+        const text = normalizeValue(candidate);
+        const score = scoreDisplayValue(text);
+        if (score > bestScore) {
+          best = text;
+          bestScore = score;
+        }
+      });
+      return best;
     }
 
     function walk(node) {
@@ -439,15 +579,7 @@ window.addEventListener("DOMContentLoaded", () => {
         node.HasProperties.forEach((prop) => {
           if (!prop || typeof prop !== "object") return;
           const propName = prop.Name || prop.name || "";
-          const propValue =
-            prop.NominalValue ??
-            prop.nominalValue ??
-            prop.Value ??
-            prop.value ??
-            prop.EnumerationValues ??
-            prop.enumerationValues ??
-            "";
-          const valueText = normalizeValue(propValue);
+          const valueText = pickBestPropertyValue(prop);
           if (String(propName).trim() && valueText !== "") {
             rows.push({ name: String(propName).trim(), value: valueText });
           }
@@ -819,8 +951,23 @@ window.addEventListener("DOMContentLoaded", () => {
   /** se impostato, in MURIELEVAZIONE si vede solo questa riga (toggle con Filtra / Mostra tutte) */
   let murFiltroSoloIdElevazione = null;
 
+  /**
+   * True se ci sono state modifiche dopo l'ultimo "punto sicuro" (avvio, import, export JSON).
+   * Serve per chiedere conferma in chiusura (il dialog nativo del browser spesso non si vede in Tauri).
+   */
+  let computoModificatoPerExportJson = false;
+
+  function segnaComputoModificatoPerExportJson() {
+    computoModificatoPerExportJson = true;
+  }
+
+  function azzeraComputoModificatoPerExportJson() {
+    computoModificatoPerExportJson = false;
+  }
+
   function savePiani() {
     savePianiStorage(STORAGE_PIANI, piani);
+    segnaComputoModificatoPerExportJson();
   }
 
   function saveMurDati() {
@@ -834,6 +981,7 @@ window.addEventListener("DOMContentLoaded", () => {
       camminamentiEsterni,
       misurazioniVarie,
     );
+    segnaComputoModificatoPerExportJson();
   }
 
   function loadPiani() {
@@ -863,18 +1011,22 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function saveVoci() {
     localStorage.setItem(STORAGE_VOCI, JSON.stringify(voci));
+    segnaComputoModificatoPerExportJson();
   }
 
   function saveVociUnitaOptions() {
     localStorage.setItem(STORAGE_VOCI_UNITA_OPTIONS, JSON.stringify(vociUnitaMisuraOptions));
+    segnaComputoModificatoPerExportJson();
   }
 
   function saveIfcData() {
     if (!ifcDataCache) {
       localStorage.removeItem(STORAGE_IFC_DATA);
+      segnaComputoModificatoPerExportJson();
       return;
     }
     localStorage.setItem(STORAGE_IFC_DATA, JSON.stringify(ifcDataCache));
+    segnaComputoModificatoPerExportJson();
   }
 
   function loadIfcData() {
@@ -1574,17 +1726,44 @@ window.addEventListener("DOMContentLoaded", () => {
     const ordinate = [...voci].sort(
       (a, b) => a.posizione - b.posizione || a.idVoce - b.idVoce,
     );
-    let vociDaRenderizzare = ordinate;
+    const qCerca = String(vociCercaAbbrevInputEl?.value ?? "")
+      .trim()
+      .toLowerCase();
+    const filtratePerAbbrev =
+      qCerca === ""
+        ? ordinate
+        : ordinate.filter((item) =>
+            String(item.voceAbbreviata ?? "")
+              .toLowerCase()
+              .includes(qCerca),
+          );
+
+    let vociDaRenderizzare = filtratePerAbbrev;
     if (voceFocusId !== null) {
-      const voceInFocus = ordinate.find((item) => item.idVoce === voceFocusId);
+      const voceInFocus = filtratePerAbbrev.find((item) => item.idVoce === voceFocusId);
       if (!voceInFocus) {
         voceFocusId = null;
         vistaVociEl?.classList.remove("voce-focus-mode");
         document.querySelector("#voce-focus-close-floating")?.remove();
+        vociDaRenderizzare = filtratePerAbbrev;
       } else {
         vociDaRenderizzare = [voceInFocus];
       }
     }
+
+    const ricercaAttiva = qCerca !== "";
+
+    if (filtratePerAbbrev.length === 0) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 8;
+      cell.className = "empty-cell";
+      cell.textContent = "Nessuna voce corrisponde alla ricerca (voce abbreviata).";
+      row.appendChild(cell);
+      vociBodyEl.appendChild(row);
+      return;
+    }
+
     vociDaRenderizzare.forEach((item, index) => {
       const row = document.createElement("tr");
       row.className = "voci-row-principale";
@@ -1621,9 +1800,11 @@ window.addEventListener("DOMContentLoaded", () => {
       upButton.dataset.action = "move-voce-up";
       upButton.dataset.id = String(item.idVoce);
       upButton.textContent = "↑";
-      upButton.title = "Sposta sopra";
+      upButton.title = ricercaAttiva
+        ? "Svuota il campo Cerca per usare Sposta sopra"
+        : "Sposta sopra";
       upButton.setAttribute("aria-label", "Sposta sopra");
-      upButton.disabled = index === 0;
+      upButton.disabled = ricercaAttiva || index === 0;
 
       const downButton = document.createElement("button");
       downButton.type = "button";
@@ -1631,9 +1812,11 @@ window.addEventListener("DOMContentLoaded", () => {
       downButton.dataset.action = "move-voce-down";
       downButton.dataset.id = String(item.idVoce);
       downButton.textContent = "↓";
-      downButton.title = "Sposta sotto";
+      downButton.title = ricercaAttiva
+        ? "Svuota il campo Cerca per usare Sposta sotto"
+        : "Sposta sotto";
       downButton.setAttribute("aria-label", "Sposta sotto");
-      downButton.disabled = index === vociDaRenderizzare.length - 1;
+      downButton.disabled = ricercaAttiva || index === vociDaRenderizzare.length - 1;
 
       const deleteButton = document.createElement("button");
       deleteButton.type = "button";
@@ -2668,20 +2851,19 @@ window.addEventListener("DOMContentLoaded", () => {
     return loadIfcWithViewerFile(file, ifcPath);
   }
 
-  async function exportJson() {
+  function buildComputoDataPayload() {
     const ifcLink =
       ifcDataCache?.source?.linkedPath && typeof ifcDataCache.source.linkedPath === "string"
         ? {
             path: ifcDataCache.source.linkedPath,
-            fileName: String(ifcDataCache?.source?.fileName || fileNameFromPath(ifcDataCache.source.linkedPath)),
+            fileName: String(
+              ifcDataCache?.source?.fileName || fileNameFromPath(ifcDataCache.source.linkedPath),
+            ),
             linkedAt:
-              typeof ifcDataCache?.source?.loadedAt === "string"
-                ? ifcDataCache.source.loadedAt
-                : new Date().toISOString(),
+              typeof ifcDataCache?.source?.loadedAt === "string" ? ifcDataCache.source.loadedAt : "",
           }
         : null;
-    const payload = {
-      exportedAt: new Date().toISOString(),
+    return {
       piani,
       murielevazioni,
       stratiMurElevazione,
@@ -2694,13 +2876,68 @@ window.addEventListener("DOMContentLoaded", () => {
       vociUnitaMisuraOptions,
       ifcLink,
     };
+  }
+
+  /** Dopo avvio, import riuscito o export JSON completato: niente domanda in chiusura fino a nuove modifiche. */
+  function refreshComputoBaselineSnapshot() {
+    azzeraComputoModificatoPerExportJson();
+  }
+
+  function mostraConfermaChiusuraApp() {
+    const testo =
+      "Ci sono modifiche al computo non ancora coperte da un export JSON (pulsante ESPORTA COMPUTO).\n\nVuoi chiudere comunque l'applicazione?";
+    if (!chiusuraAppDialogEl || !chiusuraAppDialogMsgEl) {
+      return Promise.resolve(window.confirm(testo));
+    }
+    chiusuraAppDialogMsgEl.textContent = testo;
+    return new Promise((resolve) => {
+      const onClose = () => {
+        chiusuraAppDialogEl.removeEventListener("close", onClose);
+        resolve(chiusuraAppDialogEl.returnValue === "ok");
+      };
+      chiusuraAppDialogEl.addEventListener("close", onClose);
+      chiusuraAppDialogEl.showModal();
+    });
+  }
+
+  async function richiediChiusuraApplicazione() {
+    if (computoModificatoPerExportJson) {
+      const conferma = await mostraConfermaChiusuraApp();
+      if (!conferma) return;
+    }
+    try {
+      const tauriInvoke = window.__TAURI__?.core?.invoke;
+      if (typeof tauriInvoke === "function") {
+        await tauriInvoke("exit_app");
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+      window.alert("Chiusura non riuscita (comando Tauri). Riavvia l'applicazione.");
+      return;
+    }
+    window.close();
+  }
+
+  async function exportJson() {
+    const data = buildComputoDataPayload();
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      ...data,
+    };
+    if (payload.ifcLink && (!payload.ifcLink.linkedAt || payload.ifcLink.linkedAt === "")) {
+      payload.ifcLink = { ...payload.ifcLink, linkedAt: new Date().toISOString() };
+    }
     const ok = await saveFileWithPickerOrDownload(
       `computo_metrico_export_${timestampExport()}.json`,
       JSON.stringify(payload, null, 2),
       "application/json;charset=utf-8",
       [{ name: "JSON", extensions: ["json"] }],
     );
-    if (ok) window.alert("Esportazione JSON completata.");
+    if (ok) {
+      refreshComputoBaselineSnapshot();
+      window.alert("Esportazione JSON completata.");
+    }
   }
 
   async function exportIfcJson() {
@@ -3111,6 +3348,7 @@ window.addEventListener("DOMContentLoaded", () => {
           (error && error.message ? ` Dettaglio: ${error.message}` : "");
       }
     }
+    refreshComputoBaselineSnapshot();
     return { ifcLinkedPath: linkedIfcPath, ifcAutoLoaded, ifcAutoLoadMessage };
   }
 
@@ -4395,6 +4633,10 @@ window.addEventListener("DOMContentLoaded", () => {
     apriTutteLeVociManuali();
   });
 
+  vociCercaAbbrevInputEl?.addEventListener("input", () => {
+    renderVoci();
+  });
+
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && voceFocusId !== null) {
       exitVoceFocusMode();
@@ -4439,6 +4681,13 @@ window.addEventListener("DOMContentLoaded", () => {
       console.error(error);
       window.alert("Creazione PDF non riuscita. Verifica che esista il file locale /src/vendor/jspdf.umd.min.js.");
     }
+  });
+
+  chiudiAppButtonEl?.addEventListener("click", () => {
+    richiediChiusuraApplicazione().catch((err) => {
+      console.error(err);
+      window.alert("Errore durante la chiusura. Controlla la console per i dettagli.");
+    });
   });
 
   importaComputoButtonEl.addEventListener("click", () => {
@@ -5058,4 +5307,6 @@ window.addEventListener("DOMContentLoaded", () => {
     voceDialogEl.showModal();
     setTimeout(() => vocePosizioneEl?.focus(), 0);
   })();
+
+  refreshComputoBaselineSnapshot();
 });

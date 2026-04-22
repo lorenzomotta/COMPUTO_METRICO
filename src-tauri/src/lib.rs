@@ -73,6 +73,11 @@ fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
     fs::read(path).map_err(|e| format!("Errore lettura file: {}", e))
 }
 
+#[tauri::command]
+fn exit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 fn sanitize_file_name(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for c in input.chars() {
@@ -97,7 +102,8 @@ pub fn run() {
             write_export_file_bytes,
             write_temp_export_file_bytes,
             open_file_with_system,
-            read_file_bytes
+            read_file_bytes,
+            exit_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

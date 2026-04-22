@@ -37,6 +37,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .section-header-inline p {
@@ -55,6 +57,30 @@
   min-height: 26px;
   line-height: 1;
   padding: 0;
+}
+
+.voci-cerca-input {
+  min-width: 160px;
+  max-width: 280px;
+  flex: 1 1 160px;
+  height: 28px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid #c5d4e8;
+  font-size: 0.82rem;
+  color: #10233f;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.voci-cerca-input::placeholder {
+  color: #6b7f97;
+}
+
+.voci-cerca-input:focus {
+  outline: none;
+  border-color: #4a6b9a;
+  box-shadow: 0 0 0 2px rgba(74, 107, 154, 0.2);
 }
 
 .section-note {

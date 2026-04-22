@@ -735,6 +735,15 @@
                   <button type="button" id="btn-chiudi-tutte-voci" class="btn-action btn-secondary" title="Chiudi tutte le voci">
                     ▴
                   </button>
+                  <input
+                    id="voci-cerca-abbrev"
+                    type="search"
+                    class="voci-cerca-input"
+                    placeholder="Cerca per voce abbreviata…"
+                    aria-label="Cerca tra le voci per voce abbreviata"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
                 </div>
                 <p id="voci-totale-computo">TOTALE COMPUTO: €. 0,00</p>
               </header>
@@ -788,7 +797,10 @@
                   <div id="bim-props-content" class="bim-props-content" hidden>
                     <div id="bim-props-meta" class="bim-props-meta"></div>
                     <div class="bim-props-tabs" role="tablist" aria-label="Sezioni dati BIM">
-                      <button type="button" id="bim-tab-proprieta" class="bim-tab is-active" data-bim-tab="proprieta">
+                      <button type="button" id="bim-tab-computolore" class="bim-tab is-active" data-bim-tab="computolore">
+                        COMPUTOLORE
+                      </button>
+                      <button type="button" id="bim-tab-proprieta" class="bim-tab" data-bim-tab="proprieta">
                         Proprieta
                       </button>
                       <button type="button" id="bim-tab-posizione" class="bim-tab" data-bim-tab="posizione">
@@ -835,6 +847,7 @@
               <button id="btn-esporta-json" type="button" class="btn-action btn-secondary">ESPORTA COMPUTO</button>
               <button id="btn-importa-computo" type="button" class="btn-action btn-secondary">IMPORTA COMPUTO</button>
               <button id="btn-vista-bim" type="button" class="btn-action btn-secondary">VISTA BIM 3D</button>
+              <button id="btn-chiudi-app" type="button" class="btn-action btn-delete">CHIUDI</button>
             </div>
             <p class="sidebar-text">Area pronta per riepiloghi e dettagli.</p>
           </div>
@@ -964,6 +977,17 @@
           <div class="formula-dialog-actions">
             <button id="voce-mm-delete-cancel" type="button" class="btn-action btn-secondary">Annulla</button>
             <button id="voce-mm-delete-confirm" type="submit" class="btn-action btn-delete">Elimina</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="chiusura-app-dialog" class="formula-dialog">
+        <form id="chiusura-app-dialog-form" method="dialog">
+          <h3>CHIUSURA APPLICAZIONE</h3>
+          <p id="chiusura-app-dialog-msg"></p>
+          <div class="formula-dialog-actions">
+            <button type="submit" value="cancel" class="btn-action btn-secondary">Annulla</button>
+            <button type="submit" value="ok" class="btn-action btn-delete">Chiudi comunque</button>
           </div>
         </form>
       </dialog>
