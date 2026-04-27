@@ -77,6 +77,12 @@ window.addEventListener("DOMContentLoaded", () => {
   const importaIfcButtonEl = document.querySelector("#btn-importa-ifc");
   const exportIfcJsonButtonEl = document.querySelector("#btn-esporta-ifc-json");
   const ifcToMisureButtonEl = document.querySelector("#btn-ifc-to-misure");
+  const ifcToMuriApertureButtonEl = document.createElement("button");
+  const ifcToMuriApertureUndoButtonEl = document.createElement("button");
+  const ifcRiepilogoCollegamentiButtonEl = document.createElement("button");
+  const ifcRiepilogoDialogEl = document.createElement("dialog");
+  const ifcRiepilogoTableWrapEl = document.createElement("div");
+  const ifcRiepilogoCloseButtonEl = document.createElement("button");
   const bimViewerContainerEl = document.querySelector("#bim-viewer-container");
   const bimViewerStatusEl = document.querySelector("#bim-viewer-status");
   const bimPropsEmptyEl = document.querySelector("#bim-props-empty");
@@ -168,6 +174,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const voceMmDeleteCancelEl = document.querySelector("#voce-mm-delete-cancel");
   const chiusuraAppDialogEl = document.querySelector("#chiusura-app-dialog");
   const chiusuraAppDialogMsgEl = document.querySelector("#chiusura-app-dialog-msg");
+  const computoDirtyIndicatorEl = document.querySelector("#computo-dirty-indicator");
   const voceIdEl = document.querySelector("#voce-id");
   const vocePosizioneEl = document.querySelector("#voce-posizione");
   const voceAbbreviataEl = document.querySelector("#voce-abbreviata");
@@ -189,6 +196,15 @@ window.addEventListener("DOMContentLoaded", () => {
   const voceMmRigaNumeroEl = document.querySelector("#voce-mm-riga-numero");
   const voceMmRigaSegnoEl = document.querySelector("#voce-mm-riga-segno");
   const voceMmRigaCancelEl = document.querySelector("#voce-mm-riga-cancel");
+  const voceMmRigaTipoOggettoEl = document.querySelector("#voce-mm-riga-tipooggetto");
+  const voceMmRigaSpecificaEl = document.querySelector("#voce-mm-riga-specifica");
+  const voceMmRigaMisura1El = document.querySelector("#voce-mm-riga-misura1");
+  const voceMmRigaMisura2El = document.querySelector("#voce-mm-riga-misura2");
+  const voceMmRigaMisura3El = document.querySelector("#voce-mm-riga-misura3");
+  const voceMmFieldsManualeEl = document.querySelector(".voce-mm-fields-manuale");
+  const voceMmFieldsSemiautomaticaEl = document.querySelector(".voce-mm-fields-semiautomatica");
+  const voceMmCopiaMisureInFormulaEl = document.querySelector("#voce-mm-copia-misure-in-formula");
+  const voceMmRisultatoPreviewEl = document.querySelector("#voce-mm-risultato-preview");
   const vociBodyEl = document.querySelector("#voci-body");
   const vociTotaleComputoEl = document.querySelector("#voci-totale-computo");
   const btnApriTutteVociEl = document.querySelector("#btn-apri-tutte-voci");
@@ -210,6 +226,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const UNITA_MISURA_DEFAULT_OPTIONS = ["ml.", "mq.", "mc", "Kg.", "a corpo", "percentuale"];
   const TIPOMISURA_VOCE_AUTOMATICA = "AUTOMATICA";
   const TIPOMISURA_VOCE_MANUALE = "MANUALE";
+  const VOCE_MM_TIPO_MANUALE = "MANUALE";
+  const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
   const STORAGE_KEYS = {
     STORAGE_MUR_LEGACY,
     STORAGE_MUR_ELE,
@@ -237,7 +255,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let camminamentiEsterni = [];
   /** @type {{ idMisurazione: number, idVoce: string, piano: string, riferimento: string, formula: string, formulaValue: number|null, numero: number, segno: boolean, risultato: number }[]} */
   let misurazioniVarie = [];
-  /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { piano: string, riferimento: string, formula: string, formulaValue: number|null, numero: number, segno: boolean, risultato: number }[] }[]} */
+  /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, numero: number, segno: boolean, risultato: number }[] }[]} */
   let voci = [];
   /** @type {string[]} */
   let vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
@@ -278,6 +296,8 @@ window.addEventListener("DOMContentLoaded", () => {
   let pendingDeleteVoceMm = { idVoce: /** @type {number|null} */ (null), index: /** @type {number|null} */ (null) };
   /** @type {any | null} */
   let ifcDataCache = null;
+  /** @type {null | { murielevazioni: any[], stratiMurElevazione: any[], apertureElevazione: any[], elevazioneIdCounter: number, stratoMurIdCounter: number, aperturaElevIdCounter: number, currentElevazioneId: number|null, compilazionePianoId: number|null, murFiltroSoloIdElevazione: number|null }} */
+  let provaBimWallsBackup = null;
   /** @type {any | null} */
   let bimSelectedElementCache = null;
   let bimActiveTab = "computolore";
@@ -327,9 +347,40 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  /**
+   * Per porte/finestre l'asse del bounding box spesso mappa l'altezza reale in "Length" e la
+   * luce in orizzontale in "Height": in COMPUTOLORE risultano LUNGHEZZA/ALTEZZA invertite.
+   * Scambiamo solo quando sembra un vano "in piedi" (lato lungo in colonna LUNGHEZZA, lato
+   * corto in ALTEZZA) per non toccare finestre molto orizzontali.
+   */
+  function correctLunghezzaAltezzaForDoorWindow(lunghezzaStr, altezzaStr, ifcType) {
+    const t = String(ifcType || "")
+      .trim()
+      .toUpperCase();
+    if (t !== "IFCDOOR" && t !== "IFCWINDOW") {
+      return { lunghezza: lunghezzaStr, altezza: altezzaStr };
+    }
+    const a = Number(String(lunghezzaStr).replace(",", "."));
+    const b = Number(String(altezzaStr).replace(",", "."));
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a <= b) {
+      return { lunghezza: lunghezzaStr, altezza: altezzaStr };
+    }
+    const hMinTipicaVano = 1.75;
+    const bMaxLuceTipica = 1.6;
+    if (a >= hMinTipicaVano && b < a && b <= bMaxLuceTipica) {
+      return { lunghezza: altezzaStr, altezza: lunghezzaStr };
+    }
+    return { lunghezza: lunghezzaStr, altezza: altezzaStr };
+  }
+
   function buildBimSectionsByTab(selection, tab) {
     const proprietaSections = [];
     const computoloreSections = [];
+    const posizioneData = extractPositionRows(selection);
+    const format3 = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(3) : "";
+    };
     const baseRows = normalizeRows([
       { name: "IfcType", value: selection.ifcType || "" },
       { name: "ExpressID", value: selection.expressID ?? "" },
@@ -350,10 +401,27 @@ window.addEventListener("DOMContentLoaded", () => {
       proprietaSections.push({ name: item.name, rows: normalizedRows });
     });
 
+    const findGeometryRowValue = (name) => {
+      const row = (posizioneData?.geometryRows || []).find((r) => String(r?.name || "").toLowerCase() === String(name).toLowerCase());
+      return row ? row.value : "";
+    };
+    const computedComputoloreRows = [];
+    const rawL = findGeometryRowValue("Bounding Box Length");
+    const rawA = findGeometryRowValue("Bounding Box Height");
+    const corrected = correctLunghezzaAltezzaForDoorWindow(rawL, rawA, selection?.ifcType);
+    const lunghezza = format3(corrected.lunghezza);
+    const altezza = format3(corrected.altezza);
+    const spessore = format3(findGeometryRowValue("Bounding Box Width"));
+    if (lunghezza) computedComputoloreRows.push({ name: "LUNGHEZZA", value: lunghezza, um: "m" });
+    if (altezza) computedComputoloreRows.push({ name: "ALTEZZA", value: altezza, um: "m" });
+    if (spessore) computedComputoloreRows.push({ name: "SPESSORE", value: spessore, um: "m" });
+    if (computedComputoloreRows.length) {
+      computoloreSections.push({ name: "Dimensioni (da Geometry)", rows: computedComputoloreRows });
+    }
+
     const quantityRows = normalizeRows(extractQuantityRows(selection));
     if (quantityRows.length) proprietaSections.push({ name: "Quantities", rows: quantityRows });
 
-    const posizioneData = extractPositionRows(selection);
     const posizioneSections = [
       { name: "Location", rows: normalizeRows(posizioneData.locationRows) },
       { name: "Geometry", rows: normalizeRows(posizioneData.geometryRows) },
@@ -688,6 +756,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const root = selection?.properties && typeof selection.properties === "object" ? selection.properties : {};
     const locationInfo = selection?.locationInfo && typeof selection.locationInfo === "object" ? selection.locationInfo : null;
     const geometryInfo = selection?.geometryInfo && typeof selection.geometryInfo === "object" ? selection.geometryInfo : null;
+    const hitPoint = selection?.hitPoint && typeof selection.hitPoint === "object" ? selection.hitPoint : null;
+    const placementDebug =
+      selection?.placementDebug && typeof selection.placementDebug === "object" ? selection.placementDebug : null;
+    const qRows = extractQuantityRows(selection);
 
     function addRow(targetArray, name, value, um = "") {
       const key = `${String(name).toLowerCase()}::${String(value).toLowerCase()}::${String(um).toLowerCase()}`;
@@ -704,6 +776,116 @@ window.addEventListener("DOMContentLoaded", () => {
         return parts.join(", ");
       }
       return String(value);
+    }
+
+    function toFiniteNumber(value) {
+      if (value === null || value === undefined) return null;
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      const text = String(value).trim().replace(",", ".");
+      if (!text) return null;
+      const parsed = Number.parseFloat(text);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function extractPlacementCoordinates(rawCoords) {
+      if (!Array.isArray(rawCoords)) return { x: null, y: null, z: null };
+      return {
+        x: toFiniteNumber(normalizeIfcScalar(rawCoords[0])),
+        y: toFiniteNumber(normalizeIfcScalar(rawCoords[1])),
+        z: toFiniteNumber(normalizeIfcScalar(rawCoords[2])),
+      };
+    }
+
+    function tokenizeDimensionName(name) {
+      return String(name || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    }
+
+    function findQuantityValueByAliases(aliases) {
+      if (!Array.isArray(aliases) || aliases.length === 0) return null;
+      for (const row of qRows) {
+        const n = toFiniteNumber(row?.value);
+        if (!Number.isFinite(n)) continue;
+        const tokens = tokenizeDimensionName(row?.name);
+        const compact = tokens.join("");
+        const hasAlias = aliases.some((alias) => tokens.includes(alias) || compact.includes(alias));
+        if (hasAlias) return n;
+      }
+      return null;
+    }
+
+    function resolveBoundingBoxDimensions(geometry) {
+      const rawX = toFiniteNumber(geometry?.boundingBoxRawX);
+      const rawY = toFiniteNumber(geometry?.boundingBoxRawY);
+      const rawZ = toFiniteNumber(geometry?.boundingBoxRawZ);
+      const candidates = [rawX, rawY, rawZ].filter((v) => Number.isFinite(v));
+      if (!candidates.length) {
+        return {
+          length: geometry?.boundingBoxLength,
+          width: geometry?.boundingBoxWidth,
+          height: geometry?.boundingBoxHeight,
+        };
+      }
+
+      const qLength = findQuantityValueByAliases(["length", "lunghezza", "overalllength", "nominallength"]);
+      const qWidth = findQuantityValueByAliases([
+        "width",
+        "larghezza",
+        "overallwidth",
+        "nominalwidth",
+        "thickness",
+        "spessore",
+        "depth",
+        "profondita",
+      ]);
+      const qHeight = findQuantityValueByAliases(["height", "altezza", "overallheight", "nominalheight"]);
+
+      const remaining = [...candidates];
+      const out = { length: null, width: null, height: null };
+      function pickClosest(target) {
+        if (!Number.isFinite(target) || !remaining.length) return null;
+        let bestIdx = -1;
+        let bestDelta = Number.POSITIVE_INFINITY;
+        remaining.forEach((item, idx) => {
+          const delta = Math.abs(item - target);
+          if (delta < bestDelta) {
+            bestDelta = delta;
+            bestIdx = idx;
+          }
+        });
+        if (bestIdx < 0) return null;
+        return remaining.splice(bestIdx, 1)[0];
+      }
+
+      out.height = pickClosest(qHeight);
+      out.length = pickClosest(qLength);
+      out.width = pickClosest(qWidth);
+
+      const sortedRemaining = [...remaining].sort((a, b) => a - b);
+      if (!Number.isFinite(out.width) && sortedRemaining.length) out.width = sortedRemaining[0];
+      if (!Number.isFinite(out.height) && sortedRemaining.length > 1) out.height = sortedRemaining[1];
+      if (!Number.isFinite(out.length) && sortedRemaining.length) out.length = sortedRemaining[sortedRemaining.length - 1];
+
+      if (!Number.isFinite(out.height)) out.height = toFiniteNumber(geometry?.boundingBoxHeight);
+      if (!Number.isFinite(out.length)) out.length = toFiniteNumber(geometry?.boundingBoxLength);
+      if (!Number.isFinite(out.width)) out.width = toFiniteNumber(geometry?.boundingBoxWidth);
+      return out;
+    }
+
+    function readIfcEntityId(node) {
+      if (node === null || node === undefined) return null;
+      if (typeof node === "number" && Number.isFinite(node)) return node;
+      if (typeof node !== "object") return null;
+      const candidates = [node.expressID, node.expressId, node.id, node.value, node.Value, node._internalValue];
+      for (const c of candidates) {
+        const n = toFiniteNumber(c);
+        if (Number.isFinite(n)) return Math.trunc(n);
+      }
+      return null;
     }
 
     function findNodeByKeyRecursive(node, targetKey) {
@@ -724,13 +906,26 @@ window.addEventListener("DOMContentLoaded", () => {
       return null;
     }
 
-    const objectPlacement = findNodeByKeyRecursive(root, "ObjectPlacement");
-    const relativePlacement = findNodeByKeyRecursive(objectPlacement, "RelativePlacement");
-    const location = findNodeByKeyRecursive(relativePlacement, "Location");
-    const coordinates = findNodeByKeyRecursive(location, "Coordinates");
-    const axis = findNodeByKeyRecursive(relativePlacement, "Axis");
-    const refDirection = findNodeByKeyRecursive(relativePlacement, "RefDirection");
+    function pickDirectOrRecursive(node, preferredKeys = [], fallbackKey = "") {
+      if (node && typeof node === "object") {
+        for (const key of preferredKeys) {
+          if (Object.prototype.hasOwnProperty.call(node, key) && node[key] !== undefined && node[key] !== null) {
+            return node[key];
+          }
+        }
+      }
+      if (!fallbackKey) return null;
+      return findNodeByKeyRecursive(node, fallbackKey);
+    }
 
+    const objectPlacement = findNodeByKeyRecursive(root, "ObjectPlacement");
+    const relativePlacement = pickDirectOrRecursive(objectPlacement, ["RelativePlacement", "relativePlacement"], "RelativePlacement");
+    const location = pickDirectOrRecursive(relativePlacement, ["Location", "location"], "Location");
+    const coordinates = pickDirectOrRecursive(location, ["Coordinates", "coordinates"], "Coordinates");
+    const axis = pickDirectOrRecursive(relativePlacement, ["Axis", "axis"], "Axis");
+    const refDirection = pickDirectOrRecursive(relativePlacement, ["RefDirection", "refDirection"], "RefDirection");
+
+    const placementCoords = extractPlacementCoordinates(coordinates);
     if (coordinates) {
       const coordsText = normalizeIfcScalar(coordinates);
       if (coordsText) addRow(locationRows, "Coordinate locali (X,Y,Z)", coordsText, "m");
@@ -750,7 +945,9 @@ window.addEventListener("DOMContentLoaded", () => {
     if (axisDir) addRow(locationRows, "Asse (DirectionRatios)", normalizeIfcScalar(axisDir));
     if (refDir) addRow(locationRows, "Direzione riferimento", normalizeIfcScalar(refDir));
 
-    const placementRelTo = findNodeByKeyRecursive(objectPlacement, "PlacementRelTo");
+    const placementRelTo = pickDirectOrRecursive(objectPlacement, ["PlacementRelTo", "placementRelTo"], "PlacementRelTo");
+    const objectPlacementId = readIfcEntityId(objectPlacement);
+    const placementRelToId = readIfcEntityId(placementRelTo);
     if (placementRelTo && typeof placementRelTo === "object") {
       const relName =
         normalizeIfcScalar(placementRelTo.Name) ||
@@ -760,6 +957,19 @@ window.addEventListener("DOMContentLoaded", () => {
         "";
       if (relName) addRow(membershipRows, "Relativo a", relName);
     }
+    const resolvedObjectPlacementId = Number.isFinite(placementDebug?.objectPlacementId)
+      ? placementDebug.objectPlacementId
+      : objectPlacementId;
+    const resolvedPlacementRelToId = Number.isFinite(placementDebug?.placementRelToId)
+      ? placementDebug.placementRelToId
+      : placementRelToId;
+    const resolvedRelativePlacementId = Number.isFinite(placementDebug?.relativePlacementId)
+      ? placementDebug.relativePlacementId
+      : null;
+    if (Number.isFinite(resolvedObjectPlacementId)) addRow(membershipRows, "ObjectPlacement ID", resolvedObjectPlacementId);
+    if (Number.isFinite(resolvedRelativePlacementId))
+      addRow(membershipRows, "RelativePlacement ID", resolvedRelativePlacementId);
+    if (Number.isFinite(resolvedPlacementRelToId)) addRow(membershipRows, "PlacementRelTo ID", resolvedPlacementRelToId);
 
     // Fallback frequenti in alcuni IFC esportati con nomi proprietari
     const fallbackKeys = [
@@ -786,25 +996,40 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (geometryInfo) {
+      if (Number.isFinite(selection?.expressID)) addRow(geometryRows, "Express ID", selection.expressID);
       if (typeof geometryInfo.hasOwnGeometry === "boolean") {
         addRow(geometryRows, "Has Own Geometry", geometryInfo.hasOwnGeometry ? "Si" : "No");
       }
-      if (Number.isFinite(geometryInfo.globalX)) addRow(geometryRows, "Global X", geometryInfo.globalX, "m");
-      if (Number.isFinite(geometryInfo.globalY)) addRow(geometryRows, "Global Y", geometryInfo.globalY, "m");
-      if (Number.isFinite(geometryInfo.globalZ)) addRow(geometryRows, "Global Z", geometryInfo.globalZ, "m");
-      if (Number.isFinite(geometryInfo.boundingBoxLength))
-        addRow(geometryRows, "Bounding Box Length", geometryInfo.boundingBoxLength, "m");
-      if (Number.isFinite(geometryInfo.boundingBoxWidth))
-        addRow(geometryRows, "Bounding Box Width", geometryInfo.boundingBoxWidth, "m");
-      if (Number.isFinite(geometryInfo.boundingBoxHeight))
-        addRow(geometryRows, "Bounding Box Height", geometryInfo.boundingBoxHeight, "m");
+      // Priorita': punto reale cliccato nel viewer -> placement istanza -> fallback geometry info.
+      const resolvedGlobalX = Number.isFinite(hitPoint?.x)
+        ? hitPoint.x
+        : Number.isFinite(placementCoords.x)
+          ? placementCoords.x
+          : geometryInfo.globalX;
+      const resolvedGlobalY = Number.isFinite(hitPoint?.y)
+        ? hitPoint.y
+        : Number.isFinite(placementCoords.y)
+          ? placementCoords.y
+          : geometryInfo.globalY;
+      const resolvedGlobalZ = Number.isFinite(hitPoint?.z)
+        ? hitPoint.z
+        : Number.isFinite(placementCoords.z)
+          ? placementCoords.z
+          : geometryInfo.globalZ;
+      const resolvedBBox = resolveBoundingBoxDimensions(geometryInfo);
+      if (Number.isFinite(resolvedGlobalX)) addRow(geometryRows, "Global X", resolvedGlobalX, "m");
+      if (Number.isFinite(resolvedGlobalY)) addRow(geometryRows, "Global Y", resolvedGlobalY, "m");
+      if (Number.isFinite(resolvedGlobalZ)) addRow(geometryRows, "Global Z", resolvedGlobalZ, "m");
+      if (Number.isFinite(resolvedBBox.length)) addRow(geometryRows, "Bounding Box Length", resolvedBBox.length, "m");
+      if (Number.isFinite(resolvedBBox.width)) addRow(geometryRows, "Bounding Box Width", resolvedBBox.width, "m");
+      if (Number.isFinite(resolvedBBox.height)) addRow(geometryRows, "Bounding Box Height", resolvedBBox.height, "m");
 
-      const hasGlobalZ = Number.isFinite(geometryInfo.globalZ);
-      const hasBBoxHeight = Number.isFinite(geometryInfo.boundingBoxHeight);
+      const hasGlobalZ = Number.isFinite(resolvedGlobalZ);
+      const hasBBoxHeight = Number.isFinite(resolvedBBox.height);
       if (hasGlobalZ && hasBBoxHeight) {
-        const halfH = Number(geometryInfo.boundingBoxHeight) / 2;
-        const topElevation = Number((Number(geometryInfo.globalZ) + halfH).toFixed(3));
-        const bottomElevation = Number((Number(geometryInfo.globalZ) - halfH).toFixed(3));
+        const halfH = Number(resolvedBBox.height) / 2;
+        const topElevation = Number((Number(resolvedGlobalZ) + halfH).toFixed(3));
+        const bottomElevation = Number((Number(resolvedGlobalZ) - halfH).toFixed(3));
         addRow(locationRows, "Top Elevation", topElevation, "m");
         addRow(locationRows, "Bottom Elevation", bottomElevation, "m");
         addRow(locationRows, "Global Top Elevation", topElevation, "m");
@@ -812,7 +1037,6 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    const qRows = extractQuantityRows(selection);
     qRows.forEach((row) => {
       const n = String(row.name || "").toLowerCase();
       if (n.includes("length") || n.includes("width") || n.includes("height") || n.includes("depth") || n.includes("thickness")) {
@@ -957,12 +1181,35 @@ window.addEventListener("DOMContentLoaded", () => {
    */
   let computoModificatoPerExportJson = false;
 
+  function updateComputoDirtyIndicator() {
+    if (!computoDirtyIndicatorEl) return;
+    computoDirtyIndicatorEl.hidden = !computoModificatoPerExportJson;
+  }
+
   function segnaComputoModificatoPerExportJson() {
     computoModificatoPerExportJson = true;
+    updateComputoDirtyIndicator();
   }
 
   function azzeraComputoModificatoPerExportJson() {
     computoModificatoPerExportJson = false;
+    updateComputoDirtyIndicator();
+  }
+
+  function isElementoInFormTracciatoPerDirty(target) {
+    if (!(target instanceof Element)) return false;
+    const trackedFormsSelector = [
+      "#piano-form",
+      "#strati-mur-form",
+      "#aperture-elev-form",
+      "#scavo-form",
+      "#corsello-form",
+      "#camminamenti-form",
+      "#misurazioni-form",
+      "#voce-dialog-form",
+      "#voce-mm-riga-dialog-form",
+    ].join(", ");
+    return Boolean(target.closest(trackedFormsSelector));
   }
 
   function savePiani() {
@@ -1097,13 +1344,90 @@ window.addEventListener("DOMContentLoaded", () => {
     return TIPOMISURA_VOCE_AUTOMATICA;
   }
 
+  function normalizzaTipoMisurazioneVoce(raw) {
+    const s = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+    if (s === VOCE_MM_TIPO_SEMIAUTOMATICA) return VOCE_MM_TIPO_SEMIAUTOMATICA;
+    return VOCE_MM_TIPO_MANUALE;
+  }
+
+  function parseNonNegativeDecimal3OrNull(raw) {
+    const txt = String(raw ?? "").trim();
+    if (txt === "") return null;
+    const normalized = txt.replaceAll(",", ".");
+    if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
+    const n = Number(normalized);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return Number(n.toFixed(3));
+  }
+
+  function mmFactorOrOne(value) {
+    return typeof value === "number" && Number.isFinite(value) ? value : 1;
+  }
+
+  function formatFixedOrOne(raw) {
+    const txt = String(raw ?? "").trim();
+    if (txt === "") return "1";
+    const parsed = parseNonNegativeDecimal3OrNull(txt);
+    if (parsed === null) return null;
+    return Number(parsed).toFixed(3);
+  }
+
+  function calcolaMisurazioneVoceSemiautomatica(misura1, misura2, misura3, numero, segno) {
+    if (!Number.isInteger(numero) || numero < 0) {
+      return { ok: false, message: "NUMERO deve essere un intero maggiore o uguale a zero." };
+    }
+    const raw = Number((mmFactorOrOne(misura1) * mmFactorOrOne(misura2) * mmFactorOrOne(misura3) * numero).toFixed(3));
+    const risultato = segno ? -Math.abs(raw) : raw;
+    return { ok: true, risultato };
+  }
+
+  function getVoceMmRigaRisultatoPreview() {
+    const formula = (voceMmRigaFormulaEl?.value || "").trim();
+    const numeroParsed = Number.parseInt(voceMmRigaNumeroEl?.value || "0", 10);
+    const segno = voceMmRigaSegnoEl?.checked === true;
+    const misura1 = parseNonNegativeDecimal3OrNull(voceMmRigaMisura1El?.value);
+    const misura2 = parseNonNegativeDecimal3OrNull(voceMmRigaMisura2El?.value);
+    const misura3 = parseNonNegativeDecimal3OrNull(voceMmRigaMisura3El?.value);
+    const hasSemiData =
+      (voceMmRigaTipoOggettoEl?.value || "").trim() !== "" ||
+      (voceMmRigaSpecificaEl?.value || "").trim() !== "" ||
+      (voceMmRigaMisura1El?.value || "").trim() !== "" ||
+      (voceMmRigaMisura2El?.value || "").trim() !== "" ||
+      (voceMmRigaMisura3El?.value || "").trim() !== "";
+    const hasFormula = formula !== "";
+    const tipo = hasFormula && !hasSemiData ? VOCE_MM_TIPO_MANUALE : VOCE_MM_TIPO_SEMIAUTOMATICA;
+    if (!Number.isInteger(numeroParsed) || numeroParsed < 0) {
+      return { ok: false, risultato: 0 };
+    }
+    if (tipo === VOCE_MM_TIPO_MANUALE) {
+      const calc = calcolaMisurazioneVaria(formula, numeroParsed, segno);
+      if (!calc.ok) return { ok: false, risultato: 0 };
+      return { ok: true, risultato: calc.risultato };
+    }
+    const calc = calcolaMisurazioneVoceSemiautomatica(misura1, misura2, misura3, numeroParsed, segno);
+    if (!calc.ok) return { ok: false, risultato: 0 };
+    return { ok: true, risultato: calc.risultato };
+  }
+
+  function updateVoceMmRisultatoPreview() {
+    if (!voceMmRisultatoPreviewEl) return;
+    const preview = getVoceMmRigaRisultatoPreview();
+    const risultato = preview.ok ? preview.risultato : 0;
+    const risultatoText = Number(risultato).toLocaleString("it-IT", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    voceMmRisultatoPreviewEl.textContent = `RISULTATO: ${risultatoText}`;
+    voceMmRisultatoPreviewEl.classList.toggle("is-negativo", Number(risultato) < 0);
+  }
+
   function normalizzaMisurazioniManualiVoce(raw) {
     if (!Array.isArray(raw)) return [];
     return raw
       .filter(
         (m) =>
           typeof m?.piano === "string" &&
-          typeof m?.riferimento === "string" &&
+          (typeof m?.riferimento === "string" || typeof m?.specifica === "string") &&
           typeof m?.formula === "string" &&
           (typeof m?.formulaValue === "number" || m?.formulaValue === null) &&
           typeof m?.numero === "number" &&
@@ -1113,10 +1437,19 @@ window.addEventListener("DOMContentLoaded", () => {
           Number.isFinite(m.risultato),
       )
       .map((m) => ({
+        tipo: normalizzaTipoMisurazioneVoce(m.tipo),
         piano: m.piano,
-        riferimento: m.riferimento,
+        riferimento: m.riferimento || m.specifica || "",
+        tipoOggetto: typeof m?.tipoOggetto === "string" ? m.tipoOggetto : "",
+        specifica: typeof m?.specifica === "string" ? m.specifica : "",
         formula: m.formula,
         formulaValue: m.formulaValue,
+        misura1:
+          typeof m?.misura1 === "number" && Number.isFinite(m.misura1) ? Number(m.misura1.toFixed(3)) : null,
+        misura2:
+          typeof m?.misura2 === "number" && Number.isFinite(m.misura2) ? Number(m.misura2.toFixed(3)) : null,
+        misura3:
+          typeof m?.misura3 === "number" && Number.isFinite(m.misura3) ? Number(m.misura3.toFixed(3)) : null,
         numero: m.numero,
         segno: m.segno === true,
         risultato: m.risultato,
@@ -1284,7 +1617,7 @@ window.addEventListener("DOMContentLoaded", () => {
     vistaCompilazioneEl.hidden = true;
     vistaVociEl.hidden = false;
     if (vistaBimEl) vistaBimEl.hidden = true;
-    renderVoci();
+    chiudiTutteLeVociManuali();
     window.scrollTo({ top: 0, behavior: "auto" });
   }
 
@@ -1492,6 +1825,41 @@ window.addEventListener("DOMContentLoaded", () => {
     if (voceMmRigaFormulaEl) voceMmRigaFormulaEl.value = "";
     if (voceMmRigaNumeroEl) voceMmRigaNumeroEl.value = "1";
     if (voceMmRigaSegnoEl) voceMmRigaSegnoEl.checked = false;
+    if (voceMmRigaTipoOggettoEl) voceMmRigaTipoOggettoEl.value = "";
+    if (voceMmRigaSpecificaEl) voceMmRigaSpecificaEl.value = "";
+    if (voceMmRigaMisura1El) voceMmRigaMisura1El.value = "";
+    if (voceMmRigaMisura2El) voceMmRigaMisura2El.value = "";
+    if (voceMmRigaMisura3El) voceMmRigaMisura3El.value = "";
+    toggleVoceMmFieldsByTipo(VOCE_MM_TIPO_MANUALE);
+    updateVoceMmRisultatoPreview();
+  }
+
+  function toggleVoceMmFieldsByTipo(tipoRaw) {
+    normalizzaTipoMisurazioneVoce(tipoRaw);
+    if (voceMmFieldsManualeEl) voceMmFieldsManualeEl.hidden = false;
+    if (voceMmFieldsSemiautomaticaEl) voceMmFieldsSemiautomaticaEl.hidden = false;
+    syncVoceMmExclusiveFields();
+  }
+
+  function syncVoceMmExclusiveFields() {
+    const formulaCompilata = (voceMmRigaFormulaEl?.value || "").trim() !== "";
+    const semiCompilata =
+      (voceMmRigaTipoOggettoEl?.value || "").trim() !== "" ||
+      (voceMmRigaSpecificaEl?.value || "").trim() !== "" ||
+      (voceMmRigaMisura1El?.value || "").trim() !== "" ||
+      (voceMmRigaMisura2El?.value || "").trim() !== "" ||
+      (voceMmRigaMisura3El?.value || "").trim() !== "";
+
+    const disattivaSemi = formulaCompilata;
+    const disattivaFormula = semiCompilata;
+
+    if (voceMmRigaTipoOggettoEl) voceMmRigaTipoOggettoEl.disabled = disattivaSemi;
+    if (voceMmRigaSpecificaEl) voceMmRigaSpecificaEl.disabled = disattivaSemi;
+    if (voceMmRigaMisura1El) voceMmRigaMisura1El.disabled = disattivaSemi;
+    if (voceMmRigaMisura2El) voceMmRigaMisura2El.disabled = disattivaSemi;
+    if (voceMmRigaMisura3El) voceMmRigaMisura3El.disabled = disattivaSemi;
+    if (voceMmRigaFormulaEl) voceMmRigaFormulaEl.disabled = disattivaFormula;
+    updateVoceMmRisultatoPreview();
   }
 
   function openVoceMmRigaDialog(idVoce, index) {
@@ -1517,7 +1885,14 @@ window.addEventListener("DOMContentLoaded", () => {
       voceMmRigaFormulaEl.value = row.formula;
       voceMmRigaNumeroEl.value = String(row.numero);
       voceMmRigaSegnoEl.checked = row.segno === true;
+      if (voceMmRigaTipoOggettoEl) voceMmRigaTipoOggettoEl.value = row.tipoOggetto || "";
+      if (voceMmRigaSpecificaEl) voceMmRigaSpecificaEl.value = row.specifica || "";
+      if (voceMmRigaMisura1El) voceMmRigaMisura1El.value = row.misura1 === null ? "" : String(row.misura1);
+      if (voceMmRigaMisura2El) voceMmRigaMisura2El.value = row.misura2 === null ? "" : String(row.misura2);
+      if (voceMmRigaMisura3El) voceMmRigaMisura3El.value = row.misura3 === null ? "" : String(row.misura3);
     }
+    toggleVoceMmFieldsByTipo(VOCE_MM_TIPO_MANUALE);
+    updateVoceMmRisultatoPreview();
     voceMmRigaDialogEl.showModal();
     setTimeout(() => voceMmRigaPianoEl?.focus(), 0);
   }
@@ -1538,24 +1913,79 @@ window.addEventListener("DOMContentLoaded", () => {
     const { idVoce, index } = voceMmDialogContext;
     if (idVoce === null) return;
     const piano = voceMmRigaPianoEl.value.trim();
-    const riferimento = voceMmRigaRiferimentoEl.value.trim();
+    const riferimentoManuale = voceMmRigaRiferimentoEl.value.trim();
     const formula = voceMmRigaFormulaEl.value.trim();
     const segno = voceMmRigaSegnoEl.checked;
     const numeroParsed = Number.parseInt(voceMmRigaNumeroEl.value, 10);
-    if (!piano || !riferimento) {
-      window.alert("Compila PIANO e RIFERIMENTO.");
+    const tipoOggetto = voceMmRigaTipoOggettoEl?.value.trim() || "";
+    const specifica = voceMmRigaSpecificaEl?.value.trim() || "";
+    const misura1 = parseNonNegativeDecimal3OrNull(voceMmRigaMisura1El?.value);
+    const misura2 = parseNonNegativeDecimal3OrNull(voceMmRigaMisura2El?.value);
+    const misura3 = parseNonNegativeDecimal3OrNull(voceMmRigaMisura3El?.value);
+    const hasFormula = formula !== "";
+    const hasSemiData =
+      tipoOggetto !== "" ||
+      specifica !== "" ||
+      (voceMmRigaMisura1El?.value || "").trim() !== "" ||
+      (voceMmRigaMisura2El?.value || "").trim() !== "" ||
+      (voceMmRigaMisura3El?.value || "").trim() !== "";
+    const tipo =
+      hasFormula && !hasSemiData
+        ? VOCE_MM_TIPO_MANUALE
+        : hasSemiData && !hasFormula
+          ? VOCE_MM_TIPO_SEMIAUTOMATICA
+          : VOCE_MM_TIPO_MANUALE;
+    if (!piano) {
+      window.alert("Compila il campo PIANO.");
       return;
     }
-    const calc = calcolaMisurazioneVaria(formula, numeroParsed, segno);
+    let riferimento = riferimentoManuale;
+    let calc = null;
+    if (hasFormula && hasSemiData) {
+      window.alert("Compila solo una tipologia per riga: FORMULA oppure campi SEMIAUTOMATICA.");
+      return;
+    }
+    if (tipo === VOCE_MM_TIPO_SEMIAUTOMATICA) {
+      riferimento = specifica;
+      if (!specifica || !tipoOggetto) {
+        window.alert("Per SEMIAUTOMATICA compila TIPOOGGETTO e SPECIFICA.");
+        return;
+      }
+      if ((voceMmRigaMisura1El?.value || "").trim() !== "" && misura1 === null) {
+        window.alert("MISURA1 non valida: usa un numero >= 0 con max 3 decimali.");
+        return;
+      }
+      if ((voceMmRigaMisura2El?.value || "").trim() !== "" && misura2 === null) {
+        window.alert("MISURA2 non valida: usa un numero >= 0 con max 3 decimali.");
+        return;
+      }
+      if ((voceMmRigaMisura3El?.value || "").trim() !== "" && misura3 === null) {
+        window.alert("MISURA3 non valida: usa un numero >= 0 con max 3 decimali.");
+        return;
+      }
+      calc = calcolaMisurazioneVoceSemiautomatica(misura1, misura2, misura3, numeroParsed, segno);
+    } else {
+      if (!riferimentoManuale) {
+        window.alert("Compila PIANO e RIFERIMENTO.");
+        return;
+      }
+      calc = calcolaMisurazioneVaria(formula, numeroParsed, segno);
+    }
     if (!calc.ok) {
       window.alert(calc.message);
       return;
     }
     const nuovaRiga = {
+      tipo,
       piano,
       riferimento,
-      formula,
-      formulaValue: calc.formulaValue,
+      tipoOggetto: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? tipoOggetto : "",
+      specifica: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? specifica : "",
+      formula: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? "" : formula,
+      formulaValue: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? null : calc.formulaValue,
+      misura1: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura1 : null,
+      misura2: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2 : null,
+      misura3: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3 : null,
       numero: numeroParsed,
       segno,
       risultato: calc.risultato,
@@ -1599,16 +2029,26 @@ window.addEventListener("DOMContentLoaded", () => {
     const mm = normalizzaMisurazioniManualiVoce(v.misurazioniManuali);
     const row = mm[index];
     if (!row) return;
-    const calc = calcolaMisurazioneVaria(row.formula, row.numero, row.segno);
+    const tipo = normalizzaTipoMisurazioneVoce(row.tipo);
+    const calc =
+      tipo === VOCE_MM_TIPO_SEMIAUTOMATICA
+        ? calcolaMisurazioneVoceSemiautomatica(row.misura1, row.misura2, row.misura3, row.numero, row.segno)
+        : calcolaMisurazioneVaria(row.formula, row.numero, row.segno);
     if (!calc.ok) {
       window.alert(calc.message);
       return;
     }
     const copy = {
+      tipo,
       piano: row.piano,
       riferimento: row.riferimento,
-      formula: row.formula,
-      formulaValue: calc.formulaValue,
+      tipoOggetto: row.tipoOggetto || "",
+      specifica: row.specifica || "",
+      formula: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? "" : row.formula,
+      formulaValue: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? null : calc.formulaValue,
+      misura1: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? row.misura1 ?? null : null,
+      misura2: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? row.misura2 ?? null : null,
+      misura3: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? row.misura3 ?? null : null,
       numero: row.numero,
       segno: row.segno === true,
       risultato: calc.risultato,
@@ -1855,8 +2295,8 @@ window.addEventListener("DOMContentLoaded", () => {
         addMmRowButton.dataset.action = "add-voce-mm";
         addMmRowButton.dataset.idVoce = String(item.idVoce);
         addMmRowButton.textContent = "+";
-        addMmRowButton.title = "Aggiungi misurazione manuale";
-        addMmRowButton.setAttribute("aria-label", "Aggiungi misurazione manuale");
+        addMmRowButton.title = "Aggiungi misurazione (scegli tipologia)";
+        addMmRowButton.setAttribute("aria-label", "Aggiungi misurazione (scegli tipologia)");
         actionsCell.appendChild(addMmRowButton);
       }
       row.appendChild(actionsCell);
@@ -1866,6 +2306,7 @@ window.addEventListener("DOMContentLoaded", () => {
         isVoceManuale && (voceFocusId === item.idVoce || !vociMmCollapsed.has(item.idVoce));
       if (mostraMisurazioniManuali) {
         const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        const mmTotalColumns = 14;
         let sumMm = 0;
         mm.forEach((m) => {
           sumMm += Number(m.risultato || 0);
@@ -1884,15 +2325,31 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const table = document.createElement("table");
         table.className = "table-voce-mm-inline";
+        const colgroup = document.createElement("colgroup");
+        const isVoceFullscreen = voceFocusId === item.idVoce;
+        const colWidths = isVoceFullscreen
+          ? [48, 48, 110, 120, 120, 120, 210, 58, 58, 58, 58, 58, 58, 74]
+          : [36, 36, 76, 88, 88, 88, 130, 42, 42, 42, 42, 42, 46, 52];
+        colWidths.forEach((w) => {
+          const col = document.createElement("col");
+          col.style.width = `${w}px`;
+          colgroup.appendChild(col);
+        });
+        table.appendChild(colgroup);
 
         const thead = document.createElement("thead");
         const hr = document.createElement("tr");
         [
           "IDMIS.",
           "IDVOCE",
+          "TIPO",
           "PIANO",
-          "RIF.",
+          "TIPOOGGETTO",
+          "SPECIFICA",
           "FORMULA",
+          "M1",
+          "M2",
+          "M3",
           "N.°",
           "SEGNO",
           "RIS.",
@@ -1911,7 +2368,7 @@ window.addEventListener("DOMContentLoaded", () => {
           trSubtotal.className = `voce-mm-subtotal-row ${className}`;
 
           const tdLabel = document.createElement("td");
-          tdLabel.colSpan = 7;
+          tdLabel.colSpan = Math.max(1, mmTotalColumns - 2);
           tdLabel.className = "voce-mm-subtotal-label";
           tdLabel.textContent = label;
 
@@ -1929,14 +2386,14 @@ window.addEventListener("DOMContentLoaded", () => {
         if (mm.length === 0) {
           const er = document.createElement("tr");
           const ec = document.createElement("td");
-          ec.colSpan = 9;
+          ec.colSpan = mmTotalColumns;
           ec.className = "empty-cell";
           ec.textContent =
             "Nessuna misurazione. Usa il + verde dopo la X sulla riga voce (doppio clic su una riga per modificare).";
           er.appendChild(ec);
           tbody.appendChild(er);
         } else {
-          /** @type {Map<string, Map<string, { m: { piano: string, riferimento: string, formula: string, formulaValue: number|null, numero: number, segno: boolean, risultato: number }, idx: number }[]>>} */
+          /** @type {Map<string, Map<string, { m: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, numero: number, segno: boolean, risultato: number }, idx: number }[]>>} */
           const grouped = new Map();
           mm.forEach((m, idx) => {
             const pianoKey = (m.piano || "-").trim() || "-";
@@ -1958,16 +2415,28 @@ window.addEventListener("DOMContentLoaded", () => {
                 trMm.dataset.mmIndex = String(idx);
                 trMm.title = "Doppio clic per modificare";
                 if (m.segno) trMm.classList.add("row-sottrai");
+                const mmTipo = normalizzaTipoMisurazioneVoce(m.tipo);
                 trMm.appendChild(createCell(String(idx + 1)));
                 trMm.appendChild(createCell(String(item.idVoce)));
-                trMm.appendChild(createCell(m.piano || "-"));
-                trMm.appendChild(createCell(m.riferimento || "-"));
-                trMm.appendChild(createCell(m.formula || "-"));
+                trMm.appendChild(createCell(mmTipo));
+                trMm.appendChild(createCell(m.piano || ""));
+                trMm.appendChild(createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.tipoOggetto || "") : ""));
+                trMm.appendChild(createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.specifica || "") : (m.riferimento || "")));
+                trMm.appendChild(createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? "" : (m.formula || "")));
+                trMm.appendChild(
+                  createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.misura1 === null ? "" : Number(m.misura1).toFixed(3)) : ""),
+                );
+                trMm.appendChild(
+                  createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.misura2 === null ? "" : Number(m.misura2).toFixed(3)) : ""),
+                );
+                trMm.appendChild(
+                  createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.misura3 === null ? "" : Number(m.misura3).toFixed(3)) : ""),
+                );
                 trMm.appendChild(createCell(String(m.numero)));
                 trMm.appendChild(createCell(m.segno ? "-" : "+"));
                 trMm.appendChild(createCell(fmt2(m.risultato)));
                 const ac = document.createElement("td");
-                ac.className = "actions-cell";
+                ac.className = "actions-cell mm-actions-cell";
                 const dup = document.createElement("button");
                 dup.type = "button";
                 dup.className = "btn-action btn-mm-dup";
@@ -2467,6 +2936,11 @@ window.addEventListener("DOMContentLoaded", () => {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
+    const fmt3 = (value) =>
+      Number(value || 0).toLocaleString("it-IT", {
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
+      });
 
     const voices = [...voci].sort((a, b) => a.posizione - b.posizione || a.idVoce - b.idVoce);
     let totaleComplessivoComputo = 0;
@@ -2503,7 +2977,11 @@ window.addEventListener("DOMContentLoaded", () => {
             y += detailLineH;
             rows.forEach((m) => {
               ensureSpace(detailLineH);
-              const detailLine = `${m.formula || "-"};`;
+              const mmTipo = normalizzaTipoMisurazioneVoce(m.tipo);
+              const detailLine =
+                mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA
+                  ? `${fmt3(m.misura1 ?? 1)} x ${fmt3(m.misura2 ?? 1)} x ${fmt3(m.misura3 ?? 1)};`
+                  : `${m.formula || "-"};`;
               drawText(leftTextX, y + 3.8, detailLine, false, detailFontSize);
               drawText(partiUgualiX, y + 3.8, String(m.numero), false, detailFontSize);
               drawTextRight(resultRightX, y + 3.8, fmtRis(m.risultato), false, detailFontSize);
@@ -3004,6 +3482,787 @@ window.addEventListener("DOMContentLoaded", () => {
     saveMurDati();
     renderMisurazioniVarie();
     window.alert(`Importate ${nuoveMisure.length} misurazioni da IFC.`);
+  }
+
+  function cloneStateArray(value) {
+    return JSON.parse(JSON.stringify(Array.isArray(value) ? value : []));
+  }
+
+  function normalizeIfcTypeName(value) {
+    return String(value || "").trim().toUpperCase();
+  }
+
+  function toFiniteNumberFromUnknown(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (value && typeof value === "object") {
+      if ("value" in value) return toFiniteNumberFromUnknown(value.value);
+      if ("Value" in value) return toFiniteNumberFromUnknown(value.Value);
+      if ("wrappedValue" in value) return toFiniteNumberFromUnknown(value.wrappedValue);
+      if ("_internalValue" in value) return toFiniteNumberFromUnknown(value._internalValue);
+    }
+    const parsed = Number.parseFloat(String(value ?? "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+
+  function readExpressIdFromAny(node) {
+    if (node === null || node === undefined) return null;
+    if (typeof node === "number" && Number.isFinite(node)) return Math.trunc(node);
+    if (!node || typeof node !== "object") return null;
+    const candidates = [node.expressID, node.expressId, node.id, node.value, node.Value, node._internalValue];
+    for (const candidate of candidates) {
+      const id = readExpressIdFromAny(candidate);
+      if (Number.isFinite(id)) return id;
+    }
+    return null;
+  }
+
+  function collectEntityIdsByKeys(root, keys) {
+    const wanted = new Set(keys.map((k) => String(k).toLowerCase()));
+    const found = new Set();
+    function walk(node) {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      Object.entries(node).forEach(([key, value]) => {
+        if (wanted.has(String(key).toLowerCase())) {
+          const addValue = (candidate) => {
+            if (Array.isArray(candidate)) {
+              candidate.forEach(addValue);
+              return;
+            }
+            const id = readExpressIdFromAny(candidate);
+            if (Number.isFinite(id)) found.add(id);
+          };
+          addValue(value);
+        }
+        walk(value);
+      });
+    }
+    walk(root);
+    return Array.from(found);
+  }
+
+  function buildOpeningIdsByWallId(openings) {
+    const map = new Map();
+    const wallRefKeys = [
+      "RelatingBuildingElement",
+      "RelatedBuildingElement",
+      "BuildingElement",
+      "RelatingElement",
+      "RelatedElement",
+      "VoidsElements",
+      "VoidsElement",
+      "FillsVoids",
+      "HasFillings",
+      "HasOpenings",
+    ];
+    openings.forEach((opening) => {
+      const openingId = readExpressIdFromAny(opening?.expressID);
+      if (!Number.isFinite(openingId)) return;
+      const wallIds = collectEntityIdsByKeys(opening, wallRefKeys);
+      wallIds.forEach((wallId) => {
+        if (!Number.isFinite(wallId)) return;
+        if (!map.has(wallId)) map.set(wallId, new Set());
+        map.get(wallId).add(openingId);
+      });
+    });
+    return map;
+  }
+
+  function buildOpeningIdsByWallFromRelVoids(relVoidsElements) {
+    const map = new Map();
+    relVoidsElements.forEach((rel) => {
+      const wallIds = collectEntityIdsByKeys(rel, ["RelatingBuildingElement", "RelatingElement", "BuildingElement"]);
+      const openingIds = collectEntityIdsByKeys(rel, ["RelatedOpeningElement", "RelatingOpeningElement", "OpeningElement"]);
+      wallIds.forEach((wallId) => {
+        if (!Number.isFinite(wallId)) return;
+        if (!map.has(wallId)) map.set(wallId, new Set());
+        openingIds.forEach((openingId) => {
+          if (Number.isFinite(openingId)) map.get(wallId).add(openingId);
+        });
+      });
+    });
+    return map;
+  }
+
+  function buildFillElementIdsByOpeningFromRelFills(relFillsElements) {
+    const map = new Map();
+    relFillsElements.forEach((rel) => {
+      const openingIds = collectEntityIdsByKeys(rel, ["RelatingOpeningElement", "RelatedOpeningElement", "OpeningElement"]);
+      const fillIds = collectEntityIdsByKeys(rel, ["RelatedBuildingElement", "RelatingBuildingElement", "BuildingElement"]);
+      openingIds.forEach((openingId) => {
+        if (!Number.isFinite(openingId)) return;
+        if (!map.has(openingId)) map.set(openingId, new Set());
+        fillIds.forEach((fillId) => {
+          if (Number.isFinite(fillId)) map.get(openingId).add(fillId);
+        });
+      });
+    });
+    return map;
+  }
+
+  function readIfcStoreyLabel(element) {
+    const fromLocation = String(element?.locationInfo?.storey || "").trim();
+    if (fromLocation) return fromLocation;
+    const fromPset = stringifyIfcVal(pickFirstRecursive(element?.propertySets, "Storey")).trim();
+    return fromPset || "";
+  }
+
+  function readTipostruttura(element) {
+    const psets = element?.propertySets;
+    if (!psets || typeof psets !== "object") return "";
+    const targetKeys = ["TIPOSTRUTTURA", "TipoStruttura", "Tipo Struttura", "Tipo struttura", "TypeStructure"];
+    for (const key of targetKeys) {
+      const raw = pickFirstRecursive(psets, key);
+      const value = stringifyIfcVal(raw).trim();
+      if (value) return value;
+    }
+    return "";
+  }
+
+  function readElementLabel(element) {
+    const fromName = stringifyIfcVal(pickFirstRecursive(element?.properties, "Name")).trim();
+    if (fromName) return fromName;
+    const fromTag = stringifyIfcVal(pickFirstRecursive(element?.properties, "Tag")).trim();
+    if (fromTag) return fromTag;
+    return `${String(element?.ifcType || "Elemento")} #${String(element?.expressID || "")}`.trim();
+  }
+
+  function readElementMetric(element, metric) {
+    const rows = Array.isArray(element?.quantities) ? element.quantities : [];
+    const match = rows.find(
+      (q) =>
+        String(q?.metric || "").toLowerCase() === String(metric).toLowerCase() &&
+        typeof q?.value === "number" &&
+        Number.isFinite(q.value),
+    );
+    if (match) return Number(match.value);
+    return NaN;
+  }
+
+  function readMuroDimensions(element) {
+    function toFiniteNumber(value) {
+      if (value === null || value === undefined) return null;
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      const text = String(value).trim().replace(",", ".");
+      if (!text) return null;
+      const parsed = Number.parseFloat(text);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    function tokenizeDimensionName(name) {
+      return String(name || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    }
+    function findQuantityValueByAliases(rows, aliases) {
+      if (!Array.isArray(aliases) || aliases.length === 0) return null;
+      for (const row of rows) {
+        const n = toFiniteNumber(row?.value);
+        if (!Number.isFinite(n)) continue;
+        const tokens = tokenizeDimensionName(row?.name);
+        const compact = tokens.join("");
+        const hasAlias = aliases.some((alias) => tokens.includes(alias) || compact.includes(alias));
+        if (hasAlias) return n;
+      }
+      return null;
+    }
+    function resolveBoundingBoxDimensionsLikeComputolore(geometry, qRows) {
+      const rawX = toFiniteNumber(geometry?.boundingBoxRawX);
+      const rawY = toFiniteNumber(geometry?.boundingBoxRawY);
+      const rawZ = toFiniteNumber(geometry?.boundingBoxRawZ);
+      const candidates = [rawX, rawY, rawZ].filter((v) => Number.isFinite(v));
+      if (!candidates.length) {
+        return {
+          length: toFiniteNumber(geometry?.boundingBoxLength),
+          width: toFiniteNumber(geometry?.boundingBoxWidth),
+          height: toFiniteNumber(geometry?.boundingBoxHeight),
+        };
+      }
+
+      const qLength = findQuantityValueByAliases(qRows, ["length", "lunghezza", "overalllength", "nominallength"]);
+      const qWidth = findQuantityValueByAliases(qRows, [
+        "width",
+        "larghezza",
+        "overallwidth",
+        "nominalwidth",
+        "thickness",
+        "spessore",
+        "depth",
+        "profondita",
+      ]);
+      const qHeight = findQuantityValueByAliases(qRows, ["height", "altezza", "overallheight", "nominalheight"]);
+
+      const remaining = [...candidates];
+      const out = { length: null, width: null, height: null };
+      function pickClosest(target) {
+        if (!Number.isFinite(target) || !remaining.length) return null;
+        let bestIdx = -1;
+        let bestDelta = Number.POSITIVE_INFINITY;
+        remaining.forEach((item, idx) => {
+          const delta = Math.abs(item - target);
+          if (delta < bestDelta) {
+            bestDelta = delta;
+            bestIdx = idx;
+          }
+        });
+        if (bestIdx < 0) return null;
+        return remaining.splice(bestIdx, 1)[0];
+      }
+      out.height = pickClosest(qHeight);
+      out.length = pickClosest(qLength);
+      out.width = pickClosest(qWidth);
+
+      const sortedRemaining = [...remaining].sort((a, b) => a - b);
+      if (!Number.isFinite(out.width) && sortedRemaining.length) out.width = sortedRemaining[0];
+      if (!Number.isFinite(out.height) && sortedRemaining.length > 1) out.height = sortedRemaining[1];
+      if (!Number.isFinite(out.length) && sortedRemaining.length) out.length = sortedRemaining[sortedRemaining.length - 1];
+
+      if (!Number.isFinite(out.height)) out.height = toFiniteNumber(geometry?.boundingBoxHeight);
+      if (!Number.isFinite(out.length)) out.length = toFiniteNumber(geometry?.boundingBoxLength);
+      if (!Number.isFinite(out.width)) out.width = toFiniteNumber(geometry?.boundingBoxWidth);
+      return out;
+    }
+
+    const qRows = extractQuantityRows(element);
+    const resolvedGeom = resolveBoundingBoxDimensionsLikeComputolore(element?.geometryInfo, qRows);
+    const geomLength = toFiniteNumberFromUnknown(element?.geometryInfo?.boundingBoxLength);
+    const geomHeight = toFiniteNumberFromUnknown(element?.geometryInfo?.boundingBoxHeight);
+    const geomWidth = toFiniteNumberFromUnknown(element?.geometryInfo?.boundingBoxWidth);
+    const geomRawX = toFiniteNumberFromUnknown(element?.geometryInfo?.boundingBoxRawX);
+    const geomRawY = toFiniteNumberFromUnknown(element?.geometryInfo?.boundingBoxRawY);
+    const geomRawZ = toFiniteNumberFromUnknown(element?.geometryInfo?.boundingBoxRawZ);
+    const geomRawSorted = [geomRawX, geomRawY, geomRawZ].filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+    const geomByHeuristic = geomRawSorted.length === 3
+      ? {
+          spessore: geomRawSorted[0],
+          altezza: geomRawSorted[1],
+          lunghezza: geomRawSorted[2],
+        }
+      : null;
+    const psetLunghezza = toFiniteNumberFromUnknown(
+      pickFirstRecursive(element?.propertySets, "LUNGHEZZA") ??
+        pickFirstRecursive(element?.propertySets, "Lunghezza") ??
+        pickFirstRecursive(element?.propertySets, "LENGTH"),
+    );
+    const psetAltezza = toFiniteNumberFromUnknown(
+      pickFirstRecursive(element?.propertySets, "ALTEZZA") ??
+        pickFirstRecursive(element?.propertySets, "Altezza") ??
+        pickFirstRecursive(element?.propertySets, "HEIGHT"),
+    );
+    const psetSpessore = toFiniteNumberFromUnknown(
+      pickFirstRecursive(element?.propertySets, "SPESSORE") ??
+        pickFirstRecursive(element?.propertySets, "Spessore") ??
+        pickFirstRecursive(element?.propertySets, "THICKNESS") ??
+        pickFirstRecursive(element?.propertySets, "WIDTH"),
+    );
+    const qLength = readElementMetric(element, "length");
+    const qHeight = readElementMetric(element, "height");
+    const qWidth = readElementMetric(element, "width");
+    const pLength = toFiniteNumberFromUnknown(
+      pickFirstRecursive(element?.properties, "Length") ?? pickFirstRecursive(element?.properties, "OverallLength"),
+    );
+    const pHeight = toFiniteNumberFromUnknown(
+      pickFirstRecursive(element?.properties, "Height") ?? pickFirstRecursive(element?.properties, "OverallHeight"),
+    );
+    const pWidth = toFiniteNumberFromUnknown(
+      pickFirstRecursive(element?.properties, "Width") ?? pickFirstRecursive(element?.properties, "OverallWidth"),
+    );
+    const lunghezza = Number.isFinite(resolvedGeom?.length)
+      ? resolvedGeom.length
+      : Number.isFinite(psetLunghezza)
+      ? psetLunghezza
+      : Number.isFinite(qLength)
+        ? qLength
+        : Number.isFinite(pLength)
+          ? pLength
+          : Number.isFinite(geomLength)
+            ? geomLength
+            : Number.isFinite(geomByHeuristic?.lunghezza)
+              ? geomByHeuristic.lunghezza
+              : 0;
+    const altezza = Number.isFinite(resolvedGeom?.height)
+      ? resolvedGeom.height
+      : Number.isFinite(psetAltezza)
+        ? psetAltezza
+        : Number.isFinite(qHeight)
+          ? qHeight
+          : Number.isFinite(pHeight)
+            ? pHeight
+            : Number.isFinite(geomHeight)
+              ? geomHeight
+              : Number.isFinite(geomByHeuristic?.altezza)
+                ? geomByHeuristic.altezza
+                : 0;
+    const spessore = Number.isFinite(resolvedGeom?.width)
+      ? resolvedGeom.width
+      : Number.isFinite(psetSpessore)
+      ? psetSpessore
+      : Number.isFinite(geomByHeuristic?.spessore)
+        ? geomByHeuristic.spessore
+      : Number.isFinite(geomWidth)
+        ? geomWidth
+      : Number.isFinite(qWidth)
+        ? qWidth
+        : Number.isFinite(pWidth)
+          ? pWidth
+          : 0;
+    return {
+      lunghezza: Number(lunghezza.toFixed(2)),
+      altezza: Number(altezza.toFixed(2)),
+      spessore: Number(spessore.toFixed(2)),
+    };
+  }
+
+  function readAperturaDimensions(openingElement) {
+    function toFiniteNumber(value) {
+      if (value === null || value === undefined) return null;
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      const text = String(value).trim().replace(",", ".");
+      if (!text) return null;
+      const parsed = Number.parseFloat(text);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    function tokenizeDimensionName(name) {
+      return String(name || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    }
+    function findQuantityValueByAliases(rows, aliases) {
+      if (!Array.isArray(aliases) || aliases.length === 0) return null;
+      for (const row of rows) {
+        const n = toFiniteNumber(row?.value);
+        if (!Number.isFinite(n)) continue;
+        const tokens = tokenizeDimensionName(row?.name);
+        const compact = tokens.join("");
+        const hasAlias = aliases.some((alias) => tokens.includes(alias) || compact.includes(alias));
+        if (hasAlias) return n;
+      }
+      return null;
+    }
+    function resolveBoundingBoxDimensionsLikeComputolore(geometry, qRows) {
+      const rawX = toFiniteNumber(geometry?.boundingBoxRawX);
+      const rawY = toFiniteNumber(geometry?.boundingBoxRawY);
+      const rawZ = toFiniteNumber(geometry?.boundingBoxRawZ);
+      const candidates = [rawX, rawY, rawZ].filter((v) => Number.isFinite(v));
+      if (!candidates.length) {
+        return {
+          length: toFiniteNumber(geometry?.boundingBoxLength),
+          width: toFiniteNumber(geometry?.boundingBoxWidth),
+          height: toFiniteNumber(geometry?.boundingBoxHeight),
+        };
+      }
+      const qLength = findQuantityValueByAliases(qRows, ["length", "lunghezza", "overalllength", "nominallength"]);
+      const qWidth = findQuantityValueByAliases(qRows, [
+        "width",
+        "larghezza",
+        "overallwidth",
+        "nominalwidth",
+        "thickness",
+        "spessore",
+        "depth",
+        "profondita",
+      ]);
+      const qHeight = findQuantityValueByAliases(qRows, ["height", "altezza", "overallheight", "nominalheight"]);
+
+      const remaining = [...candidates];
+      const out = { length: null, width: null, height: null };
+      function pickClosest(target) {
+        if (!Number.isFinite(target) || !remaining.length) return null;
+        let bestIdx = -1;
+        let bestDelta = Number.POSITIVE_INFINITY;
+        remaining.forEach((item, idx) => {
+          const delta = Math.abs(item - target);
+          if (delta < bestDelta) {
+            bestDelta = delta;
+            bestIdx = idx;
+          }
+        });
+        if (bestIdx < 0) return null;
+        return remaining.splice(bestIdx, 1)[0];
+      }
+      out.height = pickClosest(qHeight);
+      out.length = pickClosest(qLength);
+      out.width = pickClosest(qWidth);
+      const sortedRemaining = [...remaining].sort((a, b) => a - b);
+      if (!Number.isFinite(out.width) && sortedRemaining.length) out.width = sortedRemaining[0];
+      if (!Number.isFinite(out.height) && sortedRemaining.length > 1) out.height = sortedRemaining[1];
+      if (!Number.isFinite(out.length) && sortedRemaining.length) out.length = sortedRemaining[sortedRemaining.length - 1];
+      if (!Number.isFinite(out.height)) out.height = toFiniteNumber(geometry?.boundingBoxHeight);
+      if (!Number.isFinite(out.length)) out.length = toFiniteNumber(geometry?.boundingBoxLength);
+      if (!Number.isFinite(out.width)) out.width = toFiniteNumber(geometry?.boundingBoxWidth);
+      return out;
+    }
+
+    const qRows = extractQuantityRows(openingElement);
+    const resolvedGeom = resolveBoundingBoxDimensionsLikeComputolore(openingElement?.geometryInfo, qRows);
+    const qLength = readElementMetric(openingElement, "length");
+    const qHeight = readElementMetric(openingElement, "height");
+    const qWidth = readElementMetric(openingElement, "width");
+    const fromPropsLength = toFiniteNumberFromUnknown(
+      pickFirstRecursive(openingElement?.properties, "OverallWidth") ??
+        pickFirstRecursive(openingElement?.properties, "Width") ??
+        pickFirstRecursive(openingElement?.properties, "NominalWidth"),
+    );
+    const fromPropsHeight = toFiniteNumberFromUnknown(
+      pickFirstRecursive(openingElement?.properties, "OverallHeight") ??
+        pickFirstRecursive(openingElement?.properties, "Height") ??
+        pickFirstRecursive(openingElement?.properties, "NominalHeight"),
+    );
+    const fromPropsSpessore = toFiniteNumberFromUnknown(
+      pickFirstRecursive(openingElement?.properties, "Thickness") ??
+        pickFirstRecursive(openingElement?.properties, "Depth"),
+    );
+    const lunghezza = Number.isFinite(resolvedGeom?.length)
+      ? Number(resolvedGeom.length.toFixed(2))
+      : Number.isFinite(qLength)
+        ? Number(qLength.toFixed(2))
+      : Number.isFinite(fromPropsLength)
+        ? Number(fromPropsLength.toFixed(2))
+        : 0;
+    const altezza = Number.isFinite(resolvedGeom?.height)
+      ? Number(resolvedGeom.height.toFixed(2))
+      : Number.isFinite(qHeight)
+        ? Number(qHeight.toFixed(2))
+      : Number.isFinite(fromPropsHeight)
+        ? Number(fromPropsHeight.toFixed(2))
+        : 0;
+    const spessore = Number.isFinite(resolvedGeom?.width)
+      ? Number(resolvedGeom.width.toFixed(2))
+      : Number.isFinite(qWidth)
+        ? Number(qWidth.toFixed(2))
+        : Number.isFinite(fromPropsSpessore)
+          ? Number(fromPropsSpessore.toFixed(2))
+          : 0;
+    const doorWinFix = correctLunghezzaAltezzaForDoorWindow(
+      String(lunghezza),
+      String(altezza),
+      openingElement?.ifcType,
+    );
+    const parseDim2 = (s) => {
+      const n = Number(String(s).replace(",", "."));
+      return Number.isFinite(n) ? Number(n.toFixed(2)) : 0;
+    };
+    return {
+      lunghezza: parseDim2(doorWinFix.lunghezza),
+      altezza: parseDim2(doorWinFix.altezza),
+      spessore,
+    };
+  }
+
+  function resolvePianoIdPerImportBim() {
+    if (Number.isFinite(compilazionePianoId)) return compilazionePianoId;
+    const primoInterrato = piani.find((p) => String(p.tipologia || "").toLowerCase() === "interrato");
+    if (primoInterrato) return primoInterrato.id;
+    if (piani.length > 0) return piani[0].id;
+    return null;
+  }
+
+  function aggiornaUndoButtonProvaBim() {
+    if (!ifcToMuriApertureUndoButtonEl) return;
+    ifcToMuriApertureUndoButtonEl.disabled = !provaBimWallsBackup;
+  }
+
+  function annullaUltimaProvaMuriApertureDaIfc() {
+    if (!provaBimWallsBackup) {
+      window.alert("Nessuna prova BIM da annullare.");
+      return;
+    }
+    murielevazioni = cloneStateArray(provaBimWallsBackup.murielevazioni);
+    stratiMurElevazione = cloneStateArray(provaBimWallsBackup.stratiMurElevazione);
+    apertureElevazione = cloneStateArray(provaBimWallsBackup.apertureElevazione);
+    elevazioneIdCounter = Number(provaBimWallsBackup.elevazioneIdCounter || 1);
+    stratoMurIdCounter = Number(provaBimWallsBackup.stratoMurIdCounter || 1);
+    aperturaElevIdCounter = Number(provaBimWallsBackup.aperturaElevIdCounter || 1);
+    currentElevazioneId = provaBimWallsBackup.currentElevazioneId;
+    compilazionePianoId = provaBimWallsBackup.compilazionePianoId;
+    murFiltroSoloIdElevazione = provaBimWallsBackup.murFiltroSoloIdElevazione;
+    provaBimWallsBackup = null;
+    saveMurDati();
+    renderMurielevazioni();
+    renderStrati();
+    renderAperture();
+    aggiornaUndoButtonProvaBim();
+    window.alert("Annullamento prova completato: dati precedenti ripristinati.");
+  }
+
+  function importaMuriEApertureDaIfcProva() {
+    if (!ifcDataCache || !Array.isArray(ifcDataCache.elements) || ifcDataCache.elements.length === 0) {
+      window.alert("Nessun dato IFC disponibile. Carica prima un file IFC.");
+      return;
+    }
+    const pianoIdTarget = resolvePianoIdPerImportBim();
+    if (!Number.isFinite(pianoIdTarget)) {
+      window.alert("Nessun piano disponibile. Crea prima almeno un piano.");
+      return;
+    }
+
+    const allElements = ifcDataCache.elements.filter((e) => e && typeof e === "object");
+    const walls = allElements.filter((e) => {
+      const t = normalizeIfcTypeName(e.ifcType);
+      return t === "IFCWALL" || t === "IFCWALLSTANDARDCASE";
+    });
+    const openings = allElements.filter((e) => normalizeIfcTypeName(e.ifcType) === "IFCOPENINGELEMENT");
+    const relVoidsElements = allElements.filter((e) => normalizeIfcTypeName(e.ifcType) === "IFCRELVOIDSELEMENT");
+    const relFillsElements = allElements.filter((e) => normalizeIfcTypeName(e.ifcType) === "IFCRELFILLSELEMENT");
+    const doorsAndWindows = allElements.filter((e) => {
+      const t = normalizeIfcTypeName(e.ifcType);
+      return t === "IFCDOOR" || t === "IFCWINDOW";
+    });
+    if (walls.length === 0) {
+      window.alert("Nel modello IFC non sono stati trovati muri (IFCWALL / IFCWALLSTANDARDCASE).");
+      return;
+    }
+
+    const openingsByExpressId = new Map();
+    openings.forEach((o) => {
+      const id = readExpressIdFromAny(o?.expressID);
+      if (Number.isFinite(id)) openingsByExpressId.set(id, o);
+    });
+    const elementsByExpressId = new Map();
+    allElements.forEach((el) => {
+      const id = readExpressIdFromAny(el?.expressID);
+      if (Number.isFinite(id)) elementsByExpressId.set(id, el);
+    });
+    doorsAndWindows.forEach((el) => {
+      const id = readExpressIdFromAny(el?.expressID);
+      if (Number.isFinite(id)) elementsByExpressId.set(id, el);
+    });
+    const openingIdsByWallId = buildOpeningIdsByWallId(openings);
+    const openingIdsByWallFromRelVoids = buildOpeningIdsByWallFromRelVoids(relVoidsElements);
+    const fillElementIdsByOpening = buildFillElementIdsByOpeningFromRelFills(relFillsElements);
+
+    const piano = piani.find((item) => item.id === pianoIdTarget);
+    const pianoLabel = piano ? `${piano.tipologia} ${piano.piano}`.trim() : `ID ${pianoIdTarget}`;
+    const conferma = window.confirm(
+      `Prova BIM: importare ${walls.length} muri nel piano "${pianoLabel}"?\n` +
+        `L'operazione è annullabile con il pulsante "Annulla ultima prova BIM".`,
+    );
+    if (!conferma) return;
+
+    provaBimWallsBackup = {
+      murielevazioni: cloneStateArray(murielevazioni),
+      stratiMurElevazione: cloneStateArray(stratiMurElevazione),
+      apertureElevazione: cloneStateArray(apertureElevazione),
+      elevazioneIdCounter,
+      stratoMurIdCounter,
+      aperturaElevIdCounter,
+      currentElevazioneId,
+      compilazionePianoId,
+      murFiltroSoloIdElevazione,
+    };
+
+    let muriImportati = 0;
+    let apertureImportate = 0;
+    let firstImportedElevazioneId = null;
+
+    walls.forEach((wall) => {
+      const idElevazione = elevazioneIdCounter++;
+      if (firstImportedElevazioneId === null) firstImportedElevazioneId = idElevazione;
+      const tipoStruttura = readTipostruttura(wall);
+      const storey = readIfcStoreyLabel(wall);
+      const label = readElementLabel(wall);
+      const dimsMuro = readMuroDimensions(wall);
+      const riferimentoParts = [label];
+      if (tipoStruttura) riferimentoParts.push(`TIPOSTRUTTURA: ${tipoStruttura}`);
+      if (storey) riferimentoParts.push(`Piano IFC: ${storey}`);
+      murielevazioni.push({
+        idElevazione,
+        idPiano: pianoIdTarget,
+        riferimento: riferimentoParts.join(" | "),
+        spessore: dimsMuro.spessore,
+        lunghezzaIfc: dimsMuro.lunghezza,
+        altezzaIfc: dimsMuro.altezza,
+        spessoreIfc: dimsMuro.spessore,
+        origineImport: "IFC_PROVA",
+      });
+      muriImportati += 1;
+
+      const wallExpressId = readExpressIdFromAny(wall?.expressID);
+      const openingIdsFromWall = collectEntityIdsByKeys(wall, [
+        "RelatedOpeningElement",
+        "RelatingOpeningElement",
+        "HasOpenings",
+        "VoidsElements",
+      ]);
+      const openingIdsFromOpeningSide = Number.isFinite(wallExpressId)
+        ? Array.from(openingIdsByWallId.get(wallExpressId) || [])
+        : [];
+      const openingIdsFromRelVoids = Number.isFinite(wallExpressId)
+        ? Array.from(openingIdsByWallFromRelVoids.get(wallExpressId) || [])
+        : [];
+      const openingIds = Array.from(
+        new Set([...openingIdsFromWall, ...openingIdsFromOpeningSide, ...openingIdsFromRelVoids]),
+      );
+      openingIds.forEach((openingId) => {
+        const opening = openingsByExpressId.get(openingId) || null;
+        const fillCandidateIds = Array.from(fillElementIdsByOpening.get(openingId) || []);
+        const fillElement = fillCandidateIds
+          .map((id) => elementsByExpressId.get(id))
+          .find((el) => el && (normalizeIfcTypeName(el.ifcType) === "IFCDOOR" || normalizeIfcTypeName(el.ifcType) === "IFCWINDOW"));
+        if (!opening && !fillElement) return;
+        // Il vano IFC (IFCOPENINGELEMENT) spesso non ha BBox/geometry per-id nel mesh: le misure risultano
+        // uguali o assurde per tutte. Porta/finestra ha mesh solida: preferiscila per L/A/S.
+        const elementForDimensions = fillElement || opening;
+        const dims = readAperturaDimensions(elementForDimensions);
+        const openingLabel = readElementLabel(fillElement || opening);
+        apertureElevazione.push({
+          idAperturaElev: aperturaElevIdCounter++,
+          idElevazione,
+          locale: openingLabel || `Apertura IFC #${openingId}`,
+          lunghezza: dims.lunghezza,
+          altezza: dims.altezza,
+          spessoreIfc: dims.spessore,
+          lunghezzaIfc: dims.lunghezza,
+          altezzaIfc: dims.altezza,
+          ante: 1,
+          tipologia: "IFC",
+          falsotelai: false,
+          hDavanzale: 0,
+          idVoceCapitolato: "",
+          origineImport: "IFC_PROVA",
+        });
+        apertureImportate += 1;
+      });
+    });
+
+    compilazionePianoId = pianoIdTarget;
+    currentElevazioneId = firstImportedElevazioneId;
+    murFiltroSoloIdElevazione = null;
+
+    saveMurDati();
+    renderMurielevazioni();
+    renderStrati();
+    renderAperture();
+    aggiornaUndoButtonProvaBim();
+
+    window.alert(
+      `Prova BIM completata.\nMuri importati: ${muriImportati}\nAperture collegate importate: ${apertureImportate}\n` +
+        `Relazioni voids trovate: ${relVoidsElements.length} | Relazioni fills trovate: ${relFillsElements.length}\n\n` +
+        `Se il risultato non ti convince, usa "Annulla ultima prova BIM".`,
+    );
+  }
+
+  function buildRiepilogoCollegamentiRows() {
+    const muriIfc = murielevazioni.filter((mur) => String(mur?.origineImport || "") === "IFC_PROVA");
+    const apertureIfc = apertureElevazione.filter((ap) => String(ap?.origineImport || "") === "IFC_PROVA");
+    const apertureByElevId = new Map();
+    apertureIfc.forEach((ap) => {
+      if (!Number.isFinite(ap?.idElevazione)) return;
+      if (!apertureByElevId.has(ap.idElevazione)) apertureByElevId.set(ap.idElevazione, []);
+      apertureByElevId.get(ap.idElevazione).push(ap);
+    });
+
+    const rows = [];
+    muriIfc.forEach((mur) => {
+      const aperture = apertureByElevId.get(mur.idElevazione) || [];
+      if (aperture.length === 0) {
+        rows.push({
+          idElevazione: mur.idElevazione,
+          idPiano: mur.idPiano,
+          riferimento: mur.riferimento || "",
+          lunghezza: fmt2(Number(mur?.lunghezzaIfc || 0)),
+          altezza: fmt2(Number(mur?.altezzaIfc || 0)),
+          spessore: fmt2(Number((mur?.spessoreIfc ?? mur?.spessore) || 0)),
+          apertureCount: 0,
+          aperturaId: "",
+          aperturaLocale: "Nessuna apertura collegata",
+          aperturaLunghezza: "-",
+          aperturaAltezza: "-",
+          aperturaSpessore: "-",
+          aperturaTipologia: "-",
+        });
+        return;
+      }
+      aperture.forEach((ap, index) => {
+        rows.push({
+          idElevazione: mur.idElevazione,
+          idPiano: mur.idPiano,
+          riferimento: index === 0 ? mur.riferimento || "" : "",
+          lunghezza: index === 0 ? fmt2(Number(mur?.lunghezzaIfc || 0)) : "",
+          altezza: index === 0 ? fmt2(Number(mur?.altezzaIfc || 0)) : "",
+          spessore: index === 0 ? fmt2(Number((mur?.spessoreIfc ?? mur?.spessore) || 0)) : "",
+          apertureCount: index === 0 ? aperture.length : "",
+          aperturaId: ap.idAperturaElev,
+          aperturaLocale: ap.locale || "",
+          aperturaLunghezza: fmt2(Number((ap?.lunghezzaIfc ?? ap?.lunghezza) || 0)),
+          aperturaAltezza: fmt2(Number((ap?.altezzaIfc ?? ap?.altezza) || 0)),
+          aperturaSpessore: fmt2(Number(ap?.spessoreIfc || 0)),
+          aperturaTipologia: ap.tipologia || "",
+        });
+      });
+    });
+    return rows;
+  }
+
+  function renderRiepilogoCollegamentiDialog() {
+    const rows = buildRiepilogoCollegamentiRows();
+    const muriIfc = murielevazioni.filter((m) => String(m?.origineImport || "") === "IFC_PROVA");
+    const apertureIfc = apertureElevazione.filter((a) => String(a?.origineImport || "") === "IFC_PROVA");
+    const totaleMuri = muriIfc.length;
+    const muriConAperture = muriIfc.filter((m) =>
+      apertureIfc.some((a) => a.idElevazione === m.idElevazione),
+    ).length;
+    const totaleAperture = apertureIfc.length;
+
+    const tableRowsHtml =
+      rows.length === 0
+        ? `<tr><td colspan="13" class="empty-cell">Nessun muro disponibile in tabella.</td></tr>`
+        : rows
+            .map(
+              (r) => `<tr>
+          <td>${escapeHtml(r.idPiano)}</td>
+          <td>${escapeHtml(r.idElevazione)}</td>
+          <td>${escapeHtml(r.riferimento)}</td>
+          <td>${escapeHtml(r.lunghezza)}</td>
+          <td>${escapeHtml(r.altezza)}</td>
+          <td>${escapeHtml(r.spessore)}</td>
+          <td>${escapeHtml(r.apertureCount)}</td>
+          <td>${escapeHtml(r.aperturaId)}</td>
+          <td>${escapeHtml(r.aperturaLocale)}</td>
+          <td>${escapeHtml(r.aperturaLunghezza)}</td>
+          <td>${escapeHtml(r.aperturaAltezza)}</td>
+          <td>${escapeHtml(r.aperturaSpessore)}</td>
+          <td>${escapeHtml(r.aperturaTipologia)}</td>
+        </tr>`,
+            )
+            .join("");
+
+    ifcRiepilogoTableWrapEl.innerHTML = `
+      <p class="bim-riepilogo-note">
+        Muri totali: <strong>${totaleMuri}</strong> |
+        Muri con aperture: <strong>${muriConAperture}</strong> |
+        Aperture totali: <strong>${totaleAperture}</strong>
+      </p>
+      <div class="table-wrap bim-riepilogo-table-wrap">
+        <table class="data-table bim-riepilogo-table">
+          <thead>
+            <tr>
+              <th>ID Piano</th>
+              <th>ID Elevazione (muro)</th>
+              <th>Riferimento muro</th>
+              <th>Lunghezza</th>
+              <th>Altezza</th>
+              <th>Spessore</th>
+              <th>N. aperture muro</th>
+              <th>ID Apertura</th>
+              <th>Apertura / locale</th>
+              <th>Apertura Lunghezza</th>
+              <th>Apertura Altezza</th>
+              <th>Apertura Spessore</th>
+              <th>Tipologia</th>
+            </tr>
+          </thead>
+          <tbody>${tableRowsHtml}</tbody>
+        </table>
+      </div>`;
   }
 
   async function exportXls() {
@@ -4385,9 +5644,71 @@ window.addEventListener("DOMContentLoaded", () => {
     formulaDialogEl.close();
   });
 
+  document.addEventListener("input", (event) => {
+    if (!isElementoInFormTracciatoPerDirty(event.target)) return;
+    segnaComputoModificatoPerExportJson();
+  });
+  document.addEventListener("change", (event) => {
+    if (!isElementoInFormTracciatoPerDirty(event.target)) return;
+    segnaComputoModificatoPerExportJson();
+  });
+
   voceMmRigaDialogFormEl?.addEventListener("submit", (event) => {
     event.preventDefault();
     salvaVoceMmRigaDialog();
+  });
+
+  voceMmRigaFormulaEl?.addEventListener("input", () => {
+    syncVoceMmExclusiveFields();
+  });
+  voceMmRigaTipoOggettoEl?.addEventListener("input", () => {
+    syncVoceMmExclusiveFields();
+  });
+  voceMmRigaSpecificaEl?.addEventListener("input", () => {
+    syncVoceMmExclusiveFields();
+  });
+  voceMmRigaMisura1El?.addEventListener("input", () => {
+    syncVoceMmExclusiveFields();
+  });
+  voceMmRigaMisura2El?.addEventListener("input", () => {
+    syncVoceMmExclusiveFields();
+  });
+  voceMmRigaMisura3El?.addEventListener("input", () => {
+    syncVoceMmExclusiveFields();
+  });
+  voceMmRigaNumeroEl?.addEventListener("input", () => {
+    updateVoceMmRisultatoPreview();
+  });
+  voceMmRigaSegnoEl?.addEventListener("change", () => {
+    updateVoceMmRisultatoPreview();
+  });
+  voceMmCopiaMisureInFormulaEl?.addEventListener("click", () => {
+    const m1 = formatFixedOrOne(voceMmRigaMisura1El?.value);
+    const m2 = formatFixedOrOne(voceMmRigaMisura2El?.value);
+    const m3 = formatFixedOrOne(voceMmRigaMisura3El?.value);
+    if (m1 === null || m2 === null || m3 === null) {
+      window.alert("Le misure devono essere numeri validi (max 3 decimali) prima della copia in formula.");
+      return;
+    }
+    const hadAnyMisura =
+      (voceMmRigaMisura1El?.value || "").trim() !== "" ||
+      (voceMmRigaMisura2El?.value || "").trim() !== "" ||
+      (voceMmRigaMisura3El?.value || "").trim() !== "";
+    if (!hadAnyMisura) {
+      window.alert("Compila almeno una misura prima di usare la copia in formula.");
+      return;
+    }
+    const confirmed = window.confirm(
+      "Confermi la conversione in FORMULA?\nVerrà inserito (MISURA1 * MISURA2 * MISURA3) nel campo FORMULA e saranno azzerati i campi semiautomatici.",
+    );
+    if (!confirmed) return;
+    if (voceMmRigaFormulaEl) voceMmRigaFormulaEl.value = `(${m1} * ${m2} * ${m3})`;
+    if (voceMmRigaMisura1El) voceMmRigaMisura1El.value = "";
+    if (voceMmRigaMisura2El) voceMmRigaMisura2El.value = "";
+    if (voceMmRigaMisura3El) voceMmRigaMisura3El.value = "";
+    if (voceMmRigaTipoOggettoEl) voceMmRigaTipoOggettoEl.value = "";
+    if (voceMmRigaSpecificaEl) voceMmRigaSpecificaEl.value = "";
+    syncVoceMmExclusiveFields();
   });
 
   voceMmRigaCancelEl?.addEventListener("click", () => {
@@ -5224,6 +6545,58 @@ window.addEventListener("DOMContentLoaded", () => {
   ifcToMisureButtonEl?.addEventListener("click", () => {
     importaMisurazioniDaIfc();
   });
+  if (ifcToMisureButtonEl?.parentElement) {
+    ifcToMuriApertureButtonEl.type = "button";
+    ifcToMuriApertureButtonEl.id = "btn-ifc-to-muri-aperture-prova";
+    ifcToMuriApertureButtonEl.className = ifcToMisureButtonEl.className || "btn-action";
+    ifcToMuriApertureButtonEl.textContent = "PROVA BIM MURI+APERTURE";
+    ifcToMuriApertureButtonEl.title = "Importa muri e aperture dal BIM (prova annullabile)";
+    ifcToMuriApertureButtonEl.addEventListener("click", () => {
+      importaMuriEApertureDaIfcProva();
+    });
+
+    ifcToMuriApertureUndoButtonEl.type = "button";
+    ifcToMuriApertureUndoButtonEl.id = "btn-annulla-prova-bim-muri-aperture";
+    ifcToMuriApertureUndoButtonEl.className = ifcToMisureButtonEl.className || "btn-action";
+    ifcToMuriApertureUndoButtonEl.textContent = "ANNULLA ULTIMA PROVA BIM";
+    ifcToMuriApertureUndoButtonEl.title = "Ripristina i dati prima della prova BIM";
+    ifcToMuriApertureUndoButtonEl.disabled = true;
+    ifcToMuriApertureUndoButtonEl.addEventListener("click", () => {
+      annullaUltimaProvaMuriApertureDaIfc();
+    });
+
+    ifcRiepilogoCollegamentiButtonEl.type = "button";
+    ifcRiepilogoCollegamentiButtonEl.id = "btn-ifc-riepilogo-collegamenti";
+    ifcRiepilogoCollegamentiButtonEl.className = ifcToMisureButtonEl.className || "btn-action";
+    ifcRiepilogoCollegamentiButtonEl.textContent = "RIEPILOGO MURI/APERTURE";
+    ifcRiepilogoCollegamentiButtonEl.title = "Mostra tabella riepilogativa collegamenti muro-apertura";
+    ifcRiepilogoCollegamentiButtonEl.addEventListener("click", () => {
+      renderRiepilogoCollegamentiDialog();
+      ifcRiepilogoDialogEl.showModal();
+    });
+
+    ifcToMisureButtonEl.insertAdjacentElement("afterend", ifcToMuriApertureButtonEl);
+    ifcToMuriApertureButtonEl.insertAdjacentElement("afterend", ifcToMuriApertureUndoButtonEl);
+    ifcToMuriApertureUndoButtonEl.insertAdjacentElement("afterend", ifcRiepilogoCollegamentiButtonEl);
+  }
+
+  ifcRiepilogoDialogEl.id = "ifc-riepilogo-collegamenti-dialog";
+  ifcRiepilogoDialogEl.className = "ifc-riepilogo-dialog";
+  ifcRiepilogoDialogEl.innerHTML = `
+    <form method="dialog" class="ifc-riepilogo-dialog-form">
+      <div class="ifc-riepilogo-dialog-header">
+        <h3>Riepilogo collegamenti muri/aperture</h3>
+      </div>
+    </form>
+  `;
+  ifcRiepilogoTableWrapEl.className = "ifc-riepilogo-table-host";
+  ifcRiepilogoCloseButtonEl.type = "button";
+  ifcRiepilogoCloseButtonEl.className = "btn-action btn-secondary";
+  ifcRiepilogoCloseButtonEl.textContent = "Chiudi";
+  ifcRiepilogoCloseButtonEl.addEventListener("click", () => ifcRiepilogoDialogEl.close());
+  ifcRiepilogoDialogEl.appendChild(ifcRiepilogoTableWrapEl);
+  ifcRiepilogoDialogEl.appendChild(ifcRiepilogoCloseButtonEl);
+  document.body.appendChild(ifcRiepilogoDialogEl);
 
   setupBimTabs();
 
@@ -5232,6 +6605,7 @@ window.addEventListener("DOMContentLoaded", () => {
   loadVociUnitaOptions();
   loadVoci();
   loadIfcData();
+  updateComputoDirtyIndicator();
   if (ifcDataCache?.source?.fileName && bimViewerStatusEl) {
     const totalEls = Number(ifcDataCache?.summary?.totalElements || 0);
     const totalMisure = Number(ifcDataCache?.summary?.totalMeasurements || 0);
@@ -5245,6 +6619,7 @@ window.addEventListener("DOMContentLoaded", () => {
   setCorselloFormMode();
   setCamminamentiFormMode();
   setMisurazioniFormMode();
+  toggleVoceMmFieldsByTipo(VOCE_MM_TIPO_MANUALE);
   updateFormulaButtonState(scavoFormulaEl, apriFormulaScavoButtonEl);
   updateFormulaButtonState(corselloFormulaEl, apriFormulaCorselloButtonEl);
   updateFormulaButtonState(camminamentiFormulaEl, apriFormulaCamminamentiButtonEl);
@@ -5271,7 +6646,8 @@ window.addEventListener("DOMContentLoaded", () => {
   renderCorselli();
   renderCamminamenti();
   renderMisurazioniVarie();
-  renderVoci();
+  chiudiTutteLeVociManuali();
+  aggiornaUndoButtonProvaBim();
 
   (function ripristinaVoceDialogDaCercaVoce() {
     const params = new URLSearchParams(window.location.search);

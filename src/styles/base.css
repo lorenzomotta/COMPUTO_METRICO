@@ -111,6 +111,17 @@ body {
   color: #000;
 }
 
+.sidebar-dirty-indicator {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
 .sidebar-actions {
   display: grid;
   gap: 8px;
@@ -515,6 +526,8 @@ button {
   padding: 0 8px 8px;
   background: linear-gradient(180deg, #f6f9fd 0%, #fff 28px);
   border-bottom: 1px solid #e2eaf4;
+  max-width: 0;
+  overflow: hidden;
 }
 
 .voci-mm-nested-wrap {
@@ -523,16 +536,22 @@ button {
 
 .voci-mm-table-wrap {
   max-height: 200px;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding-right: 6px;
   border: 1px solid #dbe5f2;
   border-radius: 8px;
 }
 
 .table-voce-mm-inline {
   width: 100%;
-  min-width: 560px;
+  min-width: 850px;
   border-collapse: collapse;
   font-size: 0.75rem;
+  table-layout: fixed;
 }
 
 .table-voce-mm-inline th,
@@ -552,57 +571,102 @@ button {
   z-index: 1;
 }
 
-/* ID/N/SEGNO stretti al minimo; FORMULA usa lo spazio liberato */
+/* Larghezze colonne fisse (14 colonne) per allineamento stabile */
 .table-voce-mm-inline th:nth-child(1),
 .table-voce-mm-inline td:nth-child(1),
 .table-voce-mm-inline th:nth-child(2),
-.table-voce-mm-inline td:nth-child(2),
-.table-voce-mm-inline th:nth-child(6),
-.table-voce-mm-inline td:nth-child(6),
-.table-voce-mm-inline th:nth-child(7),
-.table-voce-mm-inline td:nth-child(7) {
-  width: 1%;
+.table-voce-mm-inline td:nth-child(2) {
+  width: 48px;
   white-space: nowrap;
   text-align: center;
   padding-left: 2px;
   padding-right: 2px;
 }
 
-.table-voce-mm-inline th:nth-child(5),
-.table-voce-mm-inline td:nth-child(5) {
-  width: 100%;
-  min-width: 15rem;
+.table-voce-mm-inline th:nth-child(3),
+.table-voce-mm-inline td:nth-child(3) {
+  width: 110px;
+  white-space: nowrap;
 }
 
-.table-voce-mm-inline .actions-cell {
-  width: auto;
-  min-width: 4.5rem;
+.table-voce-mm-inline th:nth-child(4),
+.table-voce-mm-inline td:nth-child(4),
+.table-voce-mm-inline th:nth-child(5),
+.table-voce-mm-inline td:nth-child(5),
+.table-voce-mm-inline th:nth-child(6),
+.table-voce-mm-inline td:nth-child(6) {
+  width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-voce-mm-inline th:nth-child(7),
+.table-voce-mm-inline td:nth-child(7) {
+  width: 210px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-voce-mm-inline th:nth-child(8),
+.table-voce-mm-inline td:nth-child(8),
+.table-voce-mm-inline th:nth-child(9),
+.table-voce-mm-inline td:nth-child(9),
+.table-voce-mm-inline th:nth-child(10),
+.table-voce-mm-inline td:nth-child(10),
+.table-voce-mm-inline th:nth-child(11),
+.table-voce-mm-inline td:nth-child(11),
+.table-voce-mm-inline th:nth-child(12),
+.table-voce-mm-inline td:nth-child(12),
+.table-voce-mm-inline th:nth-child(13),
+.table-voce-mm-inline td:nth-child(13) {
+  width: 58px;
+  white-space: nowrap;
+  text-align: center;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+.table-voce-mm-inline th:nth-child(14),
+.table-voce-mm-inline td:nth-child(14) {
+  width: 74px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.table-voce-mm-inline .mm-actions-cell {
+  width: 74px;
+  min-width: 74px;
   text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   flex-wrap: nowrap;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.table-voce-mm-inline .btn-mm-dup {
+.table-voce-mm-inline .mm-actions-cell .btn-mm-dup {
   font-size: 0.82rem;
-  padding: 2px 5px;
-  min-height: 24px;
-  min-width: 26px;
+  padding: 2px 4px;
+  min-height: 22px;
+  min-width: 24px;
   background: linear-gradient(180deg, #f0f7ff 0%, #e4eef9 100%);
   border: 1px solid #7aa3d6;
   color: #1a3558;
 }
 
-.table-voce-mm-inline .btn-mm-dup:hover {
+.table-voce-mm-inline .mm-actions-cell .btn-mm-dup:hover {
   filter: brightness(1.04);
 }
 
-.table-voce-mm-inline .btn-mm-del {
+.table-voce-mm-inline .mm-actions-cell .btn-mm-del {
   font-size: 0.7rem;
-  padding: 2px 6px;
-  min-height: 24px;
+  padding: 2px 5px;
+  min-height: 22px;
+  min-width: 24px;
 }
 
 tr.voce-mm-data-row {
@@ -692,6 +756,20 @@ tr.voce-mm-data-row:hover {
   flex: 1 1 auto;
   max-height: calc(100vh - 215px);
   overflow: auto;
+  padding-right: 0;
+}
+
+#vista-voci.voce-focus-mode .table-voce-mm-inline {
+  min-width: 1210px;
+}
+
+#vista-voci:not(.voce-focus-mode) .voci-mm-table-wrap {
+  overflow-x: hidden;
+}
+
+#vista-voci:not(.voce-focus-mode) .table-voce-mm-inline {
+  min-width: 0;
+  width: 100%;
 }
 
 #vista-voci.voce-focus-mode .voci-mm-totale {
@@ -758,6 +836,33 @@ tr.voce-mm-data-row:hover {
   width: 100%;
 }
 
+.voce-mm-riga-r3 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px 14px;
+  align-items: start;
+  width: 100%;
+}
+
+.voce-mm-riga-r3 .field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.voce-mm-riga-r3 .field label {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 4px;
+}
+
+.voce-mm-riga-r3 .field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .voce-mm-riga-formula-field {
   min-width: 0;
 }
@@ -769,9 +874,34 @@ tr.voce-mm-data-row:hover {
   font-size: 0.9rem;
 }
 
+.voce-mm-riga-formula-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voce-mm-mini-btn {
+  min-height: 24px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+}
+
 .voce-mm-riga-actions {
   margin-top: 14px;
   padding-top: 4px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.voce-mm-risultato-preview {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #1a3558;
+  font-weight: 600;
+}
+
+.voce-mm-risultato-preview.is-negativo {
+  color: #b22222;
 }
 
 .voce-misurazioni-manuali-totale {

@@ -849,6 +849,9 @@
               <button id="btn-vista-bim" type="button" class="btn-action btn-secondary">VISTA BIM 3D</button>
               <button id="btn-chiudi-app" type="button" class="btn-action btn-delete">CHIUDI</button>
             </div>
+            <p id="computo-dirty-indicator" class="sidebar-dirty-indicator" hidden>
+              Modifiche non esportate
+            </p>
             <p class="sidebar-text">Area pronta per riepiloghi e dettagli.</p>
           </div>
         </aside>
@@ -936,9 +939,19 @@
                 </div>
               </div>
             </div>
-            <div class="voce-mm-riga-r2">
+            <div class="voce-mm-riga-r2 voce-mm-fields-manuale">
               <div class="field voce-mm-riga-formula-field">
-                <label for="voce-mm-riga-formula">FORMULA</label>
+                <label for="voce-mm-riga-formula">
+                  FORMULA
+                  <button
+                    id="voce-mm-copia-misure-in-formula"
+                    type="button"
+                    class="btn-action btn-secondary voce-mm-mini-btn"
+                    title="Copia MISURA1*MISURA2*MISURA3 in FORMULA"
+                  >
+                    Usa misure
+                  </button>
+                </label>
                 <input
                   id="voce-mm-riga-formula"
                   type="text"
@@ -951,8 +964,31 @@
                 <input id="voce-mm-riga-numero" type="number" step="1" min="0" placeholder="0" required />
               </div>
             </div>
+            <div class="voce-mm-riga-r3 voce-mm-fields-semiautomatica" hidden>
+              <div class="field">
+                <label for="voce-mm-riga-tipooggetto">TIPOOGGETTO</label>
+                <input id="voce-mm-riga-tipooggetto" type="text" placeholder="Es: MURO, SOLAIO..." autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="voce-mm-riga-specifica">SPECIFICA</label>
+                <input id="voce-mm-riga-specifica" type="text" placeholder="Es: Setto sud" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="voce-mm-riga-misura1">MISURA1</label>
+                <input id="voce-mm-riga-misura1" type="number" step="0.001" min="0" placeholder="0,000" />
+              </div>
+              <div class="field">
+                <label for="voce-mm-riga-misura2">MISURA2</label>
+                <input id="voce-mm-riga-misura2" type="number" step="0.001" min="0" placeholder="0,000" />
+              </div>
+              <div class="field">
+                <label for="voce-mm-riga-misura3">MISURA3</label>
+                <input id="voce-mm-riga-misura3" type="number" step="0.001" min="0" placeholder="0,000" />
+              </div>
+            </div>
           </div>
           <div class="formula-dialog-actions voce-mm-riga-actions">
+            <p id="voce-mm-risultato-preview" class="voce-mm-risultato-preview">RISULTATO: 0,00</p>
             <button id="voce-mm-riga-cancel" type="button" class="btn-action btn-delete">Annulla</button>
             <button id="voce-mm-riga-save" type="submit" class="btn-action btn-secondary">Salva</button>
           </div>

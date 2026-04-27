@@ -155,7 +155,8 @@ export function createBimViewer(containerEl, setStatus, onSelectedElement) {
 
       for (const expressID of expressIds) {
         try {
-          const itemProperties = await manager.getItemProperties(modelID, expressID, false);
+          // true include relazioni inverse utili (es: aperture collegate ai muri)
+          const itemProperties = await manager.getItemProperties(modelID, expressID, true);
           const propertySets = await manager.getPropertySets(modelID, expressID, true);
           const typeProperties = await manager.getTypeProperties(modelID, expressID, true);
           const materialProperties = await manager.getMaterialsProperties(modelID, expressID, true);
@@ -163,6 +164,7 @@ export function createBimViewer(containerEl, setStatus, onSelectedElement) {
           const plainPsets = toPlainIfcValue(propertySets);
           const plainTypeProps = toPlainIfcValue(typeProperties);
           const plainMaterials = toPlainIfcValue(materialProperties);
+          const geometryInfo = computeElementGeometryInfo(modelID, expressID);
 
           const quantities = collectNumericQuantities(plainPsets);
           const basicMeasurements = quantities.map((q) => ({
@@ -189,6 +191,7 @@ export function createBimViewer(containerEl, setStatus, onSelectedElement) {
             propertySets: plainPsets,
             typeProperties: plainTypeProps,
             materialProperties: plainMaterials,
+            geometryInfo,
             quantities,
             measurements: basicMeasurements,
           });
@@ -267,6 +270,14 @@ export function createBimViewer(containerEl, setStatus, onSelectedElement) {
       const ifcType = ifcTypeNameByCode.get(Number(typeCode)) || String(typeCode || "N/D");
       const geometryInfo = computeElementGeometryInfo(modelID, expressID);
       const locationInfo = extractSpatialLocationInfo(expressID);
+      const placementDebug = await extractPlacementDebugInfo(modelID, expressID);
+      const hitPoint = firstHit.point
+        ? {
+            x: Number(firstHit.point.x.toFixed(3)),
+            y: Number(firstHit.point.y.toFixed(3)),
+            z: Number(firstHit.point.z.toFixed(3)),
+          }
+        : null;
       highlightExpressID(expressID);
       if (reqId !== selectionRequestSeq) return;
 
@@ -282,6 +293,8 @@ export function createBimViewer(containerEl, setStatus, onSelectedElement) {
         quantities: [],
         geometryInfo,
         locationInfo,
+        hitPoint,
+        placementDebug,
       });
       setStatus(`Elemento selezionato: ${ifcType} #${expressID}. Lettura proprietà...`);
 
@@ -305,6 +318,8 @@ export function createBimViewer(containerEl, setStatus, onSelectedElement) {
         quantities,
         geometryInfo,
         locationInfo,
+        hitPoint,
+        placementDebug,
       });
       setStatus(`Elemento selezionato: ${ifcType} #${expressID}`);
     } catch (error) {
@@ -342,7 +357,8 @@ export function createBimViewer(containerEl, setStatus, onSelectedElement) {
         modelID,
         ids: [expressID],
         material: selectionMaterial,
-        scene: null,
+        // Il subset deve essere in scena per avere matrixWorld aggiornata.
+        scene,
         removePrevious: true,
         customID: "zoom-preview-subset",
       });
@@ -369,34 +385,108 @@ export function createBimViewer(containerEl, setStatus, onSelectedElement) {
   }
 
   function computeElementGeometryInfo(modelID, expressID) {
-    try {
-      const subsetId = `geom-info-subset-${expressID}`;
+    function round3(n) {
+      return Number(Number(n).toFixed(3));
+    }
+
+    function mapBoxDimensions(size) {
+      // Regola stabile:
+      // - Height = asse Z (verticale)
+      // - Length/Width = assi orizzontali ordinati (maggiore/minore)
+      const sizeX = Number(size?.x ?? NaN);
+      const sizeY = Number(size?.y ?? NaN);
+      const sizeZ = Number(size?.z ?? NaN);
+      const horizontal = [sizeX, sizeY].filter((n) => Number.isFinite(n)).sort((a, b) => b - a);
+      const length = horizontal.length ? horizontal[0] : sizeX;
+      const width = horizontal.length > 1 ? horizontal[1] : sizeY;
+      return {
+        boundingBoxLength: round3(length),
+        boundingBoxWidth: round3(width),
+        boundingBoxHeight: round3(sizeZ),
+      };
+    }
+
+    function computeFromModelVertices() {
+      if (!currentModel || !currentModel.geometry) return null;
+      const geometry = currentModel.geometry;
+      const positionAttr = geometry.getAttribute?.("position");
+      const expressIdAttr = geometry.getAttribute?.("expressID");
+      if (!positionAttr || !expressIdAttr) return null;
+
+      currentModel.updateMatrixWorld(true);
+      const targetId = Number(expressID);
+      const box = new THREE.Box3();
+      const p = new THREE.Vector3();
+      let found = false;
+
+      const count = Math.min(Number(positionAttr.count) || 0, Number(expressIdAttr.count) || 0);
+      for (let i = 0; i < count; i++) {
+        if (Number(expressIdAttr.getX(i)) !== targetId) continue;
+        p.fromBufferAttribute(positionAttr, i).applyMatrix4(currentModel.matrixWorld);
+        box.expandByPoint(p);
+        found = true;
+      }
+      if (!found || box.isEmpty()) return null;
+
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const mapped = mapBoxDimensions(size);
+      return {
+        hasOwnGeometry: true,
+        globalX: round3(center.x),
+        globalY: round3(center.y),
+        globalZ: round3(center.z),
+        boundingBoxRawX: round3(size.x),
+        boundingBoxRawY: round3(size.y),
+        boundingBoxRawZ: round3(size.z),
+        boundingBoxLength: mapped.boundingBoxLength,
+        boundingBoxWidth: mapped.boundingBoxWidth,
+        boundingBoxHeight: mapped.boundingBoxHeight,
+      };
+    }
+
+    function computeFromSubsetFallback() {
+      const subsetId = "geom-info-subset";
+      // Pulisce eventuale subset precedente per evitare cache/stati sporchi.
+      try {
+        ifcLoader.ifcManager.removeSubset(modelID, selectionMaterial, subsetId);
+      } catch (_) {
+        // subset assente: ignorabile
+      }
       const tmpSubset = ifcLoader.ifcManager.createSubset({
         modelID,
         ids: [expressID],
         material: selectionMaterial,
-        scene: null,
+        scene,
         removePrevious: true,
         customID: subsetId,
       });
       if (!tmpSubset) return null;
+      currentModel?.updateMatrixWorld?.(true);
+      tmpSubset.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(tmpSubset);
       ifcLoader.ifcManager.removeSubset(modelID, selectionMaterial, subsetId);
       if (box.isEmpty()) return null;
 
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
-      const round3 = (n) => Number(Number(n).toFixed(3));
-
+      const mapped = mapBoxDimensions(size);
       return {
         hasOwnGeometry: true,
         globalX: round3(center.x),
         globalY: round3(center.y),
         globalZ: round3(center.z),
-        boundingBoxLength: round3(size.x),
-        boundingBoxWidth: round3(size.y),
-        boundingBoxHeight: round3(size.z),
+        boundingBoxRawX: round3(size.x),
+        boundingBoxRawY: round3(size.y),
+        boundingBoxRawZ: round3(size.z),
+        boundingBoxLength: mapped.boundingBoxLength,
+        boundingBoxWidth: mapped.boundingBoxWidth,
+        boundingBoxHeight: mapped.boundingBoxHeight,
       };
+    }
+
+    try {
+      return computeFromModelVertices() || computeFromSubsetFallback();
     } catch (error) {
       console.warn("Calcolo geometry info non riuscito:", error);
       return null;
@@ -425,6 +515,42 @@ export function createBimViewer(containerEl, setStatus, onSelectedElement) {
       building: pickName(building),
       storey: pickName(storey),
     };
+  }
+
+  async function extractPlacementDebugInfo(modelID, expressID) {
+    function readIdCandidate(value) {
+      if (value === null || value === undefined) return null;
+      if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+      if (typeof value !== "object") {
+        const n = Number.parseInt(String(value), 10);
+        return Number.isFinite(n) ? n : null;
+      }
+      const keys = ["value", "Value", "expressID", "expressId", "id", "_internalValue"];
+      for (const key of keys) {
+        if (!(key in value)) continue;
+        const id = readIdCandidate(value[key]);
+        if (id !== null) return id;
+      }
+      return null;
+    }
+
+    try {
+      const itemRaw = await ifcLoader.ifcManager.getItemProperties(modelID, expressID, false);
+      const objectPlacementId = readIdCandidate(itemRaw?.ObjectPlacement ?? itemRaw?.objectPlacement);
+      if (!Number.isFinite(objectPlacementId)) return null;
+
+      const placementRaw = await ifcLoader.ifcManager.getItemProperties(modelID, objectPlacementId, false);
+      const relativePlacementId = readIdCandidate(placementRaw?.RelativePlacement ?? placementRaw?.relativePlacement);
+      const placementRelToId = readIdCandidate(placementRaw?.PlacementRelTo ?? placementRaw?.placementRelTo);
+
+      return {
+        objectPlacementId,
+        relativePlacementId: Number.isFinite(relativePlacementId) ? relativePlacementId : null,
+        placementRelToId: Number.isFinite(placementRelToId) ? placementRelToId : null,
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   function findSpatialChainForExpressID(root, targetExpressID) {
