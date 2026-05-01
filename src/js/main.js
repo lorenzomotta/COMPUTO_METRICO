@@ -65,6 +65,13 @@ window.addEventListener("DOMContentLoaded", () => {
   const tornaPianiEsterniButtonEl = document.querySelector("#btn-torna-piani-esterni");
   const sidebarEsterniVariButtonEl = document.querySelector("#btn-sidebar-esterni-vari");
   const gestionePianiButtonEl = document.querySelector("#btn-gestione-piani");
+  const sidebarLeftActionsEl = document.querySelector(".sidebar-left .sidebar-actions");
+  const apertureMasterSidebarButtonEl = document.createElement("button");
+  const grondeSidebarButtonEl = document.createElement("button");
+  const davanzaliSidebarButtonEl = document.createElement("button");
+  const soglieSidebarButtonEl = document.createElement("button");
+  const falsiTelaiSidebarButtonEl = document.createElement("button");
+  const falsiTelaiAllSidebarButtonEl = document.createElement("button");
   const aggiungiVoceButtonEl = document.querySelector("#btn-aggiungi-voce");
   const vediVociButtonEl = document.querySelector("#btn-vedi-voci");
   const apriPdfVociButtonEl = document.querySelector("#btn-apri-pdf-voci");
@@ -83,6 +90,10 @@ window.addEventListener("DOMContentLoaded", () => {
   const ifcRiepilogoDialogEl = document.createElement("dialog");
   const ifcRiepilogoTableWrapEl = document.createElement("div");
   const ifcRiepilogoCloseButtonEl = document.createElement("button");
+  const apertureMasterDialogEl = document.createElement("dialog");
+  const useAperturaDialogEl = document.createElement("dialog");
+  const confirmDeleteAperturaMasterDialogEl = document.createElement("dialog");
+  const confirmEditVoceMmAperturaDialogEl = document.createElement("dialog");
   const bimViewerContainerEl = document.querySelector("#bim-viewer-container");
   const bimViewerStatusEl = document.querySelector("#bim-viewer-status");
   const bimPropsEmptyEl = document.querySelector("#bim-props-empty");
@@ -204,7 +215,20 @@ window.addEventListener("DOMContentLoaded", () => {
   const voceMmFieldsManualeEl = document.querySelector(".voce-mm-fields-manuale");
   const voceMmFieldsSemiautomaticaEl = document.querySelector(".voce-mm-fields-semiautomatica");
   const voceMmCopiaMisureInFormulaEl = document.querySelector("#voce-mm-copia-misure-in-formula");
+  const voceMmTemplateFaldaButtonEl = document.querySelector("#voce-mm-template-falda");
+  const voceMmTemplateFaldaDialogEl = document.querySelector("#voce-mm-template-falda-dialog");
+  const voceMmTemplateFaldaFormEl = document.querySelector("#voce-mm-template-falda-form");
+  const voceMmTemplateFaldaCancelEl = document.querySelector("#voce-mm-template-falda-cancel");
+  const voceMmTemplateFaldaGrondaEl = document.querySelector("#voce-mm-template-falda-gronda");
+  const voceMmTemplateFaldaSalitaEl = document.querySelector("#voce-mm-template-falda-salita");
+  const voceMmTemplateFaldaPendenzaEl = document.querySelector("#voce-mm-template-falda-pendenza");
+  const voceMmTemplateFaldaCanaleEl = document.querySelector("#voce-mm-template-falda-canale");
   const voceMmRisultatoPreviewEl = document.querySelector("#voce-mm-risultato-preview");
+  const grondeDialogEl = document.createElement("dialog");
+  const davanzaliDialogEl = document.createElement("dialog");
+  const soglieDialogEl = document.createElement("dialog");
+  const falsiTelaiDialogEl = document.createElement("dialog");
+  const falsiTelaiAllDialogEl = document.createElement("dialog");
   const vociBodyEl = document.querySelector("#voci-body");
   const vociTotaleComputoEl = document.querySelector("#voci-totale-computo");
   const btnApriTutteVociEl = document.querySelector("#btn-apri-tutte-voci");
@@ -223,6 +247,11 @@ window.addEventListener("DOMContentLoaded", () => {
   const STORAGE_VOCI = "computo_metrico_voci";
   const STORAGE_VOCI_UNITA_OPTIONS = "computo_metrico_voci_unita_options";
   const STORAGE_IFC_DATA = "computo_metrico_ifc_data";
+  const STORAGE_APERTURE_MASTER = "computo_metrico_aperture_master";
+  const STORAGE_DAVANZALI_SBORDI = "computo_metrico_davanzali_sbordi";
+  const STORAGE_SOGLIE_SBORDI = "computo_metrico_soglie_sbordi";
+  const STORAGE_FALSITELAI_LEGNO_AGGIUNTE = "computo_metrico_falsitelai_legno_aggiunte";
+  const STORAGE_FALSITELAI_ALLUMINIO_AGGIUNTE = "computo_metrico_falsitelai_alluminio_aggiunte";
   const UNITA_MISURA_DEFAULT_OPTIONS = ["ml.", "mq.", "mc", "Kg.", "a corpo", "percentuale"];
   const TIPOMISURA_VOCE_AUTOMATICA = "AUTOMATICA";
   const TIPOMISURA_VOCE_MANUALE = "MANUALE";
@@ -253,16 +282,24 @@ window.addEventListener("DOMContentLoaded", () => {
   let corselliEsterni = [];
   /** @type {{ idPlCamm: number, piano: string, riferimento: string, sottrai: boolean, misura1: number|null, misura2: number|null, formula: string, formulaValue: number|null, area: number, altezza: number|null, volume: number, idVoce: string }[]} */
   let camminamentiEsterni = [];
-  /** @type {{ idMisurazione: number, idVoce: string, piano: string, riferimento: string, formula: string, formulaValue: number|null, numero: number, segno: boolean, risultato: number }[]} */
+  /** @type {{ idMisurazione: number, idVoce: string, piano: string, riferimento: string, formula: string, formulaValue: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[]} */
   let misurazioniVarie = [];
-  /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, numero: number, segno: boolean, risultato: number }[] }[]} */
+  /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, canaleGronda?: boolean, grondaCanaleValore?: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[] }[]} */
   let voci = [];
+  /** @type {{ idAperturaMaster: string, locale: string, largh: number, alt: number, hDav: number, ante: number, tipologia: string, falso: string, scuro: string, inferiata: string, zanzariera: string }[]} */
+  let apertureMaster = [];
   /** @type {string[]} */
   let vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
   /** voci manuali collassate nella tabella VOCI */
   const vociMmCollapsed = new Set();
   /** id voce in modalità focus fullscreen nella vista VOCI */
   let voceFocusId = null;
+  /** draft editor aperture collegata per riga misurazione manuale (chiave: "idVoce:mmIndex") */
+  const voceMmAperturaDraftByKey = new Map();
+  let apertureMasterIdCounter = 1;
+  let voceMmUseAperturaContext = { idVoce: /** @type {number|null} */ (null), mmIndex: /** @type {number|null} */ (null) };
+  let apertureMasterEditingId = null;
+  let apertureMasterPendingDeleteId = null;
 
   let pianoIdCounter = 1;
   let elevazioneIdCounter = 1;
@@ -294,6 +331,21 @@ window.addEventListener("DOMContentLoaded", () => {
   let pendingDeleteVoceId = null;
   /** Eliminazione misurazione manuale in attesa di conferma nel modale */
   let pendingDeleteVoceMm = { idVoce: /** @type {number|null} */ (null), index: /** @type {number|null} */ (null) };
+  let voceMmTemplateFaldaMeta = { canale: false, gronda: null };
+  /** @type {Record<string, number>} */
+  let davanzaliSbordiByKey = {};
+  /** @type {Record<string, number>} */
+  let soglieSbordiByKey = {};
+  /** @type {Record<string, number>} */
+  let falsiTelaiLegnoAggiunteByKey = {};
+  /** @type {Record<string, number>} */
+  let falsiTelaiAlluminioAggiunteByKey = {};
+  /** Modifica apertura collegata in attesa di conferma nel modale */
+  let pendingEditVoceMmApertura = {
+    idVoce: /** @type {number|null} */ (null),
+    mmIndex: /** @type {number|null} */ (null),
+    idAperturaMaster: /** @type {string} */ (""),
+  };
   /** @type {any | null} */
   let ifcDataCache = null;
   /** @type {null | { murielevazioni: any[], stratiMurElevazione: any[], apertureElevazione: any[], elevazioneIdCounter: number, stratoMurIdCounter: number, aperturaElevIdCounter: number, currentElevazioneId: number|null, compilazionePianoId: number|null, murFiltroSoloIdElevazione: number|null }} */
@@ -1245,7 +1297,12 @@ window.addEventListener("DOMContentLoaded", () => {
     scaviEsterni = loaded.scaviEsterni;
     corselliEsterni = loaded.corselliEsterni;
     camminamentiEsterni = loaded.camminamentiEsterni;
-    misurazioniVarie = Array.isArray(loaded.misurazioniVarie) ? loaded.misurazioniVarie : [];
+    misurazioniVarie = Array.isArray(loaded.misurazioniVarie)
+      ? loaded.misurazioniVarie.map((item) => ({
+          ...item,
+          apertureCollegate: normalizzaApertureCollegateMisurazione(item?.apertureCollegate),
+        }))
+      : [];
     elevazioneIdCounter = loaded.elevazioneIdCounter;
     stratoMurIdCounter = loaded.stratoMurIdCounter;
     aperturaElevIdCounter = loaded.aperturaElevIdCounter;
@@ -1261,8 +1318,36 @@ window.addEventListener("DOMContentLoaded", () => {
     segnaComputoModificatoPerExportJson();
   }
 
+  function saveApertureMaster() {
+    localStorage.setItem(STORAGE_APERTURE_MASTER, JSON.stringify(apertureMaster));
+    segnaComputoModificatoPerExportJson();
+  }
+
   function saveVociUnitaOptions() {
     localStorage.setItem(STORAGE_VOCI_UNITA_OPTIONS, JSON.stringify(vociUnitaMisuraOptions));
+    segnaComputoModificatoPerExportJson();
+  }
+
+  function saveDavanzaliSbordi() {
+    localStorage.setItem(STORAGE_DAVANZALI_SBORDI, JSON.stringify(davanzaliSbordiByKey));
+    segnaComputoModificatoPerExportJson();
+  }
+
+  function saveSoglieSbordi() {
+    localStorage.setItem(STORAGE_SOGLIE_SBORDI, JSON.stringify(soglieSbordiByKey));
+    segnaComputoModificatoPerExportJson();
+  }
+
+  function saveFalsiTelaiLegnoAggiunte() {
+    localStorage.setItem(STORAGE_FALSITELAI_LEGNO_AGGIUNTE, JSON.stringify(falsiTelaiLegnoAggiunteByKey));
+    segnaComputoModificatoPerExportJson();
+  }
+
+  function saveFalsiTelaiAlluminioAggiunte() {
+    localStorage.setItem(
+      STORAGE_FALSITELAI_ALLUMINIO_AGGIUNTE,
+      JSON.stringify(falsiTelaiAlluminioAggiunteByKey),
+    );
     segnaComputoModificatoPerExportJson();
   }
 
@@ -1323,6 +1408,106 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function loadDavanzaliSbordi() {
+    try {
+      const raw = localStorage.getItem(STORAGE_DAVANZALI_SBORDI);
+      if (!raw) {
+        davanzaliSbordiByKey = {};
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        davanzaliSbordiByKey = {};
+        return;
+      }
+      const out = {};
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (typeof key !== "string" || key.trim() === "") return;
+        const n = parseNonNegativeDecimal2(value);
+        if (n === null) return;
+        out[key] = Number(n.toFixed(2));
+      });
+      davanzaliSbordiByKey = out;
+    } catch {
+      davanzaliSbordiByKey = {};
+    }
+  }
+
+  function loadSoglieSbordi() {
+    try {
+      const raw = localStorage.getItem(STORAGE_SOGLIE_SBORDI);
+      if (!raw) {
+        soglieSbordiByKey = {};
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        soglieSbordiByKey = {};
+        return;
+      }
+      const out = {};
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (typeof key !== "string" || key.trim() === "") return;
+        const n = parseNonNegativeDecimal2(value);
+        if (n === null) return;
+        out[key] = Number(n.toFixed(2));
+      });
+      soglieSbordiByKey = out;
+    } catch {
+      soglieSbordiByKey = {};
+    }
+  }
+
+  function loadFalsiTelaiLegnoAggiunte() {
+    try {
+      const raw = localStorage.getItem(STORAGE_FALSITELAI_LEGNO_AGGIUNTE);
+      if (!raw) {
+        falsiTelaiLegnoAggiunteByKey = {};
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        falsiTelaiLegnoAggiunteByKey = {};
+        return;
+      }
+      const out = {};
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (typeof key !== "string" || key.trim() === "") return;
+        const n = parseNonNegativeDecimal2(value);
+        if (n === null) return;
+        out[key] = Number(n.toFixed(2));
+      });
+      falsiTelaiLegnoAggiunteByKey = out;
+    } catch {
+      falsiTelaiLegnoAggiunteByKey = {};
+    }
+  }
+
+  function loadFalsiTelaiAlluminioAggiunte() {
+    try {
+      const raw = localStorage.getItem(STORAGE_FALSITELAI_ALLUMINIO_AGGIUNTE);
+      if (!raw) {
+        falsiTelaiAlluminioAggiunteByKey = {};
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        falsiTelaiAlluminioAggiunteByKey = {};
+        return;
+      }
+      const out = {};
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (typeof key !== "string" || key.trim() === "") return;
+        const n = parseNonNegativeDecimal2(value);
+        if (n === null) return;
+        out[key] = Number(n.toFixed(2));
+      });
+      falsiTelaiAlluminioAggiunteByKey = out;
+    } catch {
+      falsiTelaiAlluminioAggiunteByKey = {};
+    }
+  }
+
   function renderVociUnitaOptions(selectedValue = "") {
     if (!voceUnitaMisuraEl) return;
     voceUnitaMisuraEl.innerHTML = "";
@@ -1368,6 +1553,12 @@ window.addEventListener("DOMContentLoaded", () => {
     const txt = String(raw ?? "").trim();
     if (txt === "") return "1";
     const parsed = parseNonNegativeDecimal3OrNull(txt);
+    if (parsed === null) return null;
+    return Number(parsed).toFixed(3);
+  }
+
+  function formatFixed3ForFormula(raw) {
+    const parsed = parseNonNegativeDecimal3OrNull(raw);
     if (parsed === null) return null;
     return Number(parsed).toFixed(3);
   }
@@ -1450,10 +1641,69 @@ window.addEventListener("DOMContentLoaded", () => {
           typeof m?.misura2 === "number" && Number.isFinite(m.misura2) ? Number(m.misura2.toFixed(3)) : null,
         misura3:
           typeof m?.misura3 === "number" && Number.isFinite(m.misura3) ? Number(m.misura3.toFixed(3)) : null,
+        canaleGronda: m?.canaleGronda === true,
+        grondaCanaleValore:
+          typeof m?.grondaCanaleValore === "number" && Number.isFinite(m.grondaCanaleValore)
+            ? Number(m.grondaCanaleValore.toFixed(3))
+            : null,
         numero: m.numero,
         segno: m.segno === true,
         risultato: m.risultato,
+        apertureCollegate: normalizzaApertureCollegateRefs(m.apertureCollegate),
       }));
+  }
+
+  function calcolaMetricheAperturaMisurazione(apertura, m2AltVal, m3Val) {
+    const m2 = typeof m2AltVal === "number" && Number.isFinite(m2AltVal) ? m2AltVal : 0;
+    const m3 = typeof m3Val === "number" && Number.isFinite(m3Val) ? m3Val : 0;
+    const largh = Number(apertura?.largh || 0);
+    const altApertura = Number(apertura?.alt || 0);
+    const hDav = Number(apertura?.hDav || 0);
+    const hInclusa = Number(Math.min(altApertura, Math.max(0, m2 - hDav)).toFixed(2));
+    const mq = Number((largh * hInclusa).toFixed(2));
+    const mc = Number((mq * m3).toFixed(2));
+    return { hInclusa, mq, mc };
+  }
+
+  function normalizzaUnitaVoceDetrazione(unitaRaw) {
+    return String(unitaRaw || "")
+      .toLowerCase()
+      .replace(/\s+/g, "")
+      .replace(/\./g, "");
+  }
+
+  function calcolaDetrazioneApertureMisurazione(misurazione, unitaNorm) {
+    const mmTipo = normalizzaTipoMisurazioneVoce(misurazione?.tipo);
+    if (mmTipo !== VOCE_MM_TIPO_SEMIAUTOMATICA) return 0;
+    const misura2Val =
+      typeof misurazione?.misura2 === "number" && Number.isFinite(misurazione.misura2)
+        ? Number(misurazione.misura2)
+        : null;
+    const misura3Val =
+      typeof misurazione?.misura3 === "number" && Number.isFinite(misurazione.misura3)
+        ? Number(misurazione.misura3)
+        : null;
+    let sumMq = 0;
+    let sumMc = 0;
+    const aperture = risolviApertureCollegateRefs(misurazione?.apertureCollegate);
+    aperture.forEach((apertura) => {
+      const metric = calcolaMetricheAperturaMisurazione(apertura, misura2Val, misura3Val);
+      sumMq += Number(metric.mq || 0);
+      sumMc += Number(metric.mc || 0);
+    });
+    if (unitaNorm.includes("mc")) return Number(sumMc.toFixed(2));
+    if (unitaNorm.includes("mq")) return Number(sumMq.toFixed(2));
+    return 0;
+  }
+
+  function calcolaDetrazioneApertureVoce(item, mmRows) {
+    const mm = Array.isArray(mmRows) ? mmRows : normalizzaMisurazioniManualiVoce(item?.misurazioniManuali);
+    const unitaNorm = normalizzaUnitaVoceDetrazione(item?.unitaMisura);
+    const detrazione = mm.reduce(
+      (sum, m) => sum + calcolaDetrazioneApertureMisurazione(m, unitaNorm),
+      0,
+    );
+    return Number(detrazione.toFixed(2));
   }
 
   function formatTotaleMisurazioniManualiIt(sum) {
@@ -1518,6 +1768,1113 @@ window.addEventListener("DOMContentLoaded", () => {
       voci = [];
       voceIdCounter = 1;
     }
+  }
+
+  function loadApertureMaster() {
+    try {
+      const raw = localStorage.getItem(STORAGE_APERTURE_MASTER);
+      if (!raw) {
+        apertureMaster = [];
+        apertureMasterIdCounter = 1;
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      apertureMaster = normalizzaApertureMaster(parsed);
+      apertureMasterIdCounter =
+        apertureMaster.reduce((max, ap) => {
+          const n = Number(String(ap.idAperturaMaster || "").replace("APM-", ""));
+          return Number.isFinite(n) ? Math.max(max, n) : max;
+        }, 0) + 1;
+    } catch {
+      apertureMaster = [];
+      apertureMasterIdCounter = 1;
+    }
+  }
+
+  function migraApertureCollegateVociSuMaster() {
+    let changed = false;
+    voci = voci.map((voce) => {
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali).map((row) => {
+        const refs = normalizzaApertureCollegateRefs(row.apertureCollegate);
+        if (JSON.stringify(refs) !== JSON.stringify(row.apertureCollegate || [])) changed = true;
+        return { ...row, apertureCollegate: refs };
+      });
+      return { ...voce, misurazioniManuali: mm };
+    });
+    if (changed) {
+      saveApertureMaster();
+      saveVoci();
+    }
+  }
+
+  function openApertureMasterDialog() {
+    const renderOptions = (field, current, options) =>
+      options
+        .map(
+          (opt) =>
+            `<option value="${escapeHtml(opt)}" ${current === opt ? "selected" : ""}>${escapeHtml(opt)}</option>`,
+        )
+        .join("");
+    const buildEditableMasterRow = (idRow, ap) => `<tr class="row-edit-master-apertura" data-editing-id="${escapeHtml(idRow)}">
+            <td>${escapeHtml(idRow === "__new__" ? "Nuova" : idRow)}</td>
+            <td><input type="text" data-master-field="locale" value="${escapeHtml(ap.locale)}" /></td>
+            <td><input type="number" step="0.01" min="0" data-master-field="largh" value="${escapeHtml(String(ap.largh))}" /></td>
+            <td><input type="number" step="0.01" min="0" data-master-field="alt" value="${escapeHtml(String(ap.alt))}" /></td>
+            <td><input type="number" step="0.01" min="0" data-master-field="hDav" value="${escapeHtml(String(ap.hDav))}" /></td>
+            <td><input type="number" step="1" min="0" data-master-field="ante" value="${escapeHtml(String(ap.ante))}" /></td>
+            <td>
+              <select data-master-field="tipologia">
+                ${renderOptions("tipologia", ap.tipologia, ["FINESTRA","PORTA FINESTRA","BOCCA LUPO","FIN CANTINA","PORTONCINO","PORTA CANTINA","PORTA REI","PORTA INTERNA","SCRIGNO","BASCULANTE","SEZIONALE"])}
+              </select>
+            </td>
+            <td><select data-master-field="falso">${renderOptions("falso", ap.falso, ["NO","ALLUMINIO","LEGNO"])}</select></td>
+            <td><select data-master-field="scuro">${renderOptions("scuro", ap.scuro, ["NO","PERSIANA","TAPPARELLA"])}</select></td>
+            <td><select data-master-field="inferiata">${renderOptions("inferiata", ap.inferiata, ["NO","SI"])}</select></td>
+            <td><select data-master-field="zanzariera">${renderOptions("zanzariera", ap.zanzariera, ["NO","SI"])}</select></td>
+            <td class="actions-cell">
+              <button type="button" class="btn-action btn-secondary" data-action="${idRow === "__new__" ? "save-new-master-apertura-inline" : "save-master-apertura-inline"}" data-id="${escapeHtml(idRow)}">✓</button>
+              <button type="button" class="btn-action btn-delete" data-action="cancel-edit-master-apertura" data-id="${escapeHtml(idRow)}">✕</button>
+            </td>
+          </tr>`;
+    const righe = apertureMaster
+      .map(
+        (ap) => {
+          const isEditing = apertureMasterEditingId === ap.idAperturaMaster;
+          if (!isEditing) {
+            return `<tr>
+              <td>${escapeHtml(ap.idAperturaMaster)}</td>
+              <td>${escapeHtml(ap.locale)}</td>
+              <td>${fmt2(ap.largh)}</td>
+              <td>${fmt2(ap.alt)}</td>
+              <td>${fmt2(ap.hDav)}</td>
+              <td>${escapeHtml(String(ap.ante))}</td>
+              <td>${escapeHtml(ap.tipologia)}</td>
+              <td>${escapeHtml(ap.falso)}</td>
+              <td>${escapeHtml(ap.scuro)}</td>
+              <td>${escapeHtml(ap.inferiata)}</td>
+              <td>${escapeHtml(ap.zanzariera)}</td>
+              <td class="actions-cell">
+                <button type="button" class="btn-action btn-edit" data-action="edit-master-apertura" data-id="${escapeHtml(ap.idAperturaMaster)}">✎</button>
+                <button type="button" class="btn-action btn-delete" data-action="delete-master-apertura" data-id="${escapeHtml(ap.idAperturaMaster)}">🗑</button>
+              </td>
+            </tr>`;
+          }
+          return buildEditableMasterRow(ap.idAperturaMaster, ap);
+        },
+      )
+      .join("");
+    const newRow = apertureMasterEditingId === "__new__"
+      ? buildEditableMasterRow("__new__", {
+          locale: "",
+          largh: "",
+          alt: "",
+          hDav: "0",
+          ante: "1",
+          tipologia: "FINESTRA",
+          falso: "NO",
+          scuro: "NO",
+          inferiata: "NO",
+          zanzariera: "NO",
+        })
+      : "";
+    apertureMasterDialogEl.innerHTML = `
+      <form method="dialog" class="ifc-riepilogo-dialog-form">
+        <div class="ifc-riepilogo-dialog-header"><h3>Archivio APERTURE</h3></div>
+      </form>
+      <div style="padding:8px;">
+        <button type="button" class="btn-action btn-secondary" data-action="new-master-apertura">Nuova apertura</button>
+      </div>
+      <div class="ifc-riepilogo-table-host">
+        <table class="table-voce-mm-inline aperture-master-table">
+          <thead><tr><th>ID</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>FALSO</th><th>SCURO</th><th>INFERIATA</th><th>ZANZARIERA</th><th>AZIONI</th></tr></thead>
+          <tbody>${righe || ""}${newRow || (righe ? "" : `<tr><td colspan="12" class="empty-cell">Nessuna apertura in archivio.</td></tr>`)}</tbody>
+        </table>
+      </div>
+      <div style="padding:8px;display:flex;justify-content:flex-end;">
+        <button type="button" class="btn-action btn-secondary" data-action="close-master-aperture">Chiudi</button>
+      </div>
+    `;
+    apertureMasterDialogEl.showModal();
+  }
+
+  function readAperturaMasterInlineDraft(idAperturaMaster) {
+    const row = apertureMasterDialogEl.querySelector(
+      `tr.row-edit-master-apertura[data-editing-id="${idAperturaMaster}"]`,
+    );
+    if (!row) return null;
+    const getValue = (field) =>
+      String(row.querySelector(`[data-master-field="${field}"]`)?.value || "").trim();
+    return parseVoceMmAperturaDraft({
+      locale: getValue("locale"),
+      largh: getValue("largh"),
+      alt: getValue("alt"),
+      hDav: getValue("hDav"),
+      ante: getValue("ante"),
+      tipologia: getValue("tipologia"),
+      falso: getValue("falso"),
+      scuro: getValue("scuro"),
+      inferiata: getValue("inferiata"),
+      zanzariera: getValue("zanzariera"),
+    });
+  }
+
+  function eliminaAperturaMaster(id) {
+    apertureMaster = apertureMaster.filter((ap) => ap.idAperturaMaster !== id);
+    voci = voci.map((voce) => ({
+      ...voce,
+      misurazioniManuali: normalizzaMisurazioniManualiVoce(voce.misurazioniManuali).map((mm) => ({
+        ...mm,
+        apertureCollegate: normalizzaApertureCollegateRefs(mm.apertureCollegate).filter(
+          (ref) => ref.idAperturaMaster !== id,
+        ),
+      })),
+    }));
+    apertureMasterPendingDeleteId = null;
+    saveApertureMaster();
+    saveVoci();
+    syncVoceDavanzali();
+    syncVoceSoglie();
+    syncVoceCanali();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
+    renderVoci();
+    openApertureMasterDialog();
+  }
+
+  function collegaAperturaMasterARigaVoce(idVoce, idx, idAperturaMaster) {
+    voci = voci.map((item) => {
+      if (item.idVoce !== idVoce) return item;
+      const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+      if (idx < 0 || idx >= mm.length) return item;
+      const row = mm[idx];
+      const refs = normalizzaApertureCollegateRefs(row.apertureCollegate);
+      mm[idx] = { ...row, apertureCollegate: [...refs, { idAperturaMaster }] };
+      return { ...item, misurazioniManuali: mm };
+    });
+    saveVoci();
+    renderVoci();
+  }
+
+  function openUseAperturaDialog(idVoce, mmIndex) {
+    voceMmUseAperturaContext = { idVoce, mmIndex };
+    const rows = apertureMaster
+      .map(
+        (ap) =>
+          `<tr data-apertura-master-id="${escapeHtml(ap.idAperturaMaster)}">
+            <td>${escapeHtml(ap.idAperturaMaster)}</td>
+            <td>${escapeHtml(ap.locale)}</td>
+            <td>${fmt2(ap.largh)}</td>
+            <td>${fmt2(ap.alt)}</td>
+            <td>${fmt2(ap.hDav)}</td>
+            <td>${escapeHtml(String(ap.ante))}</td>
+            <td>${escapeHtml(ap.tipologia)}</td>
+            <td><button type="button" class="btn-action btn-secondary" data-action="use-apertura-master" data-id="${escapeHtml(ap.idAperturaMaster)}">Usa</button></td>
+          </tr>`,
+      )
+      .join("");
+    useAperturaDialogEl.innerHTML = `
+      <form method="dialog" class="ifc-riepilogo-dialog-form">
+        <div class="ifc-riepilogo-dialog-header"><h3>Seleziona apertura da archivio</h3></div>
+      </form>
+      <div class="ifc-riepilogo-table-host">
+        <table class="table-voce-mm-inline">
+          <thead><tr><th>ID</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>AZIONI</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="8" class="empty-cell">Archivio APERTURE vuoto.</td></tr>`}</tbody>
+        </table>
+      </div>
+      <div style="padding:8px;display:flex;justify-content:flex-end;">
+        <button type="button" class="btn-action btn-secondary" data-action="close-use-apertura-dialog">Chiudi</button>
+      </div>
+    `;
+    useAperturaDialogEl.showModal();
+  }
+
+  function buildArchivioGrondeRows() {
+    const rows = [];
+    voci.forEach((voce) => {
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        if (riga?.canaleGronda !== true) return;
+        const grondaVal =
+          typeof riga?.grondaCanaleValore === "number" && Number.isFinite(riga.grondaCanaleValore)
+            ? Number(riga.grondaCanaleValore)
+            : null;
+        if (grondaVal === null) return;
+        const riferimento = String(riga?.riferimento || "").trim() || "-";
+        const piano = String(riga?.piano || "").trim() || "-";
+        rows.push({ piano, riferimento, gronda: grondaVal });
+      });
+    });
+    return rows;
+  }
+
+  function openArchivioGrondeDialog() {
+    const rows = buildArchivioGrondeRows();
+    const righeHtml =
+      rows.length === 0
+        ? `<tr><td colspan="2" class="empty-cell">Nessuna gronda in archivio.</td></tr>`
+        : rows
+            .map(
+              (row) => `<tr>
+                <td>${escapeHtml(row.riferimento)}</td>
+                <td>${escapeHtml(fmt2(row.gronda))}</td>
+              </tr>`,
+            )
+            .join("");
+    grondeDialogEl.innerHTML = `
+      <form method="dialog" class="ifc-riepilogo-dialog-form">
+        <div class="ifc-riepilogo-dialog-header"><h3>Archivio GRONDE</h3></div>
+        <div class="table-wrap">
+          <table class="table-voce-mm-inline">
+            <thead><tr><th>RIFERIMENTO</th><th>GRONDA</th></tr></thead>
+            <tbody>${righeHtml}</tbody>
+          </table>
+        </div>
+        <div style="padding:8px;display:flex;justify-content:flex-end;">
+          <button type="button" class="btn-action btn-secondary" data-action="close-gronde-dialog">Chiudi</button>
+        </div>
+      </form>
+    `;
+    grondeDialogEl.showModal();
+  }
+
+  function buildArchivioFalsiTelaiRows() {
+    /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, altezza: number, aggiunta: number }>} */
+    const map = new Map();
+    voci.forEach((voce) => {
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        const piano = String(riga?.piano || "").trim() || "-";
+        const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
+        aperture.forEach((apertura, idx) => {
+          if (String(apertura?.falso || "").trim().toUpperCase() !== "LEGNO") return;
+          const locale = String(apertura?.locale || "").trim() || "-";
+          const larghezza = Number(apertura?.largh || 0);
+          const altezza = Number(apertura?.alt || 0);
+          const masterId = String(apertura?.idAperturaMaster || "").trim();
+          const key = masterId ? `apm:${masterId}|p:${piano}` : `row:${piano}|loc:${locale}|i:${idx}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              piano,
+              locale,
+              larghezza,
+              altezza,
+              aggiunta:
+                typeof falsiTelaiLegnoAggiunteByKey[key] === "number" &&
+                Number.isFinite(falsiTelaiLegnoAggiunteByKey[key])
+                  ? Number(falsiTelaiLegnoAggiunteByKey[key].toFixed(2))
+                  : 0.1,
+            });
+          }
+        });
+      });
+    });
+    return [...map.values()].sort((a, b) => a.piano.localeCompare(b.piano) || a.locale.localeCompare(b.locale));
+  }
+
+  function openArchivioFalsiTelaiDialog() {
+    const rows = buildArchivioFalsiTelaiRows();
+    const righeHtml =
+      rows.length === 0
+        ? `<tr><td colspan="5" class="empty-cell">Nessun falso telaio legno in archivio.</td></tr>`
+        : rows
+            .map(
+              (row) => `<tr>
+                <td>${escapeHtml(row.piano)}</td>
+                <td>${escapeHtml(row.locale)}</td>
+                <td>${escapeHtml(fmt2(row.larghezza))}</td>
+                <td>${escapeHtml(fmt2(row.altezza))}</td>
+                <td>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="${escapeHtml(fmt2(row.aggiunta))}"
+                    data-action="change-falsi-telai-aggiunta"
+                    data-key="${escapeHtml(row.key)}"
+                    class="voce-mm-ap-input"
+                    style="max-width:90px;"
+                  />
+                </td>
+              </tr>`,
+            )
+            .join("");
+    falsiTelaiDialogEl.innerHTML = `
+      <form method="dialog" class="ifc-riepilogo-dialog-form">
+        <div class="ifc-riepilogo-dialog-header"><h3>Archivio FALSI TELAI LEGNO</h3></div>
+        <div class="table-wrap">
+          <table class="table-voce-mm-inline">
+            <thead><tr><th>PIANO</th><th>LOCALE</th><th>LARGHEZZA</th><th>ALTEZZA</th><th>AGGIUNTA</th></tr></thead>
+            <tbody>${righeHtml}</tbody>
+          </table>
+        </div>
+        <div style="padding:8px;display:flex;justify-content:flex-end;">
+          <button type="button" class="btn-action btn-secondary" data-action="close-falsi-telai-dialog">Chiudi</button>
+        </div>
+      </form>
+    `;
+    falsiTelaiDialogEl.showModal();
+  }
+
+  function buildArchivioFalsiTelaiAlluminioRows() {
+    /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, altezza: number, aggiunta: number }>} */
+    const map = new Map();
+    voci.forEach((voce) => {
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        const piano = String(riga?.piano || "").trim() || "-";
+        const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
+        aperture.forEach((apertura, idx) => {
+          if (String(apertura?.falso || "").trim().toUpperCase() !== "ALLUMINIO") return;
+          const locale = String(apertura?.locale || "").trim() || "-";
+          const larghezza = Number(apertura?.largh || 0);
+          const altezza = Number(apertura?.alt || 0);
+          const masterId = String(apertura?.idAperturaMaster || "").trim();
+          const key = masterId ? `apm:${masterId}|p:${piano}` : `row:${piano}|loc:${locale}|i:${idx}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              piano,
+              locale,
+              larghezza,
+              altezza,
+              aggiunta:
+                typeof falsiTelaiAlluminioAggiunteByKey[key] === "number" &&
+                Number.isFinite(falsiTelaiAlluminioAggiunteByKey[key])
+                  ? Number(falsiTelaiAlluminioAggiunteByKey[key].toFixed(2))
+                  : 0.1,
+            });
+          }
+        });
+      });
+    });
+    return [...map.values()].sort((a, b) => a.piano.localeCompare(b.piano) || a.locale.localeCompare(b.locale));
+  }
+
+  function openArchivioFalsiTelaiAlluminioDialog() {
+    const rows = buildArchivioFalsiTelaiAlluminioRows();
+    const righeHtml =
+      rows.length === 0
+        ? `<tr><td colspan="5" class="empty-cell">Nessun falso telaio alluminio in archivio.</td></tr>`
+        : rows
+            .map(
+              (row) => `<tr>
+                <td>${escapeHtml(row.piano)}</td>
+                <td>${escapeHtml(row.locale)}</td>
+                <td>${escapeHtml(fmt2(row.larghezza))}</td>
+                <td>${escapeHtml(fmt2(row.altezza))}</td>
+                <td>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="${escapeHtml(fmt2(row.aggiunta))}"
+                    data-action="change-falsi-telai-alluminio-aggiunta"
+                    data-key="${escapeHtml(row.key)}"
+                    class="voce-mm-ap-input"
+                    style="max-width:90px;"
+                  />
+                </td>
+              </tr>`,
+            )
+            .join("");
+    falsiTelaiAllDialogEl.innerHTML = `
+      <form method="dialog" class="ifc-riepilogo-dialog-form">
+        <div class="ifc-riepilogo-dialog-header"><h3>Archivio FALSI TELAI ALLUMINIO</h3></div>
+        <div class="table-wrap">
+          <table class="table-voce-mm-inline">
+            <thead><tr><th>PIANO</th><th>LOCALE</th><th>LARGHEZZA</th><th>ALTEZZA</th><th>AGGIUNTA</th></tr></thead>
+            <tbody>${righeHtml}</tbody>
+          </table>
+        </div>
+        <div style="padding:8px;display:flex;justify-content:flex-end;">
+          <button type="button" class="btn-action btn-secondary" data-action="close-falsi-telai-alluminio-dialog">Chiudi</button>
+        </div>
+      </form>
+    `;
+    falsiTelaiAllDialogEl.showModal();
+  }
+
+  function buildArchivioDavanzaliRows() {
+    /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, sbordo: number }>} */
+    const map = new Map();
+    voci.forEach((voce) => {
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        const piano = String(riga?.piano || "").trim() || "-";
+        const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
+        aperture.forEach((apertura, idx) => {
+          const hDav = Number(apertura?.hDav || 0);
+          if (!(hDav > 0)) return;
+          const locale = String(apertura?.locale || "").trim() || "-";
+          const larghezza = Number(apertura?.largh || 0);
+          const masterId = String(apertura?.idAperturaMaster || "").trim();
+          const key = masterId ? `apm:${masterId}|p:${piano}` : `row:${piano}|loc:${locale}|i:${idx}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              piano,
+              locale,
+              larghezza,
+              sbordo:
+                typeof davanzaliSbordiByKey[key] === "number" && Number.isFinite(davanzaliSbordiByKey[key])
+                  ? Number(davanzaliSbordiByKey[key].toFixed(2))
+                  : 0.05,
+            });
+          }
+        });
+      });
+    });
+    return [...map.values()].sort((a, b) => a.piano.localeCompare(b.piano) || a.locale.localeCompare(b.locale));
+  }
+
+  function trovaVoceDavanzali() {
+    return voci.find(
+      (item) =>
+        String(item?.voceAbbreviata || "").trim().toUpperCase() === "DAVANZALI" ||
+        String(item?.voce || "").trim().toUpperCase() === "DAVANZALI",
+    );
+  }
+
+  function trovaVoceSoglie() {
+    return voci.find(
+      (item) =>
+        String(item?.voceAbbreviata || "").trim().toUpperCase() === "SOGLIE" ||
+        String(item?.voce || "").trim().toUpperCase() === "SOGLIE",
+    );
+  }
+
+  function trovaVoceCanali() {
+    return voci.find(
+      (item) =>
+        String(item?.voceAbbreviata || "").trim().toUpperCase() === "CANALI" ||
+        String(item?.voce || "").trim().toUpperCase() === "CANALI",
+    );
+  }
+
+  function trovaVoceFalsiTelaiLegno() {
+    return voci.find(
+      (item) =>
+        String(item?.voceAbbreviata || "").trim().toUpperCase() === "FALSI TELAI LEGNO" ||
+        String(item?.voce || "").trim().toUpperCase() === "FALSI TELAI LEGNO",
+    );
+  }
+
+  function trovaVoceFalsiTelaiAlluminio() {
+    return voci.find(
+      (item) =>
+        String(item?.voceAbbreviata || "").trim().toUpperCase() === "FALSI TELAI ALLUMINIO" ||
+        String(item?.voce || "").trim().toUpperCase() === "FALSI TELAI ALLUMINIO",
+    );
+  }
+
+  function nextVoceMmIdForRows(rows) {
+    const maxId = (Array.isArray(rows) ? rows : []).reduce(
+      (max, row) =>
+        typeof row?.idMisurazione === "number" && Number.isFinite(row.idMisurazione)
+          ? Math.max(max, row.idMisurazione)
+          : max,
+      0,
+    );
+    return maxId + 1;
+  }
+
+  function isVoceSpecialeNoTotaleRiferimento(voceItem) {
+    const abbrev = String(voceItem?.voceAbbreviata || "").trim().toUpperCase();
+    return (
+      abbrev === "DAVANZALI" ||
+      abbrev === "SOGLIE" ||
+      abbrev === "CANALI" ||
+      abbrev === "FALSI TELAI LEGNO" ||
+      abbrev === "FALSI TELAI ALLUMINIO"
+    );
+  }
+
+  function syncVoceDavanzali() {
+    let voceDavanzali = trovaVoceDavanzali();
+    const voceDavanzaliId = voceDavanzali?.idVoce ?? null;
+    /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, sbordo: number }>} */
+    const mapRighe = new Map();
+    voci.forEach((voce) => {
+      if (voceDavanzaliId !== null && voce.idVoce === voceDavanzaliId) return;
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        const piano = String(riga?.piano || "").trim() || "-";
+        const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
+        aperture.forEach((apertura, idx) => {
+          const hDav = Number(apertura?.hDav || 0);
+          if (!(hDav > 0)) return;
+          const locale = String(apertura?.locale || "").trim() || "-";
+          const larghezza = Number(apertura?.largh || 0);
+          const masterId = String(apertura?.idAperturaMaster || "").trim();
+          const key = masterId ? `apm:${masterId}|p:${piano}` : `row:${piano}|loc:${locale}|i:${idx}`;
+          if (!mapRighe.has(key)) {
+            mapRighe.set(key, {
+              key,
+              piano,
+              locale,
+              larghezza,
+              sbordo:
+                typeof davanzaliSbordiByKey[key] === "number" && Number.isFinite(davanzaliSbordiByKey[key])
+                  ? Number(davanzaliSbordiByKey[key].toFixed(2))
+                  : 0.05,
+            });
+          }
+        });
+      });
+    });
+    const righeDavanzali = [...mapRighe.values()].sort(
+      (a, b) => a.piano.localeCompare(b.piano) || a.locale.localeCompare(b.locale),
+    );
+
+    if (!voceDavanzali && righeDavanzali.length > 0) {
+      const newId = voceIdCounter++;
+      voci.push({
+        idVoce: newId,
+        posizione: getPrimaPosizioneVoceDisponibile(),
+        voceAbbreviata: "DAVANZALI",
+        unitaMisura: UNITA_MISURA_DEFAULT_OPTIONS[0],
+        prezzo: 0,
+        tipoMisura: TIPOMISURA_VOCE_MANUALE,
+        voce: "DAVANZALI",
+        note: "",
+        misurazioniManuali: [],
+      });
+      normalizzaPosizioniVoci();
+      voceDavanzali = voci.find((item) => item.idVoce === newId) || null;
+    }
+
+    if (!voceDavanzali) return;
+
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceDavanzali.misurazioniManuali);
+    let nextMmId = nextVoceMmIdForRows(mmEsistenti);
+    const nuoveMisurazioni = righeDavanzali.map((row) => {
+      const sbordo = Number(Number(row.sbordo || 0.05).toFixed(2));
+      const largh = Number(Number(row.larghezza || 0).toFixed(2));
+      const formula = `${fmt2(largh)} + ${fmt2(sbordo)} + ${fmt2(sbordo)}`;
+      const calc = calcolaMisurazioneVaria(formula, 1, false);
+      const riferimento = String(row.locale || "").trim() || "-";
+      const risultato = calc.ok ? calc.risultato : Number((largh + sbordo + sbordo).toFixed(2));
+      const formulaValue = calc.ok ? calc.formulaValue : Number((largh + sbordo + sbordo).toFixed(2));
+      return {
+        idMisurazione: nextMmId++,
+        tipo: VOCE_MM_TIPO_MANUALE,
+        piano: String(row.piano || "").trim() || "-",
+        riferimento,
+        formula,
+        formulaValue,
+        numero: 1,
+        segno: false,
+        risultato,
+        apertureCollegate: [],
+      };
+    });
+
+    voci = voci.map((item) =>
+      item.idVoce === voceDavanzali.idVoce
+        ? {
+            ...item,
+            voceAbbreviata: "DAVANZALI",
+            voce: "DAVANZALI",
+            tipoMisura: TIPOMISURA_VOCE_MANUALE,
+            misurazioniManuali: nuoveMisurazioni,
+          }
+        : item,
+    );
+
+    saveVoci();
+    renderVoci();
+  }
+
+  function syncVoceSoglie() {
+    let voceSoglie = trovaVoceSoglie();
+    const voceSoglieId = voceSoglie?.idVoce ?? null;
+    /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, sbordo: number }>} */
+    const mapRighe = new Map();
+    voci.forEach((voce) => {
+      if (voceSoglieId !== null && voce.idVoce === voceSoglieId) return;
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        const piano = String(riga?.piano || "").trim() || "-";
+        const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
+        aperture.forEach((apertura, idx) => {
+          const hDav = Number(apertura?.hDav || 0);
+          if (Math.abs(hDav) > 0.0001) return;
+          const locale = String(apertura?.locale || "").trim() || "-";
+          const larghezza = Number(apertura?.largh || 0);
+          const masterId = String(apertura?.idAperturaMaster || "").trim();
+          const key = masterId ? `apm:${masterId}|p:${piano}` : `row:${piano}|loc:${locale}|i:${idx}`;
+          if (!mapRighe.has(key)) {
+            mapRighe.set(key, {
+              key,
+              piano,
+              locale,
+              larghezza,
+              sbordo:
+                typeof soglieSbordiByKey[key] === "number" && Number.isFinite(soglieSbordiByKey[key])
+                  ? Number(soglieSbordiByKey[key].toFixed(2))
+                  : 0.05,
+            });
+          }
+        });
+      });
+    });
+    const righeSoglie = [...mapRighe.values()].sort(
+      (a, b) => a.piano.localeCompare(b.piano) || a.locale.localeCompare(b.locale),
+    );
+
+    if (!voceSoglie && righeSoglie.length > 0) {
+      const newId = voceIdCounter++;
+      voci.push({
+        idVoce: newId,
+        posizione: getPrimaPosizioneVoceDisponibile(),
+        voceAbbreviata: "SOGLIE",
+        unitaMisura: UNITA_MISURA_DEFAULT_OPTIONS[0],
+        prezzo: 0,
+        tipoMisura: TIPOMISURA_VOCE_MANUALE,
+        voce: "SOGLIE",
+        note: "",
+        misurazioniManuali: [],
+      });
+      normalizzaPosizioniVoci();
+      voceSoglie = voci.find((item) => item.idVoce === newId) || null;
+    }
+
+    if (!voceSoglie) return;
+
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceSoglie.misurazioniManuali);
+    let nextMmId = nextVoceMmIdForRows(mmEsistenti);
+    const nuoveMisurazioni = righeSoglie.map((row) => {
+      const sbordo = Number(Number(row.sbordo || 0.05).toFixed(2));
+      const largh = Number(Number(row.larghezza || 0).toFixed(2));
+      const formula = `${fmt2(largh)} + ${fmt2(sbordo)} + ${fmt2(sbordo)}`;
+      const calc = calcolaMisurazioneVaria(formula, 1, false);
+      const riferimento = String(row.locale || "").trim() || "-";
+      const risultato = calc.ok ? calc.risultato : Number((largh + sbordo + sbordo).toFixed(2));
+      const formulaValue = calc.ok ? calc.formulaValue : Number((largh + sbordo + sbordo).toFixed(2));
+      return {
+        idMisurazione: nextMmId++,
+        tipo: VOCE_MM_TIPO_MANUALE,
+        piano: String(row.piano || "").trim() || "-",
+        riferimento,
+        formula,
+        formulaValue,
+        numero: 1,
+        segno: false,
+        risultato,
+        apertureCollegate: [],
+      };
+    });
+
+    voci = voci.map((item) =>
+      item.idVoce === voceSoglie.idVoce
+        ? {
+            ...item,
+            voceAbbreviata: "SOGLIE",
+            voce: "SOGLIE",
+            tipoMisura: TIPOMISURA_VOCE_MANUALE,
+            misurazioniManuali: nuoveMisurazioni,
+          }
+        : item,
+    );
+
+    saveVoci();
+    renderVoci();
+  }
+
+  function syncVoceCanali() {
+    let voceCanali = trovaVoceCanali();
+    const voceCanaliId = voceCanali?.idVoce ?? null;
+    /** @type {{ piano: string, riferimento: string, gronda: number }[]} */
+    const rows = [];
+    voci.forEach((voce) => {
+      if (voceCanaliId !== null && voce.idVoce === voceCanaliId) return;
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        if (riga?.canaleGronda !== true) return;
+        const grondaVal =
+          typeof riga?.grondaCanaleValore === "number" && Number.isFinite(riga.grondaCanaleValore)
+            ? Number(riga.grondaCanaleValore)
+            : null;
+        if (grondaVal === null) return;
+        rows.push({
+          piano: String(riga?.piano || "").trim() || "-",
+          riferimento: String(riga?.riferimento || "").trim() || "-",
+          gronda: Number(grondaVal.toFixed(2)),
+        });
+      });
+    });
+
+    if (!voceCanali && rows.length > 0) {
+      const newId = voceIdCounter++;
+      voci.push({
+        idVoce: newId,
+        posizione: getPrimaPosizioneVoceDisponibile(),
+        voceAbbreviata: "CANALI",
+        unitaMisura: UNITA_MISURA_DEFAULT_OPTIONS[0],
+        prezzo: 0,
+        tipoMisura: TIPOMISURA_VOCE_MANUALE,
+        voce: "CANALI",
+        note: "",
+        misurazioniManuali: [],
+      });
+      normalizzaPosizioniVoci();
+      voceCanali = voci.find((item) => item.idVoce === newId) || null;
+    }
+
+    if (!voceCanali) return;
+
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceCanali.misurazioniManuali);
+    let nextMmId = nextVoceMmIdForRows(mmEsistenti);
+    const nuoveMisurazioni = rows.map((row) => {
+      const formula = fmt2(row.gronda);
+      const calc = calcolaMisurazioneVaria(formula, 1, false);
+      const risultato = calc.ok ? calc.risultato : Number(row.gronda.toFixed(2));
+      const formulaValue = calc.ok ? calc.formulaValue : Number(row.gronda.toFixed(2));
+      return {
+        idMisurazione: nextMmId++,
+        tipo: VOCE_MM_TIPO_MANUALE,
+        piano: row.piano,
+        riferimento: row.riferimento,
+        formula,
+        formulaValue,
+        numero: 1,
+        segno: false,
+        risultato,
+        apertureCollegate: [],
+      };
+    });
+
+    voci = voci.map((item) =>
+      item.idVoce === voceCanali.idVoce
+        ? {
+            ...item,
+            voceAbbreviata: "CANALI",
+            voce: "CANALI",
+            tipoMisura: TIPOMISURA_VOCE_MANUALE,
+            misurazioniManuali: nuoveMisurazioni,
+          }
+        : item,
+    );
+
+    saveVoci();
+    renderVoci();
+  }
+
+  function syncVoceFalsiTelaiLegno() {
+    let voceFalsi = trovaVoceFalsiTelaiLegno();
+    const voceFalsiId = voceFalsi?.idVoce ?? null;
+    /** @type {Map<string, { key: string, piano: string, riferimento: string, larghezza: number, altezza: number, aggiunta: number }>} */
+    const mapRows = new Map();
+    voci.forEach((voce) => {
+      if (voceFalsiId !== null && voce.idVoce === voceFalsiId) return;
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        const piano = String(riga?.piano || "").trim() || "-";
+        const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
+        aperture.forEach((apertura, idx) => {
+          if (String(apertura?.falso || "").trim().toUpperCase() !== "LEGNO") return;
+          const riferimento = String(apertura?.locale || "").trim() || "-";
+          const larghezza = Number(apertura?.largh || 0);
+          const altezza = Number(apertura?.alt || 0);
+          const masterId = String(apertura?.idAperturaMaster || "").trim();
+          const key = masterId ? `apm:${masterId}|p:${piano}` : `row:${piano}|loc:${riferimento}|i:${idx}`;
+          if (!mapRows.has(key)) {
+            mapRows.set(key, {
+              key,
+              piano,
+              riferimento,
+              larghezza,
+              altezza,
+              aggiunta:
+                typeof falsiTelaiLegnoAggiunteByKey[key] === "number" &&
+                Number.isFinite(falsiTelaiLegnoAggiunteByKey[key])
+                  ? Number(falsiTelaiLegnoAggiunteByKey[key].toFixed(2))
+                  : 0.1,
+            });
+          }
+        });
+      });
+    });
+    const rows = [...mapRows.values()].sort(
+      (a, b) => a.piano.localeCompare(b.piano) || a.riferimento.localeCompare(b.riferimento),
+    );
+
+    if (!voceFalsi && rows.length > 0) {
+      const newId = voceIdCounter++;
+      voci.push({
+        idVoce: newId,
+        posizione: getPrimaPosizioneVoceDisponibile(),
+        voceAbbreviata: "FALSI TELAI LEGNO",
+        unitaMisura: UNITA_MISURA_DEFAULT_OPTIONS[0],
+        prezzo: 0,
+        tipoMisura: TIPOMISURA_VOCE_MANUALE,
+        voce: "FALSI TELAI LEGNO",
+        note: "",
+        misurazioniManuali: [],
+      });
+      normalizzaPosizioniVoci();
+      voceFalsi = voci.find((item) => item.idVoce === newId) || null;
+    }
+
+    if (!voceFalsi) return;
+
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceFalsi.misurazioniManuali);
+    let nextMmId = nextVoceMmIdForRows(mmEsistenti);
+    const nuoveMisurazioni = rows.map((row) => {
+      const larg = Number(Number(row.larghezza || 0).toFixed(2));
+      const alt = Number(Number(row.altezza || 0).toFixed(2));
+      const agg = Number(Number(row.aggiunta || 0.1).toFixed(2));
+      const formula = `(${fmt2(larg)} + ${fmt2(agg)}) + 2 * (${fmt2(alt)} + ${fmt2(agg)})`;
+      const calc = calcolaMisurazioneVaria(formula, 1, false);
+      const risultato = calc.ok ? calc.risultato : Number(((larg + agg) + 2 * (alt + agg)).toFixed(2));
+      const formulaValue = calc.ok ? calc.formulaValue : Number(((larg + agg) + 2 * (alt + agg)).toFixed(2));
+      return {
+        idMisurazione: nextMmId++,
+        tipo: VOCE_MM_TIPO_MANUALE,
+        piano: row.piano,
+        riferimento: row.riferimento,
+        formula,
+        formulaValue,
+        numero: 1,
+        segno: false,
+        risultato,
+        apertureCollegate: [],
+      };
+    });
+
+    voci = voci.map((item) =>
+      item.idVoce === voceFalsi.idVoce
+        ? {
+            ...item,
+            voceAbbreviata: "FALSI TELAI LEGNO",
+            voce: "FALSI TELAI LEGNO",
+            tipoMisura: TIPOMISURA_VOCE_MANUALE,
+            misurazioniManuali: nuoveMisurazioni,
+          }
+        : item,
+    );
+
+    saveVoci();
+    renderVoci();
+  }
+
+  function syncVoceFalsiTelaiAlluminio() {
+    let voceFalsi = trovaVoceFalsiTelaiAlluminio();
+    const voceFalsiId = voceFalsi?.idVoce ?? null;
+    /** @type {Map<string, { key: string, piano: string, riferimento: string, larghezza: number, altezza: number, aggiunta: number }>} */
+    const mapRows = new Map();
+    voci.forEach((voce) => {
+      if (voceFalsiId !== null && voce.idVoce === voceFalsiId) return;
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        const piano = String(riga?.piano || "").trim() || "-";
+        const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
+        aperture.forEach((apertura, idx) => {
+          if (String(apertura?.falso || "").trim().toUpperCase() !== "ALLUMINIO") return;
+          const riferimento = String(apertura?.locale || "").trim() || "-";
+          const larghezza = Number(apertura?.largh || 0);
+          const altezza = Number(apertura?.alt || 0);
+          const masterId = String(apertura?.idAperturaMaster || "").trim();
+          const key = masterId ? `apm:${masterId}|p:${piano}` : `row:${piano}|loc:${riferimento}|i:${idx}`;
+          if (!mapRows.has(key)) {
+            mapRows.set(key, {
+              key,
+              piano,
+              riferimento,
+              larghezza,
+              altezza,
+              aggiunta:
+                typeof falsiTelaiAlluminioAggiunteByKey[key] === "number" &&
+                Number.isFinite(falsiTelaiAlluminioAggiunteByKey[key])
+                  ? Number(falsiTelaiAlluminioAggiunteByKey[key].toFixed(2))
+                  : 0.1,
+            });
+          }
+        });
+      });
+    });
+    const rows = [...mapRows.values()].sort(
+      (a, b) => a.piano.localeCompare(b.piano) || a.riferimento.localeCompare(b.riferimento),
+    );
+
+    if (!voceFalsi && rows.length > 0) {
+      const newId = voceIdCounter++;
+      voci.push({
+        idVoce: newId,
+        posizione: getPrimaPosizioneVoceDisponibile(),
+        voceAbbreviata: "FALSI TELAI ALLUMINIO",
+        unitaMisura: UNITA_MISURA_DEFAULT_OPTIONS[0],
+        prezzo: 0,
+        tipoMisura: TIPOMISURA_VOCE_MANUALE,
+        voce: "FALSI TELAI ALLUMINIO",
+        note: "",
+        misurazioniManuali: [],
+      });
+      normalizzaPosizioniVoci();
+      voceFalsi = voci.find((item) => item.idVoce === newId) || null;
+    }
+
+    if (!voceFalsi) return;
+
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceFalsi.misurazioniManuali);
+    let nextMmId = nextVoceMmIdForRows(mmEsistenti);
+    const nuoveMisurazioni = rows.map((row) => {
+      const larg = Number(Number(row.larghezza || 0).toFixed(2));
+      const alt = Number(Number(row.altezza || 0).toFixed(2));
+      const agg = Number(Number(row.aggiunta || 0.1).toFixed(2));
+      const formula = `(${fmt2(larg)} + ${fmt2(agg)}) + 2 * (${fmt2(alt)} + ${fmt2(agg)})`;
+      const calc = calcolaMisurazioneVaria(formula, 1, false);
+      const risultato = calc.ok ? calc.risultato : Number(((larg + agg) + 2 * (alt + agg)).toFixed(2));
+      const formulaValue = calc.ok ? calc.formulaValue : Number(((larg + agg) + 2 * (alt + agg)).toFixed(2));
+      return {
+        idMisurazione: nextMmId++,
+        tipo: VOCE_MM_TIPO_MANUALE,
+        piano: row.piano,
+        riferimento: row.riferimento,
+        formula,
+        formulaValue,
+        numero: 1,
+        segno: false,
+        risultato,
+        apertureCollegate: [],
+      };
+    });
+
+    voci = voci.map((item) =>
+      item.idVoce === voceFalsi.idVoce
+        ? {
+            ...item,
+            voceAbbreviata: "FALSI TELAI ALLUMINIO",
+            voce: "FALSI TELAI ALLUMINIO",
+            tipoMisura: TIPOMISURA_VOCE_MANUALE,
+            misurazioniManuali: nuoveMisurazioni,
+          }
+        : item,
+    );
+
+    saveVoci();
+    renderVoci();
+  }
+
+  function openArchivioDavanzaliDialog() {
+    const rows = buildArchivioDavanzaliRows();
+    const righeHtml =
+      rows.length === 0
+        ? `<tr><td colspan="4" class="empty-cell">Nessun davanzale in archivio.</td></tr>`
+        : rows
+            .map(
+              (row) => `<tr>
+                <td>${escapeHtml(row.piano)}</td>
+                <td>${escapeHtml(row.locale)}</td>
+                <td>${escapeHtml(fmt2(row.larghezza))}</td>
+                <td>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="${escapeHtml(fmt2(row.sbordo))}"
+                    data-action="change-davanzale-sbordo"
+                    data-key="${escapeHtml(row.key)}"
+                    class="voce-mm-ap-input"
+                    style="max-width:90px;"
+                  />
+                </td>
+              </tr>`,
+            )
+            .join("");
+    davanzaliDialogEl.innerHTML = `
+      <form method="dialog" class="ifc-riepilogo-dialog-form">
+        <div class="ifc-riepilogo-dialog-header"><h3>Archivio DAVANZALI</h3></div>
+        <div class="table-wrap">
+          <table class="table-voce-mm-inline">
+            <thead><tr><th>PIANO</th><th>LOCALE</th><th>LARGHEZZA</th><th>SBORDO</th></tr></thead>
+            <tbody>${righeHtml}</tbody>
+          </table>
+        </div>
+        <div style="padding:8px;display:flex;justify-content:flex-end;">
+          <button type="button" class="btn-action btn-secondary" data-action="close-davanzali-dialog">Chiudi</button>
+        </div>
+      </form>
+    `;
+    davanzaliDialogEl.showModal();
+  }
+
+  function buildArchivioSoglieRows() {
+    /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, sbordo: number }>} */
+    const map = new Map();
+    voci.forEach((voce) => {
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      mm.forEach((riga) => {
+        const piano = String(riga?.piano || "").trim() || "-";
+        const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
+        aperture.forEach((apertura, idx) => {
+          const hDav = Number(apertura?.hDav || 0);
+          if (Math.abs(hDav) > 0.0001) return;
+          const locale = String(apertura?.locale || "").trim() || "-";
+          const larghezza = Number(apertura?.largh || 0);
+          const masterId = String(apertura?.idAperturaMaster || "").trim();
+          const key = masterId ? `apm:${masterId}|p:${piano}` : `row:${piano}|loc:${locale}|i:${idx}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              piano,
+              locale,
+              larghezza,
+              sbordo:
+                typeof soglieSbordiByKey[key] === "number" && Number.isFinite(soglieSbordiByKey[key])
+                  ? Number(soglieSbordiByKey[key].toFixed(2))
+                  : 0.05,
+            });
+          }
+        });
+      });
+    });
+    return [...map.values()].sort((a, b) => a.piano.localeCompare(b.piano) || a.locale.localeCompare(b.locale));
+  }
+
+  function openArchivioSoglieDialog() {
+    const rows = buildArchivioSoglieRows();
+    const righeHtml =
+      rows.length === 0
+        ? `<tr><td colspan="4" class="empty-cell">Nessuna soglia in archivio.</td></tr>`
+        : rows
+            .map(
+              (row) => `<tr>
+                <td>${escapeHtml(row.piano)}</td>
+                <td>${escapeHtml(row.locale)}</td>
+                <td>${escapeHtml(fmt2(row.larghezza))}</td>
+                <td>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="${escapeHtml(fmt2(row.sbordo))}"
+                    data-action="change-soglia-sbordo"
+                    data-key="${escapeHtml(row.key)}"
+                    class="voce-mm-ap-input"
+                    style="max-width:90px;"
+                  />
+                </td>
+              </tr>`,
+            )
+            .join("");
+    soglieDialogEl.innerHTML = `
+      <form method="dialog" class="ifc-riepilogo-dialog-form">
+        <div class="ifc-riepilogo-dialog-header"><h3>Archivio SOGLIE</h3></div>
+        <div class="table-wrap">
+          <table class="table-voce-mm-inline">
+            <thead><tr><th>PIANO</th><th>LOCALE</th><th>LARGHEZZA</th><th>SBORDO</th></tr></thead>
+            <tbody>${righeHtml}</tbody>
+          </table>
+        </div>
+        <div style="padding:8px;display:flex;justify-content:flex-end;">
+          <button type="button" class="btn-action btn-secondary" data-action="close-soglie-dialog">Chiudi</button>
+        </div>
+      </form>
+    `;
+    soglieDialogEl.showModal();
   }
 
   function creaNuovaElevazione(idPiano) {
@@ -1819,6 +3176,213 @@ window.addEventListener("DOMContentLoaded", () => {
     return { ok: true, formulaValue, risultato };
   }
 
+  function getVoceMmAperturaDraftKey(idVoce, mmIndex) {
+    return `${idVoce}:${mmIndex}`;
+  }
+
+  function createEmptyVoceMmAperturaDraft() {
+    return {
+      locale: "",
+      largh: "",
+      alt: "",
+      hDav: "0",
+      ante: "1",
+      tipologia: "FINESTRA",
+      falso: "NO",
+      scuro: "NO",
+      inferiata: "NO",
+      zanzariera: "NO",
+    };
+  }
+
+  function parseVoceMmAperturaDraft(draft) {
+    const locale = String(draft?.locale || "").trim();
+    const largh = parseNonNegativeDecimal2(String(draft?.largh || ""));
+    const alt = parseNonNegativeDecimal2(String(draft?.alt || ""));
+    const hDav = parseNonNegativeDecimal2(String(draft?.hDav || ""));
+    const ante = parseAnteIntero(String(draft?.ante || ""));
+    const tipologia = String(draft?.tipologia || "").trim();
+    const falso = String(draft?.falso || "").trim().toUpperCase();
+    const scuro = String(draft?.scuro || "").trim().toUpperCase();
+    const inferiata = String(draft?.inferiata || "").trim().toUpperCase();
+    const zanzariera = String(draft?.zanzariera || "").trim().toUpperCase();
+    const tipologie = new Set([
+      "FINESTRA",
+      "PORTA FINESTRA",
+      "BOCCA LUPO",
+      "FIN CANTINA",
+      "PORTONCINO",
+      "PORTA CANTINA",
+      "PORTA REI",
+      "PORTA INTERNA",
+      "SCRIGNO",
+      "BASCULANTE",
+      "SEZIONALE",
+    ]);
+    const falsi = new Set(["NO", "ALLUMINIO", "LEGNO"]);
+    const scuri = new Set(["NO", "PERSIANA", "TAPPARELLA"]);
+    const siNo = new Set(["NO", "SI"]);
+    if (
+      !locale ||
+      largh === null ||
+      alt === null ||
+      hDav === null ||
+      ante === null ||
+      !tipologia ||
+      !tipologie.has(tipologia) ||
+      !falsi.has(falso) ||
+      !scuri.has(scuro) ||
+      !siNo.has(inferiata) ||
+      !siNo.has(zanzariera)
+    ) {
+      return null;
+    }
+    return {
+      locale,
+      largh,
+      alt,
+      hDav,
+      ante,
+      tipologia,
+      falso,
+      scuro,
+      inferiata,
+      zanzariera,
+    };
+  }
+
+  function nextAperturaMasterId() {
+    const id = `APM-${String(apertureMasterIdCounter).padStart(4, "0")}`;
+    apertureMasterIdCounter += 1;
+    return id;
+  }
+
+  function normalizzaAperturaMasterRecord(item, fallbackId = "") {
+    if (!item || typeof item !== "object") return null;
+    const base = normalizzaApertureCollegateMisurazione([item])[0];
+    if (!base) return null;
+    const idAperturaMaster =
+      typeof item?.idAperturaMaster === "string" && item.idAperturaMaster.trim() !== ""
+        ? item.idAperturaMaster.trim()
+        : fallbackId;
+    return { idAperturaMaster, ...base };
+  }
+
+  function normalizzaApertureMaster(raw) {
+    if (!Array.isArray(raw)) return [];
+    const out = [];
+    raw.forEach((item) => {
+      const normalized = normalizzaAperturaMasterRecord(item, nextAperturaMasterId());
+      if (normalized) out.push(normalized);
+    });
+    return out;
+  }
+
+  function creaAperturaMasterDaDati(item, forcedId = "") {
+    const normalized = normalizzaAperturaMasterRecord(item);
+    if (!normalized) return null;
+    const created = {
+      ...normalized,
+      idAperturaMaster: forcedId && forcedId.trim() !== "" ? forcedId.trim() : nextAperturaMasterId(),
+    };
+    apertureMaster.push(created);
+    return created.idAperturaMaster;
+  }
+
+  function normalizzaApertureCollegateRefs(apertureRaw) {
+    if (!Array.isArray(apertureRaw)) return [];
+    return apertureRaw
+      .map((item) => {
+        if (item && typeof item === "object" && typeof item.idAperturaMaster === "string") {
+          const id = item.idAperturaMaster.trim();
+          if (id !== "") {
+            const exists = apertureMaster.some((ap) => ap.idAperturaMaster === id);
+            if (exists) return { idAperturaMaster: id };
+            const createdWithSameId = creaAperturaMasterDaDati(item, id);
+            return createdWithSameId ? { idAperturaMaster: createdWithSameId } : null;
+          }
+        }
+        const idLegacy = creaAperturaMasterDaDati(item);
+        return idLegacy ? { idAperturaMaster: idLegacy } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function risolviApertureCollegateRefs(apertureRefsRaw) {
+    const refs = normalizzaApertureCollegateRefs(apertureRefsRaw);
+    return refs
+      .map((ref) => {
+        const master = apertureMaster.find((ap) => ap.idAperturaMaster === ref.idAperturaMaster);
+        if (!master) return null;
+        return { ...master };
+      })
+      .filter(Boolean);
+  }
+
+  function normalizzaApertureCollegateMisurazione(apertureRaw) {
+    if (!Array.isArray(apertureRaw)) return [];
+    return apertureRaw
+      .filter(
+        (item) =>
+          typeof item?.locale === "string" &&
+          (typeof item?.largh === "number" || typeof item?.lunghezza === "number") &&
+          (typeof item?.alt === "number" || typeof item?.altezza === "number") &&
+          (typeof item?.hDav === "number" || typeof item?.hDavanzale === "number") &&
+          typeof item?.ante === "number" &&
+          Number.isInteger(item.ante) &&
+          typeof item?.tipologia === "string",
+      )
+      .map((item) => ({
+        idApertura:
+          typeof item?.idApertura === "string" && item.idApertura.trim() !== ""
+            ? item.idApertura
+            : `AP-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        locale: item.locale.trim(),
+        largh: Number((Number(item.largh ?? item.lunghezza ?? 0)).toFixed(2)),
+        alt: Number((Number(item.alt ?? item.altezza ?? 0)).toFixed(2)),
+        hDav: Number((Number(item.hDav ?? item.hDavanzale ?? 0)).toFixed(2)),
+        ante: item.ante,
+        tipologia: item.tipologia.trim(),
+        falso:
+          typeof item?.falso === "string"
+            ? item.falso.toUpperCase()
+            : item?.falsotelai === true
+              ? "ALLUMINIO"
+              : "NO",
+        scuro: typeof item?.scuro === "string" ? item.scuro.toUpperCase() : "NO",
+        inferiata: typeof item?.inferiata === "string" ? item.inferiata.toUpperCase() : "NO",
+        zanzariera: typeof item?.zanzariera === "string" ? item.zanzariera.toUpperCase() : "NO",
+      }));
+  }
+
+  function chiediDatiAperturaMisurazione() {
+    const locale = window.prompt("APERTURA - Locale", "")?.trim() ?? "";
+    if (!locale) return null;
+    const lunghezza = parseNonNegativeDecimal2(window.prompt("APERTURA - Lunghezza (m)", "") ?? "");
+    if (lunghezza === null) return null;
+    const altezza = parseNonNegativeDecimal2(window.prompt("APERTURA - Altezza (m)", "") ?? "");
+    if (altezza === null) return null;
+    const ante = parseAnteIntero(window.prompt("APERTURA - Numero ante (intero)", "1") ?? "");
+    if (ante === null) return null;
+    const tipologia = window.prompt("APERTURA - Tipologia", "PORTA")?.trim() ?? "";
+    if (!tipologia) return null;
+    const falsotelaiRaw = window.prompt("APERTURA - Falsotelai? (si/no)", "no")?.trim().toLowerCase() ?? "";
+    if (falsotelaiRaw !== "si" && falsotelaiRaw !== "no") return null;
+    const hDavanzale = parseNonNegativeDecimal2(window.prompt("APERTURA - H Davanzale (m)", "0") ?? "");
+    if (hDavanzale === null) return null;
+    return {
+      idApertura: `AP-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+      locale,
+      lunghezza,
+      altezza,
+      ante,
+      tipologia,
+      falsotelai: falsotelaiRaw === "si",
+      hDavanzale,
+      idVoceCapitolato: "",
+    };
+  }
+
   function resetVoceMmRigaFormFields() {
     if (voceMmRigaPianoEl) voceMmRigaPianoEl.value = "";
     if (voceMmRigaRiferimentoEl) voceMmRigaRiferimentoEl.value = "";
@@ -1830,6 +3394,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (voceMmRigaMisura1El) voceMmRigaMisura1El.value = "";
     if (voceMmRigaMisura2El) voceMmRigaMisura2El.value = "";
     if (voceMmRigaMisura3El) voceMmRigaMisura3El.value = "";
+    voceMmTemplateFaldaMeta = { canale: false, gronda: null };
     toggleVoceMmFieldsByTipo(VOCE_MM_TIPO_MANUALE);
     updateVoceMmRisultatoPreview();
   }
@@ -1890,6 +3455,13 @@ window.addEventListener("DOMContentLoaded", () => {
       if (voceMmRigaMisura1El) voceMmRigaMisura1El.value = row.misura1 === null ? "" : String(row.misura1);
       if (voceMmRigaMisura2El) voceMmRigaMisura2El.value = row.misura2 === null ? "" : String(row.misura2);
       if (voceMmRigaMisura3El) voceMmRigaMisura3El.value = row.misura3 === null ? "" : String(row.misura3);
+      voceMmTemplateFaldaMeta = {
+        canale: row.canaleGronda === true,
+        gronda:
+          typeof row.grondaCanaleValore === "number" && Number.isFinite(row.grondaCanaleValore)
+            ? Number(row.grondaCanaleValore)
+            : null,
+      };
     }
     toggleVoceMmFieldsByTipo(VOCE_MM_TIPO_MANUALE);
     updateVoceMmRisultatoPreview();
@@ -1986,9 +3558,27 @@ window.addEventListener("DOMContentLoaded", () => {
       misura1: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura1 : null,
       misura2: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2 : null,
       misura3: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3 : null,
+      canaleGronda:
+        tipo === VOCE_MM_TIPO_MANUALE &&
+        voceMmTemplateFaldaMeta.canale === true &&
+        typeof voceMmTemplateFaldaMeta.gronda === "number",
+      grondaCanaleValore:
+        tipo === VOCE_MM_TIPO_MANUALE &&
+        voceMmTemplateFaldaMeta.canale === true &&
+        typeof voceMmTemplateFaldaMeta.gronda === "number"
+          ? Number(voceMmTemplateFaldaMeta.gronda.toFixed(3))
+          : null,
       numero: numeroParsed,
       segno,
       risultato: calc.risultato,
+      apertureCollegate:
+        index !== null
+          ? normalizzaApertureCollegateRefs(
+              normalizzaMisurazioniManualiVoce(voci.find((vv) => vv.idVoce === idVoce)?.misurazioniManuali)[
+                index
+              ]?.apertureCollegate,
+            )
+          : [],
     };
     let targetIndex = index;
     const shouldFocusAfterSave = index === null;
@@ -2004,12 +3594,16 @@ window.addEventListener("DOMContentLoaded", () => {
       return { ...v, misurazioniManuali: mm };
     });
     saveVoci();
+    syncVoceCanali();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
     renderVoci();
     voceMmRigaDialogEl.close();
     if (shouldFocusAfterSave && targetIndex !== null && Number.isInteger(targetIndex) && targetIndex >= 0) {
       focusVoceMmRow(idVoce, targetIndex);
     }
     voceMmDialogContext = { idVoce: null, index: null };
+    voceMmTemplateFaldaMeta = { canale: false, gronda: null };
   }
 
   function eliminaVoceMmRiga(idVoce, index) {
@@ -2019,6 +3613,9 @@ window.addEventListener("DOMContentLoaded", () => {
       return { ...v, misurazioniManuali: mm };
     });
     saveVoci();
+    syncVoceCanali();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
     renderVoci();
   }
 
@@ -2049,9 +3646,15 @@ window.addEventListener("DOMContentLoaded", () => {
       misura1: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? row.misura1 ?? null : null,
       misura2: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? row.misura2 ?? null : null,
       misura3: tipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? row.misura3 ?? null : null,
+      canaleGronda: row.canaleGronda === true,
+      grondaCanaleValore:
+        typeof row.grondaCanaleValore === "number" && Number.isFinite(row.grondaCanaleValore)
+          ? Number(row.grondaCanaleValore.toFixed(3))
+          : null,
       numero: row.numero,
       segno: row.segno === true,
       risultato: calc.risultato,
+      apertureCollegate: normalizzaApertureCollegateRefs(row.apertureCollegate),
     };
     voci = voci.map((vv) => {
       if (vv.idVoce !== idVoce) return vv;
@@ -2060,8 +3663,67 @@ window.addEventListener("DOMContentLoaded", () => {
       return { ...vv, misurazioniManuali: arr };
     });
     saveVoci();
+    syncVoceCanali();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
     renderVoci();
     openVoceMmRigaDialog(idVoce, index + 1);
+  }
+
+  /** Duplica una voce completa (con misurazioni e collegamenti aperture) subito sotto l'originale. */
+  function duplicaVoceCompleta(idVoce) {
+    normalizzaPosizioniVoci();
+    const original = voci.find((item) => item.idVoce === idVoce);
+    if (!original) return;
+    const newIdVoce = voceIdCounter++;
+    const voceAbbreviataBase = String(original.voceAbbreviata || "").trim();
+    const voceAbbreviataCopia = voceAbbreviataBase
+      ? `${voceAbbreviataBase} - COPIA`
+      : "COPIA";
+    const mmOriginal = normalizzaMisurazioniManualiVoce(original.misurazioniManuali);
+    const mmCopy = mmOriginal.map((row) => ({
+      ...row,
+      apertureCollegate: normalizzaApertureCollegateRefs(row.apertureCollegate),
+    }));
+    const copy = {
+      ...original,
+      idVoce: newIdVoce,
+      posizione: original.posizione + 1,
+      voceAbbreviata: voceAbbreviataCopia,
+      misurazioniManuali: mmCopy,
+    };
+    voci.push(copy);
+    spostaVoceAPosizione(newIdVoce, original.posizione + 1);
+    saveVoci();
+    syncVoceCanali();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
+    renderVoci();
+  }
+
+  function avviaModificaVoceMmApertura(idVoce, idx, aperturaId) {
+    const voce = voci.find((item) => item.idVoce === idVoce);
+    const mm = normalizzaMisurazioniManualiVoce(voce?.misurazioniManuali);
+    const row = mm[idx];
+    if (!row) return;
+    const aperture = risolviApertureCollegateRefs(row.apertureCollegate);
+    const src = aperture.find((apertura) => apertura.idAperturaMaster === aperturaId);
+    if (!src) return;
+    const key = getVoceMmAperturaDraftKey(idVoce, idx);
+    voceMmAperturaDraftByKey.set(key, {
+      locale: src.locale || "",
+      largh: String(src.largh ?? ""),
+      alt: String(src.alt ?? ""),
+      hDav: String(src.hDav ?? ""),
+      ante: String(src.ante ?? 1),
+      tipologia: src.tipologia || "FINESTRA",
+      falso: src.falso || "NO",
+      scuro: src.scuro || "NO",
+      inferiata: src.inferiata || "NO",
+      zanzariera: src.zanzariera || "NO",
+      editingAperturaMasterId: src.idAperturaMaster,
+    });
+    renderVoci();
   }
 
   function resetVoceForm() {
@@ -2144,8 +3806,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const totaleComputo = voci.reduce((acc, item) => {
       const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
       const totaleQuantitaVoce = mm.reduce((sum, m) => sum + Number(m.risultato || 0), 0);
+      const detrazioneAperture = calcolaDetrazioneApertureVoce(item, mm);
+      const totaleQuantitaVoceNetto = totaleQuantitaVoce - detrazioneAperture;
       const prezzoVoce = parseNonNegativeDecimal2(item.prezzo) ?? 0;
-      return acc + totaleQuantitaVoce * prezzoVoce;
+      return acc + totaleQuantitaVoceNetto * prezzoVoce;
     }, 0);
     if (vociTotaleComputoEl) {
       vociTotaleComputoEl.textContent = `TOTALE COMPUTO: ${formatEuro2(totaleComputo)}`;
@@ -2214,6 +3878,9 @@ window.addEventListener("DOMContentLoaded", () => {
       const cellVoceAbbrev = createCell(item.voceAbbreviata || "-");
       cellVoceAbbrev.title = item.voce;
       cellVoceAbbrev.classList.add("voci-cell-open-focus");
+      if (isVoceSpecialeNoTotaleRiferimento(item)) {
+        cellVoceAbbrev.classList.add("voci-cell-special-voce");
+      }
       cellVoceAbbrev.dataset.action = "open-voce-focus";
       cellVoceAbbrev.dataset.idVoce = String(item.idVoce);
       row.appendChild(cellVoceAbbrev);
@@ -2267,10 +3934,19 @@ window.addEventListener("DOMContentLoaded", () => {
       deleteButton.title = "Elimina";
       deleteButton.setAttribute("aria-label", "Elimina");
 
+      const copyButton = document.createElement("button");
+      copyButton.type = "button";
+      copyButton.className = "btn-action btn-secondary";
+      copyButton.dataset.action = "copy-voce";
+      copyButton.dataset.id = String(item.idVoce);
+      copyButton.textContent = "⧉";
+      copyButton.title = "Copia voce con misurazioni e aperture collegate";
+      copyButton.setAttribute("aria-label", "Copia voce");
+
       const isVoceManuale =
         normalizzaTipoMisuraVoce(item.tipoMisura) === TIPOMISURA_VOCE_MANUALE;
 
-      actionsCell.append(upButton, downButton, editButton);
+      actionsCell.append(upButton, downButton, copyButton, editButton);
       actionsCell.appendChild(deleteButton);
       if (isVoceManuale) {
         const collapseMmButton = document.createElement("button");
@@ -2348,7 +4024,7 @@ window.addEventListener("DOMContentLoaded", () => {
           "SPECIFICA",
           "FORMULA",
           "M1",
-          "M2",
+          "M2/ALT",
           "M3",
           "N.°",
           "SEGNO",
@@ -2395,6 +4071,7 @@ window.addEventListener("DOMContentLoaded", () => {
         } else {
           /** @type {Map<string, Map<string, { m: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, numero: number, segno: boolean, risultato: number }, idx: number }[]>>} */
           const grouped = new Map();
+          const unitaNormDetrazione = normalizzaUnitaVoceDetrazione(item.unitaMisura);
           mm.forEach((m, idx) => {
             const pianoKey = (m.piano || "-").trim() || "-";
             const rifKey = (m.riferimento || "-").trim() || "-";
@@ -2406,8 +4083,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
           grouped.forEach((rifMap, pianoKey) => {
             let sumPiano = 0;
+            let sumPianoAperture = 0;
             rifMap.forEach((rows, rifKey) => {
               let sumRif = 0;
+              let sumRifAperture = 0;
               rows.forEach(({ m, idx }) => {
                 const trMm = document.createElement("tr");
                 trMm.className = "voce-mm-data-row";
@@ -2429,9 +4108,24 @@ window.addEventListener("DOMContentLoaded", () => {
                 trMm.appendChild(
                   createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.misura2 === null ? "" : Number(m.misura2).toFixed(3)) : ""),
                 );
-                trMm.appendChild(
-                  createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.misura3 === null ? "" : Number(m.misura3).toFixed(3)) : ""),
+                const m3Cell = createCell(
+                  mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA
+                    ? (m.misura3 === null ? "" : Number(m.misura3).toFixed(3))
+                    : "",
                 );
+                const m3Mancante =
+                  m.misura3 === null ||
+                  typeof m.misura3 !== "number" ||
+                  !Number.isFinite(m.misura3);
+                if (
+                  mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA &&
+                  unitaNormDetrazione.includes("mc") &&
+                  m3Mancante
+                ) {
+                  m3Cell.classList.add("voce-mm-m3-missing");
+                  m3Cell.title = "M3 obbligatorio per voci in mc";
+                }
+                trMm.appendChild(m3Cell);
                 trMm.appendChild(createCell(String(m.numero)));
                 trMm.appendChild(createCell(m.segno ? "-" : "+"));
                 trMm.appendChild(createCell(fmt2(m.risultato)));
@@ -2458,15 +4152,408 @@ window.addEventListener("DOMContentLoaded", () => {
                 trMm.appendChild(ac);
                 tbody.appendChild(trMm);
 
+                if (!isVoceSpecialeNoTotaleRiferimento(item)) {
+                  const apertureCollegate = risolviApertureCollegateRefs(m.apertureCollegate);
+                  const trAp = document.createElement("tr");
+                  trAp.className = "voce-mm-aperture-row";
+                  const tdAp = document.createElement("td");
+                  tdAp.colSpan = mmTotalColumns;
+                  tdAp.className = "empty-cell voce-mm-aperture-cell";
+                  const draftKey = getVoceMmAperturaDraftKey(item.idVoce, idx);
+                  const draft = voceMmAperturaDraftByKey.get(draftKey);
+                  const editingAperturaMasterId = String(draft?.editingAperturaMasterId || "").trim();
+                  const savedWrap = document.createElement("div");
+                  savedWrap.className = "voce-mm-aperture-editor-wrap voce-mm-aperture-saved-wrap";
+                  const savedHead = document.createElement("div");
+                  savedHead.className = "voce-mm-aperture-editor-head";
+                  [
+                    "LOCALE",
+                    "LRGH",
+                    "ALT.",
+                    "HDAV",
+                    "ANTE",
+                    "TIPOLOGIA",
+                    "FALSO",
+                    "SCURO",
+                    "INFERIATA",
+                    "ZANZARIERA",
+                    "H INCL.",
+                    "MQ",
+                    "MC",
+                    "AZIONI",
+                  ].forEach((label) => {
+                    const cell = document.createElement("div");
+                    cell.className = "voce-mm-ap-col-label";
+                    if (label === "AZIONI") cell.classList.add("voce-mm-ap-col-actions");
+                    cell.textContent = label;
+                    savedHead.appendChild(cell);
+                  });
+                  savedWrap.appendChild(savedHead);
+                  const misura2Val =
+                    typeof m.misura2 === "number" ? Number(m.misura2) : null;
+                  const misura3Val =
+                    typeof m.misura3 === "number" ? Number(m.misura3) : null;
+
+                if (apertureCollegate.length === 0) {
+                  const emptyText = document.createElement("div");
+                  emptyText.className = "voce-mm-aperture-empty";
+                  emptyText.textContent = "Nessuna apertura";
+                  tdAp.appendChild(savedWrap);
+                  tdAp.appendChild(emptyText);
+                } else {
+                  apertureCollegate.forEach((apertura) => {
+                    if (editingAperturaMasterId && editingAperturaMasterId === apertura.idAperturaMaster) {
+                      const row = document.createElement("div");
+                      row.className =
+                        "voce-mm-aperture-editor-inputs voce-mm-aperture-saved-row voce-mm-aperture-editing-inline";
+                      const buildInputCell = (field, value, type = "text") => {
+                        const c = document.createElement("div");
+                        c.className = "voce-mm-ap-col-input";
+                        const input = document.createElement("input");
+                        input.type = type;
+                        input.value = value;
+                        input.className = "voce-mm-ap-input";
+                        input.dataset.action = "change-voce-mm-apertura-draft";
+                        input.dataset.idVoce = String(item.idVoce);
+                        input.dataset.mmIndex = String(idx);
+                        input.dataset.field = field;
+                        c.appendChild(input);
+                        row.appendChild(c);
+                      };
+                      const buildSelectCell = (field, value, options) => {
+                        const c = document.createElement("div");
+                        c.className = "voce-mm-ap-col-input";
+                        const sel = document.createElement("select");
+                        sel.className = "voce-mm-ap-input";
+                        sel.dataset.action = "change-voce-mm-apertura-draft";
+                        sel.dataset.idVoce = String(item.idVoce);
+                        sel.dataset.mmIndex = String(idx);
+                        sel.dataset.field = field;
+                        options.forEach((opt) => {
+                          const o = document.createElement("option");
+                          o.value = opt;
+                          o.textContent = opt;
+                          sel.appendChild(o);
+                        });
+                        sel.value = value;
+                        c.appendChild(sel);
+                        row.appendChild(c);
+                      };
+                      buildInputCell("locale", draft?.locale || "");
+                      buildInputCell("largh", draft?.largh || "", "number");
+                      buildInputCell("alt", draft?.alt || "", "number");
+                      buildInputCell("hDav", draft?.hDav || "", "number");
+                      buildInputCell("ante", draft?.ante || "", "number");
+                      buildSelectCell("tipologia", draft?.tipologia || "FINESTRA", [
+                        "FINESTRA",
+                        "PORTA FINESTRA",
+                        "BOCCA LUPO",
+                        "FIN CANTINA",
+                        "PORTONCINO",
+                        "PORTA CANTINA",
+                        "PORTA REI",
+                        "PORTA INTERNA",
+                        "SCRIGNO",
+                        "BASCULANTE",
+                        "SEZIONALE",
+                      ]);
+                      buildSelectCell("falso", draft?.falso || "NO", ["NO", "ALLUMINIO", "LEGNO"]);
+                      buildSelectCell("scuro", draft?.scuro || "NO", ["NO", "PERSIANA", "TAPPARELLA"]);
+                      buildSelectCell("inferiata", draft?.inferiata || "NO", ["NO", "SI"]);
+                      buildSelectCell("zanzariera", draft?.zanzariera || "NO", ["NO", "SI"]);
+                      const metric = calcolaMetricheAperturaMisurazione(
+                        apertura,
+                        mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
+                        mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
+                      );
+                      const roCell = (text, extraClass = "") => {
+                        const c = document.createElement("div");
+                        c.className =
+                          `voce-mm-ap-col-input voce-mm-ap-saved-cell ${extraClass}`.trim();
+                        c.textContent = text;
+                        row.appendChild(c);
+                      };
+                      roCell(fmt2(metric.hInclusa), "voce-mm-ap-metric-cell");
+                      roCell(fmt2(metric.mq), "voce-mm-ap-metric-cell");
+                      roCell(fmt2(metric.mc), "voce-mm-ap-metric-cell");
+
+                      const actionCell = document.createElement("div");
+                      actionCell.className = "voce-mm-ap-col-input voce-mm-ap-col-actions";
+                      const saveBtn = document.createElement("button");
+                      saveBtn.type = "button";
+                      saveBtn.className = "btn-action btn-edit btn-icon-mini";
+                      saveBtn.dataset.action = "save-voce-mm-apertura-draft";
+                      saveBtn.dataset.idVoce = String(item.idVoce);
+                      saveBtn.dataset.mmIndex = String(idx);
+                      saveBtn.textContent = "✓";
+                      saveBtn.title = "Salva apertura";
+                      saveBtn.setAttribute("aria-label", "Salva apertura");
+                      const cancelBtn = document.createElement("button");
+                      cancelBtn.type = "button";
+                      cancelBtn.className = "btn-action btn-delete btn-icon-mini";
+                      cancelBtn.dataset.action = "cancel-voce-mm-apertura-draft";
+                      cancelBtn.dataset.idVoce = String(item.idVoce);
+                      cancelBtn.dataset.mmIndex = String(idx);
+                      cancelBtn.textContent = "✕";
+                      cancelBtn.title = "Annulla";
+                      cancelBtn.setAttribute("aria-label", "Annulla");
+                      actionCell.append(saveBtn, cancelBtn);
+                      row.appendChild(actionCell);
+                      savedWrap.appendChild(row);
+                      return;
+                    }
+                    const row = document.createElement("div");
+                    row.className = "voce-mm-aperture-editor-inputs voce-mm-aperture-saved-row";
+                    const pushTextCell = (text, extraClass = "") => {
+                      const c = document.createElement("div");
+                      c.className =
+                        `voce-mm-ap-col-input voce-mm-ap-saved-cell ${extraClass}`.trim();
+                      c.textContent = text;
+                      row.appendChild(c);
+                    };
+                    pushTextCell(apertura.locale || "");
+                    pushTextCell(fmt2(apertura.largh));
+                    pushTextCell(fmt2(apertura.alt));
+                    pushTextCell(fmt2(apertura.hDav));
+                    pushTextCell(String(apertura.ante));
+                    pushTextCell(apertura.tipologia || "");
+                    pushTextCell(apertura.falso || "NO");
+                    pushTextCell(apertura.scuro || "NO");
+                    pushTextCell(apertura.inferiata || "NO");
+                    pushTextCell(apertura.zanzariera || "NO");
+                    const metric = calcolaMetricheAperturaMisurazione(
+                      apertura,
+                      mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
+                      mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
+                    );
+                    pushTextCell(fmt2(metric.hInclusa), "voce-mm-ap-metric-cell");
+                    pushTextCell(fmt2(metric.mq), "voce-mm-ap-metric-cell");
+                    pushTextCell(fmt2(metric.mc), "voce-mm-ap-metric-cell");
+
+                    const actionCell = document.createElement("div");
+                    actionCell.className = "voce-mm-ap-col-input voce-mm-ap-col-actions";
+                    const editAp = document.createElement("button");
+                    editAp.type = "button";
+                    editAp.className = "btn-action btn-edit btn-icon-mini";
+                    editAp.dataset.action = "edit-voce-mm-apertura";
+                    editAp.dataset.idVoce = String(item.idVoce);
+                    editAp.dataset.mmIndex = String(idx);
+                    editAp.dataset.aperturaId = apertura.idAperturaMaster;
+                    editAp.textContent = "✎";
+                    editAp.title = "Modifica apertura";
+                    editAp.setAttribute("aria-label", "Modifica apertura");
+                    const dupAp = document.createElement("button");
+                    dupAp.type = "button";
+                    dupAp.className = "btn-action btn-secondary btn-icon-mini";
+                    dupAp.dataset.action = "duplicate-voce-mm-apertura";
+                    dupAp.dataset.idVoce = String(item.idVoce);
+                    dupAp.dataset.mmIndex = String(idx);
+                    dupAp.dataset.aperturaId = apertura.idAperturaMaster;
+                    dupAp.textContent = "⧉";
+                    dupAp.title = "Duplica apertura";
+                    dupAp.setAttribute("aria-label", "Duplica apertura");
+                    const delAp = document.createElement("button");
+                    delAp.type = "button";
+                    delAp.className = "btn-action btn-delete btn-icon-mini";
+                    delAp.dataset.action = "delete-voce-mm-apertura";
+                    delAp.dataset.idVoce = String(item.idVoce);
+                    delAp.dataset.mmIndex = String(idx);
+                    delAp.dataset.aperturaId = apertura.idAperturaMaster;
+                    delAp.textContent = "🗑";
+                    delAp.title = "Elimina apertura";
+                    delAp.setAttribute("aria-label", "Elimina apertura");
+                    actionCell.append(editAp, dupAp, delAp);
+                    row.appendChild(actionCell);
+                    savedWrap.appendChild(row);
+                  });
+                  tdAp.appendChild(savedWrap);
+                }
+                  const addApBtn = document.createElement("button");
+                  addApBtn.type = "button";
+                  addApBtn.className = "btn-action btn-secondary btn-icon-mini";
+                  addApBtn.dataset.action = "open-voce-mm-apertura-editor";
+                  addApBtn.dataset.idVoce = String(item.idVoce);
+                  addApBtn.dataset.mmIndex = String(idx);
+                  addApBtn.textContent = "+";
+                  addApBtn.title = "Nuova apertura";
+                  addApBtn.setAttribute("aria-label", "Nuova apertura");
+                  tdAp.appendChild(addApBtn);
+                  const useApBtn = document.createElement("button");
+                  useApBtn.type = "button";
+                  useApBtn.className = "btn-action btn-secondary btn-icon-mini";
+                  useApBtn.dataset.action = "use-voce-mm-apertura";
+                  useApBtn.dataset.idVoce = String(item.idVoce);
+                  useApBtn.dataset.mmIndex = String(idx);
+                  useApBtn.textContent = "↳";
+                  useApBtn.title = "Usa apertura esistente";
+                  useApBtn.setAttribute("aria-label", "Usa apertura esistente");
+                  tdAp.appendChild(useApBtn);
+                  trAp.appendChild(tdAp);
+                  tbody.appendChild(trAp);
+
+                  if (draft && !editingAperturaMasterId) {
+                  const trEditor = document.createElement("tr");
+                  trEditor.className = "voce-mm-aperture-editor-row";
+                  const tdEditor = document.createElement("td");
+                  tdEditor.colSpan = mmTotalColumns;
+                  tdEditor.className = "empty-cell voce-mm-aperture-editor-cell";
+
+                  const editorWrap = document.createElement("div");
+                  editorWrap.className = "voce-mm-aperture-editor-wrap";
+                  const editorHeaderRow = document.createElement("div");
+                  editorHeaderRow.className = "voce-mm-aperture-editor-head";
+                  const editorInputRow = document.createElement("div");
+                  editorInputRow.className = "voce-mm-aperture-editor-inputs";
+
+                  const buildInput = (value, field, type = "text") => {
+                    const input = document.createElement("input");
+                    input.type = type;
+                    input.value = value;
+                    input.className = "voce-mm-ap-input";
+                    input.dataset.action = "change-voce-mm-apertura-draft";
+                    input.dataset.idVoce = String(item.idVoce);
+                    input.dataset.mmIndex = String(idx);
+                    input.dataset.field = field;
+                    return input;
+                  };
+                  const buildSelect = (field, current, options) => {
+                    const sel = document.createElement("select");
+                    sel.className = "voce-mm-ap-input";
+                    sel.dataset.action = "change-voce-mm-apertura-draft";
+                    sel.dataset.idVoce = String(item.idVoce);
+                    sel.dataset.mmIndex = String(idx);
+                    sel.dataset.field = field;
+                    options.forEach((opt) => {
+                      const o = document.createElement("option");
+                      o.value = opt;
+                      o.textContent = opt;
+                      sel.appendChild(o);
+                    });
+                    sel.value = current;
+                    return sel;
+                  };
+
+                  const buildField = (labelText, control, extraClass = "") => {
+                    const h = document.createElement("div");
+                    h.className = `voce-mm-ap-col-label ${extraClass}`.trim();
+                    h.textContent = labelText;
+                    const c = document.createElement("div");
+                    c.className = `voce-mm-ap-col-input ${extraClass}`.trim();
+                    c.appendChild(control);
+                    editorHeaderRow.appendChild(h);
+                    editorInputRow.appendChild(c);
+                  };
+
+                  buildField("LOCALE", buildInput(draft.locale, "locale"));
+                  buildField("LRGH", buildInput(draft.largh, "largh", "number"));
+                  buildField("ALT", buildInput(draft.alt, "alt", "number"));
+                  buildField("HDAV", buildInput(draft.hDav, "hDav", "number"));
+                  buildField("ANTE", buildInput(draft.ante, "ante", "number"));
+                  buildField(
+                    "TIPOLOGIA",
+                    buildSelect("tipologia", draft.tipologia, [
+                      "FINESTRA",
+                      "PORTA FINESTRA",
+                      "BOCCA LUPO",
+                      "FIN CANTINA",
+                      "PORTONCINO",
+                      "PORTA CANTINA",
+                      "PORTA REI",
+                      "PORTA INTERNA",
+                      "SCRIGNO",
+                      "BASCULANTE",
+                      "SEZIONALE",
+                    ]),
+                  );
+                  buildField("FALSO", buildSelect("falso", draft.falso, ["NO", "ALLUMINIO", "LEGNO"]));
+                  buildField("SCURO", buildSelect("scuro", draft.scuro, ["NO", "PERSIANA", "TAPPARELLA"]));
+                  buildField("INFERIATA", buildSelect("inferiata", draft.inferiata, ["NO", "SI"]));
+                  buildField("ZANZARIERA", buildSelect("zanzariera", draft.zanzariera, ["NO", "SI"]));
+                  const draftMetric = calcolaMetricheAperturaMisurazione(
+                    {
+                      largh: parseNonNegativeDecimal2(String(draft?.largh || "")) ?? 0,
+                      alt: parseNonNegativeDecimal2(String(draft?.alt || "")) ?? 0,
+                      hDav: parseNonNegativeDecimal2(String(draft?.hDav || "")) ?? 0,
+                    },
+                    mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
+                    mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
+                  );
+                  const makeReadonly = (text, extraClass = "") => {
+                    const d = document.createElement("div");
+                    d.className = `voce-mm-ap-col-input voce-mm-ap-saved-cell ${extraClass}`.trim();
+                    d.textContent = text;
+                    return d;
+                  };
+                  buildField(
+                    "H INCL.",
+                    makeReadonly(fmt2(draftMetric.hInclusa), "voce-mm-ap-metric-cell"),
+                  );
+                  buildField("MQ", makeReadonly(fmt2(draftMetric.mq), "voce-mm-ap-metric-cell"));
+                  buildField("MC", makeReadonly(fmt2(draftMetric.mc), "voce-mm-ap-metric-cell"));
+
+                  const saveBtn = document.createElement("button");
+                  saveBtn.type = "button";
+                  saveBtn.className = "btn-action btn-edit btn-icon-mini";
+                  saveBtn.dataset.action = "save-voce-mm-apertura-draft";
+                  saveBtn.dataset.idVoce = String(item.idVoce);
+                  saveBtn.dataset.mmIndex = String(idx);
+                  saveBtn.textContent = "✓";
+                  saveBtn.title = "Salva apertura";
+                  saveBtn.setAttribute("aria-label", "Salva apertura");
+
+                  const cancelBtn = document.createElement("button");
+                  cancelBtn.type = "button";
+                  cancelBtn.className = "btn-action btn-delete btn-icon-mini";
+                  cancelBtn.dataset.action = "cancel-voce-mm-apertura-draft";
+                  cancelBtn.dataset.idVoce = String(item.idVoce);
+                  cancelBtn.dataset.mmIndex = String(idx);
+                  cancelBtn.textContent = "✕";
+                  cancelBtn.title = "Annulla";
+                  cancelBtn.setAttribute("aria-label", "Annulla");
+
+                  const actionHead = document.createElement("div");
+                  actionHead.className = "voce-mm-ap-col-label voce-mm-ap-col-actions";
+                  actionHead.textContent = "AZIONI";
+                  const actionInput = document.createElement("div");
+                  actionInput.className = "voce-mm-ap-col-input voce-mm-ap-col-actions";
+                  actionInput.append(saveBtn, cancelBtn);
+                  editorHeaderRow.appendChild(actionHead);
+                  editorInputRow.appendChild(actionInput);
+
+                  editorWrap.append(editorHeaderRow, editorInputRow);
+                  tdEditor.appendChild(editorWrap);
+                  trEditor.appendChild(tdEditor);
+                  tbody.appendChild(trEditor);
+                  }
+                }
+
                 const rowRis = Number(m.risultato || 0);
+                const rowDetrazioneAperture = calcolaDetrazioneApertureMisurazione(
+                  m,
+                  unitaNormDetrazione,
+                );
                 sumRif += rowRis;
+                sumRifAperture += rowDetrazioneAperture;
                 sumPiano += rowRis;
+                sumPianoAperture += rowDetrazioneAperture;
               });
 
-              appendSubtotalRow(`Totale RIFERIMENTO: ${rifKey}`, sumRif, "voce-mm-subtotal-rif");
+              const sumRifNetto = sumRif - sumRifAperture;
+              if (!isVoceSpecialeNoTotaleRiferimento(item)) {
+                appendSubtotalRow(
+                  `Totale RIFERIMENTO: ${rifKey} (Lordo ${fmt2(sumRif)} - Aperture ${fmt2(sumRifAperture)})`,
+                  sumRifNetto,
+                  "voce-mm-subtotal-rif",
+                );
+              }
             });
 
-            appendSubtotalRow(`Totale PIANO: ${pianoKey}`, sumPiano, "voce-mm-subtotal-piano");
+            const sumPianoNetto = sumPiano - sumPianoAperture;
+            appendSubtotalRow(
+              `Totale PIANO: ${pianoKey} (Lordo ${fmt2(sumPiano)} - Aperture ${fmt2(sumPianoAperture)})`,
+              sumPianoNetto,
+              "voce-mm-subtotal-piano",
+            );
           });
         }
         table.appendChild(tbody);
@@ -2474,21 +4561,30 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const totP = document.createElement("p");
         totP.className = "voci-mm-totale";
+        const detrazioneAperture = calcolaDetrazioneApertureVoce(item, mm);
+        const sumMmNetto = sumMm - detrazioneAperture;
+        const hasSemiautomatica = mm.some(
+          (row) => normalizzaTipoMisurazioneVoce(row?.tipo) === VOCE_MM_TIPO_SEMIAUTOMATICA,
+        );
+        const quantitaFinaleVoce = hasSemiautomatica ? sumMmNetto : sumMm;
         const strong = document.createElement("strong");
-        strong.textContent = formatTotaleMisurazioniManualiIt(sumMm);
+        strong.textContent = formatTotaleMisurazioniManualiIt(quantitaFinaleVoce);
         const prezzoVoce = parseNonNegativeDecimal2(item.prezzo) ?? 0;
-        const importoTotale = sumMm * prezzoVoce;
+        const importoTotale = quantitaFinaleVoce * prezzoVoce;
         const strongPrezzo = document.createElement("strong");
         strongPrezzo.textContent = formatEuro2(prezzoVoce);
         const strongImporto = document.createElement("strong");
         strongImporto.textContent = formatEuro2(importoTotale);
         const unitaVoce = (item.unitaMisura || "-").trim() || "-";
+        const dettaglioNetto = document.createElement("span");
+        dettaglioNetto.textContent = ` (Lordo ${formatTotaleMisurazioniManualiIt(sumMm)} - Aperture ${formatTotaleMisurazioniManualiIt(detrazioneAperture)} = Netto ${formatTotaleMisurazioniManualiIt(sumMmNetto)})`;
         totP.append(
           `TOTALE ${unitaVoce}: `,
           strong,
+          hasSemiautomatica ? dettaglioNetto : "",
           " | Prezzo voce: ",
           strongPrezzo,
-          " | Totale (Risultato x Prezzo): ",
+          hasSemiautomatica ? " | Totale (Netto x Prezzo): " : " | Totale (Risultato x Prezzo): ",
           strongImporto,
         );
 
@@ -2950,6 +5046,9 @@ window.addEventListener("DOMContentLoaded", () => {
     } else {
       voices.forEach((item) => {
         const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        const unitaNormDetrazione = normalizzaUnitaVoceDetrazione(item.unitaMisura);
+        const usaMcPerAperturePdf = unitaNormDetrazione.includes("mc");
+        const metricaAperturePdfLabel = usaMcPerAperturePdf ? "MC" : "MQ";
         const grouped = new Map();
         mm.forEach((m) => {
           const piano = (m.piano || "-").trim() || "-";
@@ -2966,12 +5065,15 @@ window.addEventListener("DOMContentLoaded", () => {
         y += gapAfterVoce;
 
         grouped.forEach((rifMap, piano) => {
-          let sumPiano = 0;
+          let sumPianoLordo = 0;
+          let sumPianoAperture = 0;
           ensureSpace(detailLineH);
           drawText(leftTextX, y + 3.8, `PIANO: ${piano}`, false, detailFontSize);
           y += detailLineH;
           rifMap.forEach((rows, rif) => {
-            let sumRif = 0;
+            let sumRifLordo = 0;
+            let sumRifAperture = 0;
+            let intestazioneApertureRifStampata = false;
             ensureSpace(detailLineH);
             drawText(leftTextX, y + 3.8, `RIFERIMENTO: ${rif}`, false, detailFontSize);
             y += detailLineH;
@@ -2984,27 +5086,95 @@ window.addEventListener("DOMContentLoaded", () => {
                   : `${m.formula || "-"};`;
               drawText(leftTextX, y + 3.8, detailLine, false, detailFontSize);
               drawText(partiUgualiX, y + 3.8, String(m.numero), false, detailFontSize);
-              drawTextRight(resultRightX, y + 3.8, fmtRis(m.risultato), false, detailFontSize);
+              const rv = Number(m.risultato || 0);
+              let detrazioneRigaAperture = 0;
+              drawTextRight(resultRightX, y + 3.8, fmtRis(rv), false, detailFontSize);
               drawText(signX, y + 3.8, m.segno ? "-" : "+", false, detailFontSize);
               y += detailLineH;
-              const rv = Number(m.risultato || 0);
-              sumRif += rv;
-              sumPiano += rv;
+              if (mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA) {
+                const misura2Val =
+                  typeof m.misura2 === "number" && Number.isFinite(m.misura2) ? Number(m.misura2) : null;
+                const misura3Val =
+                  typeof m.misura3 === "number" && Number.isFinite(m.misura3) ? Number(m.misura3) : null;
+                const apertureCollegate = risolviApertureCollegateRefs(m.apertureCollegate);
+                const detrazioneRigaPrevista = apertureCollegate.reduce((acc, apertura) => {
+                  const metriche = calcolaMetricheAperturaMisurazione(apertura, misura2Val, misura3Val);
+                  const valoreMetrica = usaMcPerAperturePdf ? metriche.mc : metriche.mq;
+                  return acc + Number(valoreMetrica || 0);
+                }, 0);
+                if (!intestazioneApertureRifStampata && detrazioneRigaPrevista > 0.0001) {
+                  ensureSpace(detailLineH);
+                  drawText(leftTextX + 1, y + 3.8, "a sottrarre aperture:", false, detailFontSize - 1);
+                  y += detailLineH;
+                  intestazioneApertureRifStampata = true;
+                }
+                apertureCollegate.forEach((apertura) => {
+                  const metriche = calcolaMetricheAperturaMisurazione(apertura, misura2Val, misura3Val);
+                  const valoreMetrica = usaMcPerAperturePdf ? metriche.mc : metriche.mq;
+                  detrazioneRigaAperture += Number(valoreMetrica || 0);
+                  const aperturePdfFontSize = detailFontSize - 1;
+                  ensureSpace(detailLineH);
+                  drawText(
+                    leftTextX + 2,
+                    y + 3.8,
+                    `${apertura.locale || "-"} - ${fmtRis(apertura.largh)} (lrg) x ${fmtRis(metriche.hInclusa)} (H incl)`,
+                    false,
+                    aperturePdfFontSize,
+                  );
+                  drawTextRight(
+                    resultRightX,
+                    y + 3.8,
+                    `- ${fmtRis(valoreMetrica)}`,
+                    false,
+                    aperturePdfFontSize,
+                  );
+                  y += detailLineH;
+                });
+              }
+              sumRifAperture += detrazioneRigaAperture;
+              sumRifLordo += rv;
+              sumPianoLordo += rv;
+              sumPianoAperture += detrazioneRigaAperture;
             });
-            ensureSpace(detailLineH);
-            drawText(leftTextX, y + 3.8, `Totale ${rif}`, false, detailFontSize);
-            drawTextRight(resultRightX, y + 3.8, fmtRis(sumRif), false, detailFontSize);
-            y += detailLineH;
+            const sumRifNetto = sumRifLordo - sumRifAperture;
+            const aperturePdfFontSize = detailFontSize - 1;
+            if (Math.abs(sumRifAperture) > 0.0001) {
+              ensureSpace(detailLineH);
+              drawText(
+                leftTextX,
+                y + 3.8,
+                "Totale aperture da sottrarre",
+                false,
+                aperturePdfFontSize,
+              );
+              drawTextRight(
+                resultRightX,
+                y + 3.8,
+                `- ${fmtRis(sumRifAperture)}`,
+                false,
+                aperturePdfFontSize,
+              );
+              y += detailLineH;
+            }
+            if (!isVoceSpecialeNoTotaleRiferimento(item)) {
+              ensureSpace(detailLineH);
+              drawText(leftTextX, y + 3.8, `Totale ${rif}`, false, detailFontSize);
+              drawTextRight(resultRightX, y + 3.8, fmtRis(sumRifNetto), false, detailFontSize);
+              y += detailLineH;
+            }
           });
+          const sumPianoNetto = sumPianoLordo - sumPianoAperture;
           ensureSpace(detailLineH);
           drawText(leftTextX, y + 3.8, `Totale ${piano}`, false, detailFontSize);
-          drawTextRight(resultRightX, y + 3.8, fmtRis(sumPiano), false, detailFontSize);
+          drawTextRight(resultRightX, y + 3.8, fmtRis(sumPianoNetto), false, detailFontSize);
           y += detailLineH;
         });
 
         const sumMm = mm.reduce((acc, m) => acc + Number(m.risultato || 0), 0);
+        const detrazioneAperture = calcolaDetrazioneApertureVoce(item, mm);
+        const sumMmNetto = sumMm - detrazioneAperture;
         const prezzo = parseNonNegativeDecimal2(item.prezzo) ?? 0;
-        totaleComplessivoComputo += sumMm * prezzo;
+        totaleComplessivoComputo += sumMmNetto * prezzo;
         ensureSpace(detailLineH + 4.5);
         drawText(
           leftTextX,
@@ -3013,10 +5183,16 @@ window.addEventListener("DOMContentLoaded", () => {
           true,
           totalFontSize,
         );
-        drawTextRight(resultRightX, y + 4.2, fmtRis(sumMm), true, totalFontSize);
+        drawTextRight(resultRightX, y + 4.2, fmtRis(sumMmNetto), true, totalFontSize);
         if (showPrices) {
           drawTextRight(prezzoRightX, y + 4.2, `€. ${fmtEuroAmount(prezzo)}`, true, totalFontSize);
-          drawTextRight(totaleRightX, y + 4.2, `€. ${fmtEuroAmount(sumMm * prezzo)}`, true, totalFontSize);
+          drawTextRight(
+            totaleRightX,
+            y + 4.2,
+            `€. ${fmtEuroAmount(sumMmNetto * prezzo)}`,
+            true,
+            totalFontSize,
+          );
         } else {
           drawTextRight(prezzoRightX, y + 4.2, "__________", true, totalFontSize);
           drawTextRight(totaleRightX, y + 4.2, "__________", true, totalFontSize);
@@ -3224,6 +5400,8 @@ window.addEventListener("DOMContentLoaded", () => {
         ]);
 
         const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        const unitaNormDetrazione = normalizzaUnitaVoceDetrazione(item.unitaMisura);
+        const usaMcPerApertureXls = unitaNormDetrazione.includes("mc");
         const groupedByPiano = new Map();
         mm.forEach((m) => {
           const piano = (m.piano || "-").trim() || "-";
@@ -3239,7 +5417,11 @@ window.addEventListener("DOMContentLoaded", () => {
           vociRows.push(["", "", "", "PIANO", piano, "", "", "", "", "", ""]);
           let sumPiano = 0;
           rifMap.forEach((rows, rif) => {
+            let sumRifAperture = 0;
             rows.forEach((m, idx) => {
+              const mmTipo = normalizzaTipoMisurazioneVoce(m.tipo);
+              const detrazioneRigaAperture = calcolaDetrazioneApertureMisurazione(m, unitaNormDetrazione);
+              const risultatoRigaNetto = Number(m.risultato || 0) - detrazioneRigaAperture;
               vociRows.push([
                 "",
                 "",
@@ -3250,12 +5432,52 @@ window.addEventListener("DOMContentLoaded", () => {
                 m.formula || "",
                 m.numero,
                 "",
-                Number(m.risultato || 0),
+                Number(risultatoRigaNetto.toFixed(3)),
                 "",
               ]);
-              sumPiano += Number(m.risultato || 0);
-              sumVoce += Number(m.risultato || 0);
+              if (mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA) {
+                const misura2Val =
+                  typeof m.misura2 === "number" && Number.isFinite(m.misura2) ? Number(m.misura2) : null;
+                const misura3Val =
+                  typeof m.misura3 === "number" && Number.isFinite(m.misura3) ? Number(m.misura3) : null;
+                const apertureCollegate = risolviApertureCollegateRefs(m.apertureCollegate);
+                apertureCollegate.forEach((apertura) => {
+                  const metriche = calcolaMetricheAperturaMisurazione(apertura, misura2Val, misura3Val);
+                  const valoreMetrica = usaMcPerApertureXls ? metriche.mc : metriche.mq;
+                  vociRows.push([
+                    "",
+                    "",
+                    "",
+                    "APERTURA",
+                    apertura.locale || "-",
+                    "-",
+                    `${fmt2(apertura.largh)} (lrg) x ${fmt2(metriche.hInclusa)} (H incl)`,
+                    "",
+                    "",
+                    Number((-valoreMetrica).toFixed(3)),
+                    "",
+                  ]);
+                });
+              }
+              sumRifAperture += detrazioneRigaAperture;
+              sumPiano += risultatoRigaNetto;
+              sumVoce += risultatoRigaNetto;
             });
+            if (Math.abs(sumRifAperture) > 0.0001) {
+              vociRows.push([
+                "",
+                "",
+                "",
+                "TOTALE APERTURE DA SOTTRARRE",
+                "",
+                "",
+                "",
+                "",
+                "",
+                Number((-sumRifAperture).toFixed(3)),
+                "",
+              ]);
+            }
           });
           vociRows.push([
             "",
@@ -3271,6 +5493,7 @@ window.addEventListener("DOMContentLoaded", () => {
             "",
           ]);
         });
+        const sumVoceNetto = sumVoce;
 
         vociRows.push([
           "",
@@ -3281,9 +5504,9 @@ window.addEventListener("DOMContentLoaded", () => {
           "",
           "",
           unita,
-          Number(sumVoce.toFixed(3)),
+          Number(sumVoceNetto.toFixed(3)),
           Number(prezzo.toFixed(2)),
-          Number((sumVoce * prezzo).toFixed(2)),
+          Number((sumVoceNetto * prezzo).toFixed(2)),
         ]);
         vociRows.push(["", "", "", "", "", "", "", "", "", "", ""]);
       });
@@ -3351,6 +5574,7 @@ window.addEventListener("DOMContentLoaded", () => {
       camminamentiEsterni,
       misurazioniVarie,
       voci,
+      apertureMaster,
       vociUnitaMisuraOptions,
       ifcLink,
     };
@@ -4473,6 +6697,7 @@ window.addEventListener("DOMContentLoaded", () => {
               numero: item.numero,
               segno: item.segno === true,
               risultato: item.risultato,
+              apertureCollegate: normalizzaApertureCollegateMisurazione(item.apertureCollegate),
             };
           })
       : [];
@@ -4513,6 +6738,7 @@ window.addEventListener("DOMContentLoaded", () => {
           .map((item) => item.trim())
           .filter((item) => item !== "")
       : [];
+    const importedApertureMaster = normalizzaApertureMaster(payload.apertureMaster);
 
     piani = importedPiani;
     murielevazioni = importedMurielevazioni;
@@ -4523,6 +6749,7 @@ window.addEventListener("DOMContentLoaded", () => {
     camminamentiEsterni = importedCamminamenti;
     misurazioniVarie = importedMisurazioni;
     voci = importedVoci;
+    apertureMaster = importedApertureMaster;
 
     const uniqueUnita = [];
     [...UNITA_MISURA_DEFAULT_OPTIONS, ...importedUnita, ...voci.map((v) => v.unitaMisura)].forEach(
@@ -4546,6 +6773,11 @@ window.addEventListener("DOMContentLoaded", () => {
     misurazioniIdCounter =
       misurazioniVarie.reduce((max, item) => Math.max(max, item.idMisurazione), 0) + 1;
     voceIdCounter = voci.reduce((max, item) => Math.max(max, item.idVoce), 0) + 1;
+    apertureMasterIdCounter =
+      apertureMaster.reduce((max, ap) => {
+        const n = Number(String(ap.idAperturaMaster || "").replace("APM-", ""));
+        return Number.isFinite(n) ? Math.max(max, n) : max;
+      }, 0) + 1;
 
     normalizzaPosizioniVoci();
     editingPianoId = null;
@@ -4571,6 +6803,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     savePiani();
     saveMurDati();
+    saveApertureMaster();
     saveVoci();
     saveVociUnitaOptions();
 
@@ -5197,9 +7430,49 @@ window.addEventListener("DOMContentLoaded", () => {
       deleteButton.dataset.id = String(item.idMisurazione);
       deleteButton.textContent = "Elimina";
 
-      actionsCell.append(editButton, deleteButton);
+      const addAperturaButton = document.createElement("button");
+      addAperturaButton.type = "button";
+      addAperturaButton.className = "btn-action";
+      addAperturaButton.dataset.action = "add-apertura-misurazione";
+      addAperturaButton.dataset.id = String(item.idMisurazione);
+      addAperturaButton.textContent = "Aggiungi apertura";
+
+      actionsCell.append(editButton, deleteButton, addAperturaButton);
       row.appendChild(actionsCell);
       misurazioniBodyEl.appendChild(row);
+
+      const detailRow = document.createElement("tr");
+      detailRow.className = "misurazione-aperture-row";
+      const detailCell = document.createElement("td");
+      detailCell.colSpan = 9;
+      detailCell.className = "empty-cell";
+      const apertureCollegate = normalizzaApertureCollegateMisurazione(item.apertureCollegate);
+      if (apertureCollegate.length === 0) {
+        detailCell.textContent = "Aperture collegate: nessuna.";
+      } else {
+        const wrapper = document.createElement("div");
+        wrapper.textContent = `Aperture collegate (${apertureCollegate.length}): `;
+        apertureCollegate.forEach((apertura, index) => {
+          if (index > 0) wrapper.append(" | ");
+          const itemWrap = document.createElement("span");
+          itemWrap.textContent =
+            `${apertura.locale} - L:${fmt2(apertura.lunghezza)} H:${fmt2(apertura.altezza)} ` +
+            `Ante:${apertura.ante} Tipo:${apertura.tipologia} Falsotelai:${apertura.falsotelai ? "Si" : "No"} ` +
+            `Dav:${fmt2(apertura.hDavanzale)} Voce:${apertura.idVoceCapitolato || "-"}`;
+          const delAperturaButton = document.createElement("button");
+          delAperturaButton.type = "button";
+          delAperturaButton.className = "btn-action btn-delete";
+          delAperturaButton.dataset.action = "delete-apertura-misurazione";
+          delAperturaButton.dataset.id = String(item.idMisurazione);
+          delAperturaButton.dataset.aperturaId = apertura.idApertura;
+          delAperturaButton.textContent = "Elimina apertura";
+          itemWrap.append(" ", delAperturaButton);
+          wrapper.appendChild(itemWrap);
+        });
+        detailCell.appendChild(wrapper);
+      }
+      detailRow.appendChild(detailCell);
+      misurazioniBodyEl.appendChild(detailRow);
     });
   }
 
@@ -5591,10 +7864,20 @@ window.addEventListener("DOMContentLoaded", () => {
       };
 
       if (editingMisurazioneId === null) {
-        misurazioniVarie.push({ ...payload, idMisurazione: misurazioniIdCounter++ });
+        misurazioniVarie.push({
+          ...payload,
+          idMisurazione: misurazioniIdCounter++,
+          apertureCollegate: [],
+        });
       } else {
         misurazioniVarie = misurazioniVarie.map((item) =>
-          item.idMisurazione === editingMisurazioneId ? { ...item, ...payload } : item,
+          item.idMisurazione === editingMisurazioneId
+            ? {
+                ...item,
+                ...payload,
+                apertureCollegate: normalizzaApertureCollegateMisurazione(item.apertureCollegate),
+              }
+            : item,
         );
       }
 
@@ -5711,9 +7994,52 @@ window.addEventListener("DOMContentLoaded", () => {
     syncVoceMmExclusiveFields();
   });
 
+  voceMmTemplateFaldaButtonEl?.addEventListener("click", () => {
+    if (!voceMmTemplateFaldaDialogEl) return;
+    if (voceMmTemplateFaldaGrondaEl) {
+      voceMmTemplateFaldaGrondaEl.value =
+        typeof voceMmTemplateFaldaMeta.gronda === "number" ? String(voceMmTemplateFaldaMeta.gronda) : "";
+    }
+    if (voceMmTemplateFaldaSalitaEl) voceMmTemplateFaldaSalitaEl.value = "";
+    if (voceMmTemplateFaldaPendenzaEl) voceMmTemplateFaldaPendenzaEl.value = "";
+    if (voceMmTemplateFaldaCanaleEl) voceMmTemplateFaldaCanaleEl.checked = voceMmTemplateFaldaMeta.canale === true;
+    voceMmTemplateFaldaDialogEl.showModal();
+    setTimeout(() => voceMmTemplateFaldaGrondaEl?.focus(), 0);
+  });
+
+  voceMmTemplateFaldaCancelEl?.addEventListener("click", () => {
+    voceMmTemplateFaldaDialogEl?.close();
+  });
+
+  voceMmTemplateFaldaFormEl?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const grondaTxt = formatFixed3ForFormula(voceMmTemplateFaldaGrondaEl?.value);
+    const salitaTxt = formatFixed3ForFormula(voceMmTemplateFaldaSalitaEl?.value);
+    const pendenzaVal = parseNonNegativeDecimal3OrNull(voceMmTemplateFaldaPendenzaEl?.value);
+    if (!grondaTxt || !salitaTxt || pendenzaVal === null) {
+      window.alert("Compila Gronda, Salita e Pendenza con numeri validi (max 3 decimali).");
+      return;
+    }
+    const pendenzaFactor = pendenzaVal / 100;
+    const radqVal = Math.sqrt(1 + pendenzaFactor * pendenzaFactor);
+    const radqTxt = Number(radqVal.toFixed(6)).toString();
+    const grondaVal = parseNonNegativeDecimal3OrNull(voceMmTemplateFaldaGrondaEl?.value);
+    const canaleChecked = voceMmTemplateFaldaCanaleEl?.checked === true;
+    voceMmTemplateFaldaMeta = {
+      canale: canaleChecked,
+      gronda: canaleChecked && grondaVal !== null ? Number(grondaVal.toFixed(3)) : null,
+    };
+    if (voceMmRigaFormulaEl) {
+      voceMmRigaFormulaEl.value = `(${grondaTxt} * (${salitaTxt} * ${radqTxt}))`;
+    }
+    voceMmTemplateFaldaDialogEl?.close();
+    syncVoceMmExclusiveFields();
+  });
+
   voceMmRigaCancelEl?.addEventListener("click", () => {
     voceMmRigaDialogEl?.close();
     voceMmDialogContext = { idVoce: null, index: null };
+    voceMmTemplateFaldaMeta = { canale: false, gronda: null };
   });
 
   vociBodyEl.addEventListener("dblclick", (event) => {
@@ -5890,6 +8216,148 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (button.dataset.action === "open-voce-mm-apertura-editor") {
+      const idVoce = Number(button.dataset.idVoce);
+      const idx = Number(button.dataset.mmIndex);
+      if (Number.isNaN(idVoce) || Number.isNaN(idx)) return;
+      const key = getVoceMmAperturaDraftKey(idVoce, idx);
+      if (!voceMmAperturaDraftByKey.has(key)) {
+        voceMmAperturaDraftByKey.set(key, createEmptyVoceMmAperturaDraft());
+      }
+      renderVoci();
+      return;
+    }
+
+    if (button.dataset.action === "use-voce-mm-apertura") {
+      const idVoce = Number(button.dataset.idVoce);
+      const idx = Number(button.dataset.mmIndex);
+      if (Number.isNaN(idVoce) || Number.isNaN(idx)) return;
+      if (apertureMaster.length === 0) {
+        window.alert("Archivio APERTURE vuoto. Crea prima una apertura.");
+        return;
+      }
+      openUseAperturaDialog(idVoce, idx);
+      return;
+    }
+
+    if (button.dataset.action === "edit-voce-mm-apertura") {
+      const idVoce = Number(button.dataset.idVoce);
+      const idx = Number(button.dataset.mmIndex);
+      const aperturaId = String(button.dataset.aperturaId || "").trim();
+      if (Number.isNaN(idVoce) || Number.isNaN(idx) || !aperturaId) return;
+      pendingEditVoceMmApertura = { idVoce, mmIndex: idx, idAperturaMaster: aperturaId };
+      confirmEditVoceMmAperturaDialogEl.showModal();
+      return;
+    }
+
+    if (button.dataset.action === "cancel-voce-mm-apertura-draft") {
+      const idVoce = Number(button.dataset.idVoce);
+      const idx = Number(button.dataset.mmIndex);
+      if (Number.isNaN(idVoce) || Number.isNaN(idx)) return;
+      voceMmAperturaDraftByKey.delete(getVoceMmAperturaDraftKey(idVoce, idx));
+      renderVoci();
+      return;
+    }
+
+    if (button.dataset.action === "save-voce-mm-apertura-draft") {
+      const idVoce = Number(button.dataset.idVoce);
+      const idx = Number(button.dataset.mmIndex);
+      if (Number.isNaN(idVoce) || Number.isNaN(idx)) return;
+      const key = getVoceMmAperturaDraftKey(idVoce, idx);
+      const draftRaw = voceMmAperturaDraftByKey.get(key);
+      const parsedApertura = parseVoceMmAperturaDraft(draftRaw);
+      if (!parsedApertura) {
+        window.alert("Compila correttamente tutti i campi obbligatori dell'apertura.");
+        return;
+      }
+      const editingAperturaMasterId = String(draftRaw?.editingAperturaMasterId || "").trim();
+      voci = voci.map((item) => {
+        if (item.idVoce !== idVoce) return item;
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        if (idx < 0 || idx >= mm.length) return item;
+        const row = mm[idx];
+        const refs = normalizzaApertureCollegateRefs(row.apertureCollegate);
+        if (editingAperturaMasterId) {
+          apertureMaster = apertureMaster.map((apertura) =>
+            apertura.idAperturaMaster === editingAperturaMasterId
+              ? { ...apertura, ...parsedApertura }
+              : apertura,
+          );
+          mm[idx] = { ...row, apertureCollegate: refs };
+        } else {
+          const nuovoId = creaAperturaMasterDaDati(parsedApertura);
+          if (nuovoId) mm[idx] = { ...row, apertureCollegate: [...refs, { idAperturaMaster: nuovoId }] };
+        }
+        return { ...item, misurazioniManuali: mm };
+      });
+      voceMmAperturaDraftByKey.delete(key);
+      saveApertureMaster();
+      saveVoci();
+      syncVoceDavanzali();
+      syncVoceSoglie();
+      syncVoceCanali();
+      syncVoceFalsiTelaiLegno();
+      syncVoceFalsiTelaiAlluminio();
+      renderVoci();
+      return;
+    }
+
+    if (button.dataset.action === "delete-voce-mm-apertura") {
+      const idVoce = Number(button.dataset.idVoce);
+      const idx = Number(button.dataset.mmIndex);
+      const aperturaId = String(button.dataset.aperturaId || "").trim();
+      if (Number.isNaN(idVoce) || Number.isNaN(idx) || !aperturaId) return;
+      if (
+        !window.confirm(
+          "Sei sicuro di eliminare questa apertura, verrà eliminata in tutte le voci che la usano",
+        )
+      ) {
+        return;
+      }
+      voci = voci.map((item) => {
+        if (item.idVoce !== idVoce) return item;
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        if (idx < 0 || idx >= mm.length) return item;
+        const row = mm[idx];
+        const aperture = normalizzaApertureCollegateRefs(row.apertureCollegate);
+        mm[idx] = {
+          ...row,
+          apertureCollegate: aperture.filter((apertura) => apertura.idAperturaMaster !== aperturaId),
+        };
+        return { ...item, misurazioniManuali: mm };
+      });
+      saveVoci();
+      renderVoci();
+      return;
+    }
+
+    if (button.dataset.action === "duplicate-voce-mm-apertura") {
+      const idVoce = Number(button.dataset.idVoce);
+      const idx = Number(button.dataset.mmIndex);
+      const aperturaId = String(button.dataset.aperturaId || "").trim();
+      if (Number.isNaN(idVoce) || Number.isNaN(idx) || !aperturaId) return;
+      voci = voci.map((item) => {
+        if (item.idVoce !== idVoce) return item;
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        if (idx < 0 || idx >= mm.length) return item;
+        const row = mm[idx];
+        const aperture = normalizzaApertureCollegateRefs(row.apertureCollegate);
+        const source = aperture.find((apertura) => apertura.idAperturaMaster === aperturaId);
+        if (!source) return item;
+        const sourceMaster = apertureMaster.find((ap) => ap.idAperturaMaster === source.idAperturaMaster);
+        if (!sourceMaster) return item;
+        const cloneMaster = { ...sourceMaster, idAperturaMaster: nextAperturaMasterId() };
+        apertureMaster.push(cloneMaster);
+        const newMasterId = cloneMaster.idAperturaMaster;
+        mm[idx] = { ...row, apertureCollegate: [...aperture, { idAperturaMaster: newMasterId }] };
+        return { ...item, misurazioniManuali: mm };
+      });
+      saveApertureMaster();
+      saveVoci();
+      renderVoci();
+      return;
+    }
+
     if (button.dataset.action === "delete-voce-mm-row") {
       const idVoce = Number(button.dataset.idVoce);
       const idx = Number(button.dataset.mmIndex);
@@ -5927,6 +8395,11 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (button.dataset.action === "copy-voce") {
+      duplicaVoceCompleta(id);
+      return;
+    }
+
     if (button.dataset.action === "move-voce-up") {
       normalizzaPosizioniVoci();
       const row = voci.find((item) => item.idVoce === id);
@@ -5945,6 +8418,19 @@ window.addEventListener("DOMContentLoaded", () => {
       saveVoci();
       renderVoci();
     }
+  });
+
+  vociBodyEl.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+    if (target.dataset.action !== "change-voce-mm-apertura-draft") return;
+    const idVoce = Number(target.dataset.idVoce);
+    const idx = Number(target.dataset.mmIndex);
+    const field = String(target.dataset.field || "").trim();
+    if (Number.isNaN(idVoce) || Number.isNaN(idx) || !field) return;
+    const key = getVoceMmAperturaDraftKey(idVoce, idx);
+    const current = voceMmAperturaDraftByKey.get(key) || createEmptyVoceMmAperturaDraft();
+    voceMmAperturaDraftByKey.set(key, { ...current, [field]: target.value });
   });
 
   btnChiudiTutteVociEl?.addEventListener("click", () => {
@@ -6395,6 +8881,45 @@ window.addEventListener("DOMContentLoaded", () => {
       if (editingMisurazioneId === id) resetMisurazioniForm();
       saveMurDati();
       renderMisurazioniVarie();
+      return;
+    }
+
+    if (button.dataset.action === "add-apertura-misurazione") {
+      const nuovaApertura = chiediDatiAperturaMisurazione();
+      if (!nuovaApertura) {
+        window.alert("Apertura non aggiunta: verifica i dati inseriti.");
+        return;
+      }
+      misurazioniVarie = misurazioniVarie.map((item) => {
+        if (item.idMisurazione !== id) return item;
+        const aperture = normalizzaApertureCollegateMisurazione(item.apertureCollegate);
+        return { ...item, apertureCollegate: [...aperture, nuovaApertura] };
+      });
+      saveMurDati();
+      renderMisurazioniVarie();
+      return;
+    }
+
+    if (button.dataset.action === "delete-apertura-misurazione") {
+      const aperturaId = String(button.dataset.aperturaId || "").trim();
+      if (!aperturaId) return;
+      if (
+        !window.confirm(
+          "Sei sicuro di eliminare questa apertura, verrà eliminata in tutte le voci che la usano",
+        )
+      ) {
+        return;
+      }
+      misurazioniVarie = misurazioniVarie.map((item) => {
+        if (item.idMisurazione !== id) return item;
+        const aperture = normalizzaApertureCollegateMisurazione(item.apertureCollegate);
+        return {
+          ...item,
+          apertureCollegate: aperture.filter((apertura) => apertura.idApertura !== aperturaId),
+        };
+      });
+      saveMurDati();
+      renderMisurazioniVarie();
     }
   });
 
@@ -6598,12 +9123,371 @@ window.addEventListener("DOMContentLoaded", () => {
   ifcRiepilogoDialogEl.appendChild(ifcRiepilogoCloseButtonEl);
   document.body.appendChild(ifcRiepilogoDialogEl);
 
+  apertureMasterDialogEl.id = "aperture-master-dialog";
+  apertureMasterDialogEl.className = "ifc-riepilogo-dialog";
+  apertureMasterDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const action = button.dataset.action;
+    const id = String(button.dataset.id || "").trim();
+    if (action === "close-master-aperture") {
+      apertureMasterDialogEl.close();
+      apertureMasterEditingId = null;
+      apertureMasterPendingDeleteId = null;
+      return;
+    }
+    if (action === "new-master-apertura") {
+      apertureMasterEditingId = "__new__";
+      apertureMasterPendingDeleteId = null;
+      openApertureMasterDialog();
+      return;
+    }
+    if (action === "edit-master-apertura" && id) {
+      apertureMasterEditingId = id;
+      apertureMasterPendingDeleteId = null;
+      openApertureMasterDialog();
+      return;
+    }
+    if (action === "cancel-edit-master-apertura") {
+      apertureMasterEditingId = null;
+      openApertureMasterDialog();
+      return;
+    }
+    if (action === "save-master-apertura-inline" && id) {
+      const parsed = readAperturaMasterInlineDraft(id);
+      if (!parsed) {
+        window.alert("Dati apertura non validi.");
+        return;
+      }
+      apertureMaster = apertureMaster.map((ap) => (ap.idAperturaMaster === id ? { ...ap, ...parsed } : ap));
+      apertureMasterEditingId = null;
+      apertureMasterPendingDeleteId = null;
+      saveApertureMaster();
+      syncVoceDavanzali();
+      syncVoceSoglie();
+      syncVoceCanali();
+      syncVoceFalsiTelaiLegno();
+      syncVoceFalsiTelaiAlluminio();
+      renderVoci();
+      openApertureMasterDialog();
+      return;
+    }
+    if (action === "save-new-master-apertura-inline") {
+      const parsed = readAperturaMasterInlineDraft("__new__");
+      if (!parsed) {
+        window.alert("Dati apertura non validi.");
+        return;
+      }
+      apertureMaster.push({ idAperturaMaster: nextAperturaMasterId(), ...parsed });
+      apertureMasterEditingId = null;
+      apertureMasterPendingDeleteId = null;
+      saveApertureMaster();
+      syncVoceDavanzali();
+      syncVoceSoglie();
+      syncVoceCanali();
+      syncVoceFalsiTelaiLegno();
+      syncVoceFalsiTelaiAlluminio();
+      renderVoci();
+      openApertureMasterDialog();
+      return;
+    }
+    if (action === "delete-master-apertura" && id) {
+      apertureMasterPendingDeleteId = id;
+      confirmDeleteAperturaMasterDialogEl.showModal();
+      return;
+    }
+  });
+  document.body.appendChild(apertureMasterDialogEl);
+
+  apertureMasterSidebarButtonEl.id = "btn-apri-archivio-aperture";
+  apertureMasterSidebarButtonEl.type = "button";
+  apertureMasterSidebarButtonEl.className = "btn-action btn-secondary";
+  apertureMasterSidebarButtonEl.textContent = "APERTURE";
+  apertureMasterSidebarButtonEl.addEventListener("click", () => {
+    openApertureMasterDialog();
+  });
+  sidebarLeftActionsEl?.appendChild(apertureMasterSidebarButtonEl);
+
+  grondeSidebarButtonEl.id = "btn-apri-archivio-gronde";
+  grondeSidebarButtonEl.type = "button";
+  grondeSidebarButtonEl.className = "btn-action btn-secondary";
+  grondeSidebarButtonEl.textContent = "CANALI";
+  grondeSidebarButtonEl.addEventListener("click", () => {
+    openArchivioGrondeDialog();
+  });
+  sidebarLeftActionsEl?.appendChild(grondeSidebarButtonEl);
+
+  davanzaliSidebarButtonEl.id = "btn-apri-archivio-davanzali";
+  davanzaliSidebarButtonEl.type = "button";
+  davanzaliSidebarButtonEl.className = "btn-action btn-secondary";
+  davanzaliSidebarButtonEl.textContent = "DAVANZALI";
+  davanzaliSidebarButtonEl.addEventListener("click", () => {
+    openArchivioDavanzaliDialog();
+  });
+  sidebarLeftActionsEl?.appendChild(davanzaliSidebarButtonEl);
+
+  soglieSidebarButtonEl.id = "btn-apri-archivio-soglie";
+  soglieSidebarButtonEl.type = "button";
+  soglieSidebarButtonEl.className = "btn-action btn-secondary";
+  soglieSidebarButtonEl.textContent = "SOGLIE";
+  soglieSidebarButtonEl.addEventListener("click", () => {
+    openArchivioSoglieDialog();
+  });
+  sidebarLeftActionsEl?.appendChild(soglieSidebarButtonEl);
+
+  falsiTelaiSidebarButtonEl.id = "btn-apri-archivio-falsi-telai";
+  falsiTelaiSidebarButtonEl.type = "button";
+  falsiTelaiSidebarButtonEl.className = "btn-action btn-secondary";
+  falsiTelaiSidebarButtonEl.textContent = "FALSI TELAI LEGNO";
+  falsiTelaiSidebarButtonEl.addEventListener("click", () => {
+    openArchivioFalsiTelaiDialog();
+  });
+  sidebarLeftActionsEl?.appendChild(falsiTelaiSidebarButtonEl);
+
+  falsiTelaiAllSidebarButtonEl.id = "btn-apri-archivio-falsi-telai-alluminio";
+  falsiTelaiAllSidebarButtonEl.type = "button";
+  falsiTelaiAllSidebarButtonEl.className = "btn-action btn-secondary";
+  falsiTelaiAllSidebarButtonEl.textContent = "FALSI TELAI ALLUMINIO";
+  falsiTelaiAllSidebarButtonEl.addEventListener("click", () => {
+    openArchivioFalsiTelaiAlluminioDialog();
+  });
+  sidebarLeftActionsEl?.appendChild(falsiTelaiAllSidebarButtonEl);
+
+  useAperturaDialogEl.id = "use-apertura-dialog";
+  useAperturaDialogEl.className = "ifc-riepilogo-dialog";
+  useAperturaDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const action = button.dataset.action;
+    if (action === "close-use-apertura-dialog") {
+      useAperturaDialogEl.close();
+      voceMmUseAperturaContext = { idVoce: null, mmIndex: null };
+      return;
+    }
+    if (action === "use-apertura-master") {
+      const id = String(button.dataset.id || "").trim();
+      const idVoce = voceMmUseAperturaContext.idVoce;
+      const mmIndex = voceMmUseAperturaContext.mmIndex;
+      if (!id || idVoce === null || mmIndex === null) return;
+      collegaAperturaMasterARigaVoce(idVoce, mmIndex, id);
+      useAperturaDialogEl.close();
+      voceMmUseAperturaContext = { idVoce: null, mmIndex: null };
+    }
+  });
+  document.body.appendChild(useAperturaDialogEl);
+
+  grondeDialogEl.id = "gronde-dialog";
+  grondeDialogEl.className = "ifc-riepilogo-dialog";
+  grondeDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-gronde-dialog") {
+      grondeDialogEl.close();
+    }
+  });
+  document.body.appendChild(grondeDialogEl);
+
+  davanzaliDialogEl.id = "davanzali-dialog";
+  davanzaliDialogEl.className = "ifc-riepilogo-dialog";
+  davanzaliDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-davanzali-dialog") {
+      davanzaliDialogEl.close();
+    }
+  });
+  davanzaliDialogEl.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.dataset.action !== "change-davanzale-sbordo") return;
+    const key = String(target.dataset.key || "").trim();
+    if (!key) return;
+    const parsed = parseNonNegativeDecimal2(target.value);
+    if (parsed === null) {
+      target.value = fmt2(typeof davanzaliSbordiByKey[key] === "number" ? davanzaliSbordiByKey[key] : 0.05);
+      return;
+    }
+    davanzaliSbordiByKey[key] = Number(parsed.toFixed(2));
+    saveDavanzaliSbordi();
+    syncVoceDavanzali();
+    syncVoceSoglie();
+    syncVoceCanali();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
+  });
+  document.body.appendChild(davanzaliDialogEl);
+
+  soglieDialogEl.id = "soglie-dialog";
+  soglieDialogEl.className = "ifc-riepilogo-dialog";
+  soglieDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-soglie-dialog") {
+      soglieDialogEl.close();
+    }
+  });
+  soglieDialogEl.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.dataset.action !== "change-soglia-sbordo") return;
+    const key = String(target.dataset.key || "").trim();
+    if (!key) return;
+    const parsed = parseNonNegativeDecimal2(target.value);
+    if (parsed === null) {
+      target.value = fmt2(typeof soglieSbordiByKey[key] === "number" ? soglieSbordiByKey[key] : 0.05);
+      return;
+    }
+    soglieSbordiByKey[key] = Number(parsed.toFixed(2));
+    saveSoglieSbordi();
+    syncVoceSoglie();
+    syncVoceCanali();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
+  });
+  document.body.appendChild(soglieDialogEl);
+
+  falsiTelaiDialogEl.id = "falsi-telai-dialog";
+  falsiTelaiDialogEl.className = "ifc-riepilogo-dialog";
+  falsiTelaiDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-falsi-telai-dialog") {
+      falsiTelaiDialogEl.close();
+    }
+  });
+  falsiTelaiDialogEl.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.dataset.action !== "change-falsi-telai-aggiunta") return;
+    const key = String(target.dataset.key || "").trim();
+    if (!key) return;
+    const parsed = parseNonNegativeDecimal2(target.value);
+    if (parsed === null) {
+      target.value = fmt2(
+        typeof falsiTelaiLegnoAggiunteByKey[key] === "number" ? falsiTelaiLegnoAggiunteByKey[key] : 0.1,
+      );
+      return;
+    }
+    falsiTelaiLegnoAggiunteByKey[key] = Number(parsed.toFixed(2));
+    saveFalsiTelaiLegnoAggiunte();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
+  });
+  document.body.appendChild(falsiTelaiDialogEl);
+
+  falsiTelaiAllDialogEl.id = "falsi-telai-alluminio-dialog";
+  falsiTelaiAllDialogEl.className = "ifc-riepilogo-dialog";
+  falsiTelaiAllDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-falsi-telai-alluminio-dialog") {
+      falsiTelaiAllDialogEl.close();
+    }
+  });
+  falsiTelaiAllDialogEl.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.dataset.action !== "change-falsi-telai-alluminio-aggiunta") return;
+    const key = String(target.dataset.key || "").trim();
+    if (!key) return;
+    const parsed = parseNonNegativeDecimal2(target.value);
+    if (parsed === null) {
+      target.value = fmt2(
+        typeof falsiTelaiAlluminioAggiunteByKey[key] === "number" ? falsiTelaiAlluminioAggiunteByKey[key] : 0.1,
+      );
+      return;
+    }
+    falsiTelaiAlluminioAggiunteByKey[key] = Number(parsed.toFixed(2));
+    saveFalsiTelaiAlluminioAggiunte();
+    syncVoceFalsiTelaiAlluminio();
+  });
+  document.body.appendChild(falsiTelaiAllDialogEl);
+
+  confirmDeleteAperturaMasterDialogEl.id = "confirm-delete-apertura-master-dialog";
+  confirmDeleteAperturaMasterDialogEl.className = "ifc-riepilogo-dialog";
+  confirmDeleteAperturaMasterDialogEl.innerHTML = `
+    <form method="dialog" class="ifc-riepilogo-dialog-form">
+      <div class="ifc-riepilogo-dialog-header"><h3>Conferma eliminazione</h3></div>
+      <p style="padding: 0 8px 8px;">
+        Sei sicuro di eliminare questa apertura, verrà eliminata in tutte le voci che la usano
+      </p>
+      <div style="padding:8px;display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn-action btn-secondary" data-action="cancel-confirm-delete-apertura-master">Annulla</button>
+        <button type="button" class="btn-action btn-delete" data-action="confirm-delete-apertura-master">Conferma</button>
+      </div>
+    </form>
+  `;
+  confirmDeleteAperturaMasterDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const action = button.dataset.action;
+    if (action === "cancel-confirm-delete-apertura-master") {
+      apertureMasterPendingDeleteId = null;
+      confirmDeleteAperturaMasterDialogEl.close();
+      return;
+    }
+    if (action === "confirm-delete-apertura-master") {
+      const id = apertureMasterPendingDeleteId;
+      if (!id) {
+        confirmDeleteAperturaMasterDialogEl.close();
+        return;
+      }
+      confirmDeleteAperturaMasterDialogEl.close();
+      eliminaAperturaMaster(id);
+    }
+  });
+  document.body.appendChild(confirmDeleteAperturaMasterDialogEl);
+
+  confirmEditVoceMmAperturaDialogEl.id = "confirm-edit-voce-mm-apertura-dialog";
+  confirmEditVoceMmAperturaDialogEl.className = "ifc-riepilogo-dialog";
+  confirmEditVoceMmAperturaDialogEl.innerHTML = `
+    <form method="dialog" class="ifc-riepilogo-dialog-form">
+      <div class="ifc-riepilogo-dialog-header"><h3>Conferma modifica apertura</h3></div>
+      <p style="padding: 0 8px 8px;">
+        SE MODIFICHI L'APERTURA, LE MODIFICHE VERRANNO APPLICATE IN TUTTE LE VOCI DOVE E' USATA QUESTA APERTURA
+      </p>
+      <div style="padding:8px;display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn-action btn-secondary" data-action="cancel-confirm-edit-voce-mm-apertura">Annulla</button>
+        <button type="button" class="btn-action btn-edit" data-action="confirm-edit-voce-mm-apertura">OK</button>
+      </div>
+    </form>
+  `;
+  confirmEditVoceMmAperturaDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const action = button.dataset.action;
+    if (action === "cancel-confirm-edit-voce-mm-apertura") {
+      pendingEditVoceMmApertura = { idVoce: null, mmIndex: null, idAperturaMaster: "" };
+      confirmEditVoceMmAperturaDialogEl.close();
+      return;
+    }
+    if (action === "confirm-edit-voce-mm-apertura") {
+      const { idVoce, mmIndex, idAperturaMaster } = pendingEditVoceMmApertura;
+      pendingEditVoceMmApertura = { idVoce: null, mmIndex: null, idAperturaMaster: "" };
+      confirmEditVoceMmAperturaDialogEl.close();
+      if (idVoce === null || mmIndex === null || !idAperturaMaster) return;
+      avviaModificaVoceMmApertura(idVoce, mmIndex, idAperturaMaster);
+    }
+  });
+  document.body.appendChild(confirmEditVoceMmAperturaDialogEl);
+
   setupBimTabs();
 
   loadPiani();
   loadMurDati();
   loadVociUnitaOptions();
+  loadDavanzaliSbordi();
+  loadSoglieSbordi();
+  loadFalsiTelaiLegnoAggiunte();
+  loadFalsiTelaiAlluminioAggiunte();
+  loadApertureMaster();
   loadVoci();
+  migraApertureCollegateVociSuMaster();
+  syncVoceDavanzali();
+  syncVoceSoglie();
+  syncVoceCanali();
+  syncVoceFalsiTelaiLegno();
+  syncVoceFalsiTelaiAlluminio();
   loadIfcData();
   updateComputoDirtyIndicator();
   if (ifcDataCache?.source?.fileName && bimViewerStatusEl) {

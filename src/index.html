@@ -951,6 +951,14 @@
                   >
                     Usa misure
                   </button>
+                  <button
+                    id="voce-mm-template-falda"
+                    type="button"
+                    class="btn-action btn-secondary voce-mm-mini-btn"
+                    title="Inserisci formula falda da valori guidati"
+                  >
+                    Formula falda
+                  </button>
                 </label>
                 <input
                   id="voce-mm-riga-formula"
@@ -1013,6 +1021,38 @@
           <div class="formula-dialog-actions">
             <button id="voce-mm-delete-cancel" type="button" class="btn-action btn-secondary">Annulla</button>
             <button id="voce-mm-delete-confirm" type="submit" class="btn-action btn-delete">Elimina</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="voce-mm-template-falda-dialog" class="formula-dialog">
+        <form id="voce-mm-template-falda-form" method="dialog">
+          <h3>Formula falda</h3>
+          <p>Inserisci i valori per comporre automaticamente la formula.</p>
+          <div class="voce-mm-template-falda-grid">
+            <div class="field">
+              <label for="voce-mm-template-falda-gronda">Gronda</label>
+              <input id="voce-mm-template-falda-gronda" type="number" step="0.001" min="0" placeholder="Es: 8,40" required />
+            </div>
+            <div class="field voce-mm-template-falda-canale-field">
+              <label for="voce-mm-template-falda-canale">Canale</label>
+              <span class="checkbox-wrap voce-mm-template-falda-canale-wrap">
+                <input id="voce-mm-template-falda-canale" type="checkbox" />
+                <span>CANALE</span>
+              </span>
+            </div>
+            <div class="field">
+              <label for="voce-mm-template-falda-salita">Salita</label>
+              <input id="voce-mm-template-falda-salita" type="number" step="0.001" min="0" placeholder="Es: 3,20" required />
+            </div>
+            <div class="field">
+              <label for="voce-mm-template-falda-pendenza">Pendenza (%)</label>
+              <input id="voce-mm-template-falda-pendenza" type="number" step="0.001" min="0" placeholder="Es: 35" required />
+            </div>
+          </div>
+          <div class="formula-dialog-actions">
+            <button id="voce-mm-template-falda-cancel" type="button" class="btn-action btn-delete">Annulla</button>
+            <button id="voce-mm-template-falda-apply" type="submit" class="btn-action btn-secondary">OK</button>
           </div>
         </form>
       </dialog>
