@@ -1,0 +1,27 @@
+/* Vista dedicata MISURE VARIE */
+
+#compilazione-misure-varie .misure-varie-block {
+  margin-top: 8px;
+}
+
+#compilazione-misure-varie .misurazioni-form {
+  grid-template-columns: repeat(7, minmax(90px, 1fr)) auto;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: end;
+}
+
+#compilazione-misure-varie .misurazioni-form .field {
+  min-width: 0;
+}
+
+#compilazione-misure-varie .misurazioni-form input:not([type="checkbox"]),
+#compilazione-misure-varie .misurazioni-form .formula-state-button {
+  min-height: 34px;
+  padding: 7px 8px;
+  font-size: 0.84rem;
+}
+
+#compilazione-misure-varie .misurazioni-form .btn-form-add-plus {
+  align-self: end;
+}

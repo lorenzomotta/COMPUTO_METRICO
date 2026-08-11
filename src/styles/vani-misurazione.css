@@ -1,0 +1,1151 @@
+/* Schermata fullscreen Misurazione VANI — gerarchia tabellare compatta */
+
+#vista-vani.vista-vani-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(145deg, #d0dae8 0%, #dce6f2 50%, #d8e2ef 100%);
+  color: #10233f;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(16, 35, 63, 0.08);
+}
+
+#vista-vani.vista-vani-overlay[hidden] {
+  display: none;
+}
+
+.vani-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: min(1920px, 100%);
+  width: 100%;
+  margin: 0 auto;
+  padding: 6px 8px 8px;
+  gap: 4px;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.vani-body-layout {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.vani-sidebar {
+  flex: 0 0 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px 8px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid rgba(16, 35, 63, 0.1);
+  box-shadow: 0 4px 18px rgba(16, 35, 63, 0.06);
+  max-height: min(78vh, calc(100vh - 104px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-self: flex-start;
+}
+
+.vani-sidebar-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vani-sidebar-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #1a3358;
+  letter-spacing: 0.02em;
+}
+
+.vani-btn-registra {
+  width: 100%;
+  justify-content: center;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+}
+
+.vani-registra-feedback {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.72rem;
+  color: #2d6a4f;
+  line-height: 1.3;
+}
+
+.vani-registra-feedback.vani-registra-feedback--err {
+  color: #9b2c2c;
+}
+
+.vani-sidebar-list {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vani-sidebar-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.vani-sidebar-row .vani-sidebar-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.vani-sidebar-elimina {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  min-width: 2rem;
+  border-radius: 6px;
+}
+
+.vani-sidebar-elimina-icon {
+  display: block;
+  pointer-events: none;
+}
+
+.vani-btn-icon-strati {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  min-width: 2rem;
+}
+
+.vani-btn-icon-strati .vani-icon-strati-toggle {
+  display: block;
+  pointer-events: none;
+}
+
+.vani-sidebar-empty {
+  font-size: 0.74rem;
+  color: #7a8aa8;
+  line-height: 1.35;
+  padding: 3px 2px;
+}
+
+.vani-sidebar-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px 7px;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: #243652;
+  background: rgba(16, 35, 63, 0.05);
+  border: 1px solid rgba(16, 35, 63, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.vani-sidebar-item:hover {
+  background: rgba(61, 90, 128, 0.12);
+  border-color: rgba(61, 90, 128, 0.28);
+}
+
+.vani-sidebar-item:focus-visible {
+  outline: 2px solid rgba(61, 90, 128, 0.45);
+  outline-offset: 1px;
+}
+
+.vani-main-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.vani-locale-cell.vani-locale-highlight {
+  outline: 2px solid rgba(61, 90, 128, 0.55);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (max-width: 900px) {
+  .vani-body-layout {
+    flex-direction: column;
+  }
+
+  .vani-sidebar {
+    flex: 0 0 auto;
+    max-height: 220px;
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.vani-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid rgba(16, 35, 63, 0.12);
+}
+
+.vani-header-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.vani-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.vani-btn-help {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #1a3a66;
+  background: #fff;
+  border: 1px solid rgba(16, 35, 63, 0.22);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 35, 63, 0.08);
+}
+
+.vani-btn-help:hover {
+  background: #f0f5fc;
+  border-color: rgba(16, 35, 63, 0.35);
+}
+
+.vani-btn-help:focus-visible {
+  outline: 2px solid #2a6fd4;
+  outline-offset: 2px;
+}
+
+.vani-btn-help[aria-expanded="true"] {
+  background: #e4edfb;
+  border-color: rgba(42, 111, 212, 0.45);
+}
+
+.vani-help-inline {
+  flex-shrink: 0;
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(16, 35, 63, 0.12);
+  box-shadow: 0 4px 14px rgba(16, 35, 63, 0.06);
+}
+
+.vani-help-inline[hidden] {
+  display: none;
+}
+
+.vani-help-inline__p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #4a5f7a;
+  line-height: 1.35;
+}
+
+.vani-help-inline__p + .vani-help-inline__p {
+  margin-top: 8px;
+}
+
+.vani-help-inline__p--muted {
+  font-size: 0.72rem;
+  color: #5a6f8c;
+}
+
+.vani-form.card-like {
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 8px;
+  box-shadow: 0 8px 28px rgba(16, 35, 63, 0.08);
+  border: 1px solid rgba(16, 35, 63, 0.1);
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.vani-form-vano {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vani-piano-head .vani-btn-after-piano-tag {
+  margin-left: -2px;
+}
+
+.vani-gerarchia-host {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.vani-btn-mini {
+  padding: 3px 8px;
+  font-size: 0.78rem;
+}
+
+.vani-btn-micro {
+  padding: 1px 5px;
+  font-size: 0.72rem;
+  min-height: 22px;
+  line-height: 1.2;
+}
+
+.vani-btn-aggiungi-parete {
+  white-space: nowrap;
+}
+
+.vani-piano-block {
+  border: 1px solid rgba(16, 35, 63, 0.12);
+  border-radius: 8px;
+  padding: 4px 6px 6px;
+  background: #fbfcfe;
+}
+
+.vani-piano-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.vani-piano-head-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vani-piano-btn-voce {
+  flex-shrink: 0;
+}
+
+.vani-piano-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #3d5a80;
+  text-transform: uppercase;
+}
+
+.vani-piano-nome {
+  flex: 1;
+  min-width: 140px;
+  max-width: min(420px, 55vw);
+  padding: 3px 6px;
+  font-size: 0.82rem;
+  border-radius: 6px;
+  border: 1px solid rgba(16, 35, 63, 0.22);
+  background: #fff;
+}
+
+.vani-piano-locale-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 6px;
+  flex: 1 1 220px;
+  min-width: 140px;
+  padding: 1px 0;
+}
+
+.vani-piano-locale-wrap.vani-locale-cell {
+  background: transparent;
+}
+
+.vani-piano-locale-tag {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #3d5a80;
+  text-transform: uppercase;
+}
+
+.vani-locale-cell-inner--inline {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.vani-grid-table--solo-vano .vani-th-parete-block {
+  width: 58%;
+}
+
+.vani-grid-table--solo-vano .vani-th-ap {
+  width: 29%;
+}
+
+.vani-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  table-layout: fixed;
+}
+
+.vani-grid-table thead th {
+  text-align: left;
+  padding: 2px 4px;
+  border-bottom: 1px solid rgba(16, 35, 63, 0.15);
+  color: #1a3358;
+  font-weight: 600;
+  background: rgba(16, 35, 63, 0.04);
+}
+
+.vani-th-locale {
+  width: 14%;
+}
+
+/* colspan 3: parete + L + H + tipo compatto nella tabella */
+.vani-th-parete-block {
+  width: 54%;
+}
+
+.vani-th-ap {
+  width: 24%;
+}
+
+.vani-th-act {
+  width: 8%;
+}
+
+.vani-grid-table tbody td {
+  padding: 2px 4px;
+  border-bottom: 1px solid rgba(16, 35, 63, 0.08);
+  vertical-align: top;
+}
+
+/* Riga principale parete: sfondo verde chiaro */
+.vani-grid-table tbody tr[data-parete-id] > td.vani-td-parete-misure,
+.vani-grid-table tbody tr[data-parete-id] > td.vani-td-aperture,
+.vani-grid-table tbody tr[data-parete-id] > td.vani-td-act {
+  background: rgba(98, 196, 114, 0.36);
+}
+
+.vani-grid-table tbody tr:last-child td,
+.vani-grid-table tbody tr:last-child th {
+  border-bottom: none;
+}
+
+.vani-locale-cell {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.vani-locale-cell-inner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.vani-locale-nome {
+  flex: 1;
+  min-width: 72px;
+  width: auto;
+  padding: 3px 5px;
+  font-size: 0.8rem;
+  border-radius: 5px;
+  border: 1px solid rgba(16, 35, 63, 0.2);
+  background: #fff;
+}
+
+.vani-locale-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.vani-td-parete-misure {
+  vertical-align: middle;
+  padding: 2px 4px !important;
+}
+
+.vani-parete-misure-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.vani-parete-toggle-strati {
+  flex-shrink: 0;
+  min-width: 1.65rem;
+  padding: 1px 4px !important;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.vani-parete-lh-inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vani-parete-rif-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
+.vani-parete-field-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #395475;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.vani-parete-flags {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px 7px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.vani-parete-flag-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.15;
+  color: #2a4266;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.vani-parete-flag-line input[type="checkbox"] {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.vani-parete-misure-row .vani-parete-rif {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: min(28rem, 100%);
+  width: auto;
+  padding: 3px 6px;
+  font-size: 0.78rem;
+  border-radius: 4px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  background: #fff;
+}
+
+.vani-in-num {
+  width: 100%;
+  max-width: 72px;
+  padding: 3px 4px;
+  font-size: 0.78rem;
+  border-radius: 4px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  background: #fff;
+}
+
+/* Contiene al massimo «99.999» (2 cifre + 3 decimali); larghezza stretta */
+.vani-in-num--lh {
+  box-sizing: border-box;
+  width: 7.25ch;
+  min-width: 7.25ch;
+  max-width: 7.25ch;
+  flex-shrink: 0;
+  padding-left: 3px;
+  padding-right: 2px;
+  text-align: right;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.vani-parete-lung,
+.vani-parete-alt {
+  text-align: center;
+}
+
+.vani-in-num--lh::-webkit-outer-spin-button,
+.vani-in-num--lh::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.vani-tr-stratifinitura td {
+  border-bottom: 1px solid rgba(16, 35, 63, 0.08);
+}
+
+/* Collasso riga strati: mantiene griglia tabella (rowspan) senza altezza visibile */
+.vani-tr-stratifinitura--collapsed {
+  visibility: collapse;
+}
+
+.vani-tr-stratifinitura--collapsed td {
+  padding: 0 !important;
+  border: none !important;
+}
+
+.vani-td-stratifinitura-below {
+  padding: 3px 5px 4px !important;
+  background: rgba(16, 35, 63, 0.035);
+  border-top: 1px dashed rgba(16, 35, 63, 0.14);
+  vertical-align: top;
+}
+
+.vani-stratifinitura-panel {
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(16, 35, 63, 0.12);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(16, 35, 63, 0.05);
+  overflow-x: auto;
+}
+
+.vani-stratifinitura-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vani-stratifinitura-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.vani-stratifinitura-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #3d5580;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vani-stratifinitura-row {
+  display: grid;
+  grid-template-columns:
+    auto
+    minmax(110px, 1.8fr)
+    minmax(7.8rem, auto)
+    minmax(6.8rem, auto)
+    minmax(88px, 1fr)
+    auto;
+  align-items: center;
+  gap: 4px;
+  min-width: min(680px, 100%);
+}
+
+.vani-stratifinitura-toggle {
+  width: 1.45rem;
+  min-width: 1.45rem;
+  padding: 0;
+  line-height: 1;
+}
+
+.vani-strato-netto-slot--collapsed {
+  display: none;
+}
+
+.vani-stratifinitura-vocibreve {
+  min-width: 0;
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 0.74rem;
+  border-radius: 4px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  background: #fff;
+}
+
+.vani-stratifinitura-field-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.vani-stratifinitura-field-wrap--num {
+  justify-content: flex-start;
+}
+
+.vani-in-num--99 {
+  box-sizing: border-box;
+  width: 6.25ch;
+  min-width: 6.25ch;
+  max-width: 6.25ch;
+  flex-shrink: 0;
+  padding-left: 3px;
+  padding-right: 2px;
+  text-align: right;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.vani-stratifinitura-elevazione,
+.vani-stratifinitura-altezza {
+  text-align: center;
+}
+
+.vani-in-num--99::-webkit-outer-spin-button,
+.vani-in-num--99::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.vani-stratifinitura-note {
+  min-width: 0;
+  width: 100%;
+  padding: 3px 5px;
+  font-size: 0.74rem;
+  border-radius: 4px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  background: #fff;
+}
+
+/* Riepilogo strati netti (sotto le righe strato finitura) */
+.vani-strati-netti {
+  margin-top: 4px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px dashed rgba(16, 35, 63, 0.2);
+  background: rgba(16, 35, 63, 0.03);
+}
+
+.vani-strati-netti-head {
+  margin-bottom: 3px;
+}
+
+.vani-strati-netti-title {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #3d5580;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Una sola tabella: stesse colonne per intestazione e valori */
+.vani-strati-netti-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.74rem;
+  color: #243652;
+}
+
+.vani-sn-col-voce {
+  width: 22%;
+  min-width: 5.5rem;
+}
+
+.vani-sn-col-lung {
+  width: 17%;
+  min-width: 4rem;
+}
+
+.vani-sn-col-h {
+  width: 14%;
+  min-width: 3.75rem;
+}
+
+.vani-sn-col-ml {
+  width: 17%;
+  min-width: 4rem;
+}
+
+.vani-sn-col-mq {
+  width: 30%;
+  min-width: 4.5rem;
+}
+
+.vani-strati-netti-table thead th {
+  text-align: left;
+  vertical-align: bottom;
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: #3d5580;
+  padding: 2px 4px;
+  border-bottom: 1px solid rgba(16, 35, 63, 0.14);
+  line-height: 1.15;
+}
+
+.vani-strati-netti-table thead th.vani-strati-netti-num {
+  text-align: center;
+}
+
+.vani-strati-netti-table tbody td {
+  padding: 2px 4px;
+  vertical-align: middle;
+  word-break: break-word;
+}
+
+.vani-sn-tbody-single tr:last-child td {
+  border-bottom: none;
+}
+
+.vani-sn-cell-voc {
+  text-align: left;
+}
+
+/* Riga lorda: numeri centrati sotto le intestazioni (evita “spostamento” con colonna stretta + allineamento a destra) */
+.vani-sn-cell-data-num {
+  text-align: center !important;
+  white-space: normal;
+}
+
+.vani-sn-row-main--dopo-precedente td {
+  border-top: 1px solid rgba(16, 35, 63, 0.12);
+  padding-top: 4px !important;
+}
+
+.vani-sn-row-main td {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.vani-sn-row-ap-banner td {
+  padding-top: 4px !important;
+  padding-bottom: 1px !important;
+  border-top: none;
+}
+
+.vani-sn-ap-banner-label {
+  font-size: 0.71rem;
+  font-weight: 600;
+  font-style: italic;
+  color: #4a6288;
+}
+
+.vani-sn-row-ap-subhd td {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #3d5580;
+  padding-top: 1px !important;
+  padding-bottom: 3px !important;
+  border-bottom: 1px solid rgba(16, 35, 63, 0.1);
+}
+
+.vani-sn-ap-sub-label {
+  text-align: center !important;
+}
+
+.vani-sn-row-ap-data td {
+  border-bottom: 1px solid rgba(16, 35, 63, 0.05);
+}
+
+.vani-sn-row-ap-data .vani-strati-netti-num {
+  text-align: center !important;
+}
+
+.vani-sn-cell-empty {
+  border: none;
+  padding: 2px 4px !important;
+}
+
+.vani-sn-row-totmq td {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  border-top: 1px dashed rgba(16, 35, 63, 0.15);
+}
+
+.vani-sn-row-totmq--solo-lordo td {
+  border-top: 1px solid rgba(16, 35, 63, 0.12);
+}
+
+.vani-sn-totmq-label {
+  text-align: right;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #2d4666;
+}
+
+.vani-sn-row-totmq .vani-sn-cell-empty {
+  border-top: inherit;
+}
+
+.vani-sn-totmq-val {
+  font-weight: 700;
+  text-align: right !important;
+}
+
+.vani-strati-netti-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.vani-td-aperture {
+  padding: 2px 4px !important;
+}
+
+.vani-ap-checkboxes {
+  max-height: 56px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 2px 0 0;
+  row-gap: 0;
+}
+
+.vani-ap-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  font-size: 0.66rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #243652;
+}
+
+.vani-ap-line span {
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+}
+
+.vani-ap-line input[type="checkbox"] {
+  margin: 0;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  accent-color: #3d5580;
+}
+
+.vani-ap-line-blocked {
+  opacity: 0.55;
+  cursor: not-allowed;
+  color: #6a7a94;
+}
+
+.vani-ap-line-blocked input {
+  cursor: not-allowed;
+}
+
+.vani-ap-cell-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.vani-btn-aggiungi-apertura {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 4px !important;
+  min-width: 26px;
+  min-height: 26px;
+  line-height: 0;
+}
+
+.vani-btn-aggiungi-apertura:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.vani-icon-finestra {
+  display: block;
+  flex-shrink: 0;
+}
+
+.vani-nuova-apertura-dialog {
+  width: min(640px, 94vw);
+  max-height: min(90vh, 720px);
+  overflow-y: auto;
+}
+
+.vani-nuova-apertura-hint {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: #4a5d75;
+  line-height: 1.4;
+}
+
+.vani-nuova-apertura-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+  margin-bottom: 12px;
+}
+
+.vani-nuova-apertura-grid .field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+}
+
+.vani-nuova-apertura-grid .field span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #3d5a80;
+}
+
+.vani-nuova-apertura-grid input,
+.vani-nuova-apertura-grid select {
+  min-height: 30px;
+  padding: 4px 6px;
+  border: 1px solid #c5d4e8;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 520px) {
+  .vani-nuova-apertura-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vani-cell-hint {
+  color: #8a9ab5;
+  font-size: 0.72rem;
+}
+
+.vani-td-act {
+  text-align: center;
+  vertical-align: middle;
+  width: auto;
+  min-width: 3.5rem;
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+}
+
+.vani-td-act-inner {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.vani-btn-dup-parete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 4px !important;
+  min-width: 26px;
+  min-height: 26px;
+  line-height: 0;
+}
+
+.vani-icon-dup-parete {
+  display: block;
+  flex-shrink: 0;
+}
+
+.vani-td-act-inner .btn-action.vani-btn-micro[data-action="rimuovi-parete"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 3px 4px !important;
+  line-height: 1;
+}
+
+/* Modale conferma eliminazioni ✕ (sopra l’overlay VANI) */
+.vani-conferma-elimina-dialog {
+  z-index: 13050;
+  margin: auto;
+  max-width: min(420px, 92vw);
+}
+
+.vani-conferma-elimina-dialog::backdrop {
+  background: rgba(16, 35, 63, 0.45);
+}
+
+.vani-conferma-elimina-dialog-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vani-conferma-elimina-msg {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #243652;
+}
+
+@media (max-width: 900px) {
+  .vani-gerarchia-host {
+    min-width: 100%;
+  }
+
+  .vani-grid-table {
+    font-size: 0.74rem;
+  }
+
+  .vani-parete-misure-row {
+    flex-wrap: wrap;
+  }
+
+  .vani-parete-flags {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    flex-basis: 100%;
+  }
+}

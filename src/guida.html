@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Guida — Computo Metrico Estimativo</title>
+    <link rel="stylesheet" href="./styles/guida.css" />
+    <script type="module" src="./js/guida.js" defer></script>
+  </head>
+  <body class="guida-body">
+    <a class="guida-skip" href="#guida-contenuto">Vai al contenuto</a>
+
+    <header class="guida-topbar">
+      <p class="guida-brand">Computo Metrico Estimativo</p>
+      <div class="guida-topbar-actions">
+        <a class="guida-btn guida-btn--primary" href="./index.html">Apri l’applicazione</a>
+      </div>
+    </header>
+
+    <div class="guida-layout">
+      <nav class="guida-nav" aria-label="Indice della guida">
+        <p class="guida-nav-title">Indice</p>
+        <ul class="guida-nav-list">
+          <li><a href="#cos-e">Cos’è questa app</a></li>
+          <li><a href="#schermo">Come è organizzata</a></li>
+          <li><a href="#piani">Piani e compilazione</a></li>
+          <li><a href="#voci">Voci del computo</a></li>
+          <li><a href="#vani">VANI</a></li>
+          <li><a href="#camminamenti">CAMMINAMENTI</a></li>
+          <li><a href="#archivi">Archivi (sidebar)</a></li>
+          <li><a href="#esterni">Esterni vari</a></li>
+          <li><a href="#bim">Vista BIM</a></li>
+          <li><a href="#esporta">Salvataggio e PDF</a></li>
+          <li><a href="#consigli">Consigli pratici</a></li>
+        </ul>
+      </nav>
+
+      <main id="guida-contenuto" class="guida-main">
+        <header class="guida-hero">
+          <h1>Guida alle funzionalità</h1>
+          <p class="guida-hero-lead">
+            Questa pagina spiega, in modo semplice, a cosa serve l’applicazione e come usare le
+            parti principali: piani, voci, vani, camminamenti, archivi e esportazione.
+          </p>
+        </header>
+
+        <section id="cos-e" class="guida-section">
+          <h2>Cos’è questa app</h2>
+          <p>
+            È un programma per preparare un <strong>computo metrico estimativo</strong>: elenco
+            delle lavorazioni (le «voci») con misure, quantità e prezzi.
+          </p>
+          <p>
+            Puoi inserire i dati a mano, oppure farli arrivare da strumenti speciali come
+            <strong>VANI</strong> e <strong>CAMMINAMENTI</strong>, che calcolano le misure dalle
+            geometrie che inserisci.
+          </p>
+          <p class="guida-callout">
+            In pratica: tu descrivi i lavori e le misure; l’app somma le quantità e prepara
+            tabelle e PDF.
+          </p>
+        </section>
+
+        <section id="schermo" class="guida-section">
+          <h2>Come è organizzata</h2>
+          <p>Lo schermo ha tre zone:</p>
+          <ul>
+            <li>
+              <strong>Sidebar sinistra</strong> — pulsanti per aprire archivi (piani, aperture,
+              davanzali…), <strong>VANI</strong>, <strong>CAMMINAMENTI</strong>, esterni vari.
+            </li>
+            <li>
+              <strong>Area centrale</strong> — la vista attiva: piani, compilazione di un piano,
+              elenco voci, oppure BIM.
+            </li>
+            <li>
+              <strong>Sidebar destra</strong> — strumenti sul computo (es. esportazione / importazione,
+              chiusura app).
+            </li>
+          </ul>
+          <p>
+            All’avvio di solito vedi la vista <strong>VOCI</strong>. Da lì puoi passare agli altri
+            strumenti.
+          </p>
+        </section>
+
+        <section id="piani" class="guida-section">
+          <h2>Piani e compilazione</h2>
+          <p>
+            Un <strong>piano</strong> è un livello dell’edificio (es. Interrato, Terra, Tetto) legato
+            a un edificio.
+          </p>
+          <h3>Cosa puoi fare</h3>
+          <ul>
+            <li>Aggiungere un piano (tipologia, edificio, nome).</li>
+            <li>Modificarlo o eliminarlo.</li>
+            <li>
+              Premere <strong>Compila</strong> per aprire la scheda di quel piano e inserire dati
+              di dettaglio (strati muratura, aperture, scavi, corselli, ecc., a seconda della
+              tipologia).
+            </li>
+          </ul>
+          <p class="guida-callout">
+            I piani sono la «struttura» dell’edificio. Le misure dei lavori finiscono poi nelle
+            <strong>voci</strong>.
+          </p>
+        </section>
+
+        <section id="voci" class="guida-section">
+          <h2>Voci del computo</h2>
+          <p>
+            Una <strong>voce</strong> è una riga di lavorazione: testo, unità di misura (ml, mq, mc…),
+            prezzo, e le misurazioni collegate.
+          </p>
+          <h3>Tipi di misura</h3>
+          <ul>
+            <li><strong>AUTOMATICA</strong> — usata per voci speciali gestite da altri strumenti.</li>
+            <li>
+              <strong>MANUALE</strong> — puoi aggiungere righe di misurazione (piano, riferimento,
+              misure, segno +/−).
+            </li>
+          </ul>
+          <h3>Colori e blocchi</h3>
+          <ul>
+            <li>
+              Se una voce riceve misure da <strong>VANI</strong> o <strong>CAMMINAMENTI</strong>,
+              la cella della voce abbreviata diventa <strong>verde</strong>.
+            </li>
+            <li>
+              Su quelle voci, in VOCI puoi soprattutto <strong>correggere l’unità di misura</strong>
+              (pulsante ✎): i totali si aggiornano. Le misure geometriche si cambiano negli
+              strumenti VANI / CAMMINAMENTI.
+            </li>
+          </ul>
+          <h3>Cercare una voce</h3>
+          <p>
+            Dal dialogo «Nuova voce» puoi usare <strong>CERCA VOCE</strong> per cercare nel
+            prezziario (pagina dedicata).
+          </p>
+        </section>
+
+        <section id="vani" class="guida-section">
+          <h2>VANI</h2>
+          <p>
+            Strumento a schermo intero per misurare i <strong>vani</strong> (locali) con pareti e
+            strati di finitura.
+          </p>
+          <h3>Come funziona (in sintesi)</h3>
+          <ol class="guida-steps">
+            <li>Apri <strong>VANI</strong> dalla sidebar sinistra.</li>
+            <li>Indica piano e locale, poi aggiungi le pareti (riferimento, lunghezza, altezza).</li>
+            <li>
+              Su ogni parete assegna uno o più <strong>strati</strong> scegliendo la
+              <strong>voce breve</strong> (deve coincidere con la voce abbreviata in VOCI).
+            </li>
+            <li>
+              Premi <strong>REGISTRA VANO</strong>: il vano va nell’elenco a sinistra e le misure
+              vengono scritte nelle voci corrispondenti.
+            </li>
+          </ol>
+          <p>
+            Puoi riaprire un vano dall’elenco per modificarlo, oppure eliminarlo (si tolgono anche
+            le righe collegate in VOCI).
+          </p>
+          <p class="guida-callout guida-callout--green">
+            Suggerimento: crea prima la voce in VOCI (tipo MANUALE + unità corretta), poi usa
+            «AGGIUNGI VOCE» da VANI se ti serve crearne una nuova: da lì il tipo misura parte già su
+            MANUALE.
+          </p>
+        </section>
+
+        <section id="camminamenti" class="guida-section">
+          <h2>CAMMINAMENTI</h2>
+          <p>
+            Strumento simile a VANI, pensato per superfici tipo camminamenti: piano, più
+            <strong>riferimenti</strong>, ciascuno con Lato 1, Lato 2, note e più
+            <strong>strati</strong>.
+          </p>
+          <h3>Su ogni strato trovi</h3>
+          <ul>
+            <li><strong>N°</strong> — numero strato (automatico)</li>
+            <li><strong>VOCE</strong> — voce breve (come in VANI)</li>
+            <li><strong>M1 / M2</strong> — presi da Lato 1 e Lato 2</li>
+            <li><strong>Spessore</strong> — può essere anche 0</li>
+            <li><strong>Mq</strong> = M1 × M2</li>
+            <li><strong>Mc</strong> = M1 × M2 × spessore</li>
+            <li>Casella <strong>−</strong> — riga negativa (sottrazione)</li>
+          </ul>
+          <p>
+            In fondo a ogni riferimento vedi i totali:
+            <strong>valori positivi</strong>, <strong>valori negativi</strong> e
+            <strong>totale netto</strong>.
+          </p>
+          <p>
+            Con <strong>REGISTRA</strong> i dati passano in VOCI (stesso colore verde delle voci da
+            VANI). Nel PDF le righe positive vengono elencate prima di quelle negative.
+          </p>
+        </section>
+
+        <section id="archivi" class="guida-section">
+          <h2>Archivi (sidebar sinistra)</h2>
+          <p>Servono a tenere elenchi riutilizzabili, senza riscrivere ogni volta gli stessi dati.</p>
+          <ul>
+            <li><strong>PIANI</strong> — nomi piano per le misurazioni (archivio)</li>
+            <li><strong>APERTURE</strong> — finestre/porte master (usate anche da VANI)</li>
+            <li><strong>DAVANZALI</strong> / <strong>SOGLIE</strong> — sbordi e misure tipiche</li>
+            <li><strong>CANALI</strong> — gronde / canali</li>
+            <li><strong>FALSI TELAI</strong> (legno / alluminio) — archivi dedicati</li>
+          </ul>
+        </section>
+
+        <section id="esterni" class="guida-section">
+          <h2>Esterni vari</h2>
+          <p>
+            Dal pulsante <strong>ESTERNI VARI</strong> puoi gestire misurazioni «esterne» (es.
+            camminamenti in forma più semplice nella compilazione, e altre voci di dettaglio).
+          </p>
+          <p class="guida-callout">
+            Non confondere questo flusso con il modulo fullscreen
+            <strong>CAMMINAMENTI</strong> della sidebar: sono due strumenti diversi. Il modulo
+            fullscreen è pensato come VANI (strati + sync automatico sulle voci).
+          </p>
+        </section>
+
+        <section id="bim" class="guida-section">
+          <h2>Vista BIM</h2>
+          <p>
+            Apre una vista 3D (file IFC) per lavorare sul modello. Ci sono prove e strumenti di
+            collegamento muri/aperture. Serve se usi modelli BIM; non è obbligatorio per il computo
+            «classico» a tabelle.
+          </p>
+        </section>
+
+        <section id="esporta" class="guida-section">
+          <h2>Salvataggio e PDF</h2>
+          <ul>
+            <li>
+              Molti dati restano salvati in locale (memoria del programma), così non li perdi
+              chiudendo e riaprendo.
+            </li>
+            <li>
+              Puoi <strong>esportare</strong> / <strong>importare</strong> il computo (file) dalla
+              sidebar destra.
+            </li>
+            <li>
+              Dalle voci puoi generare un <strong>PDF</strong> del layout: per ogni voce compaiono
+              piano, riferimento, quantità e totali (con prezzi oppure solo quantità, a seconda
+              dell’opzione).
+            </li>
+          </ul>
+        </section>
+
+        <section id="consigli" class="guida-section">
+          <h2>Consigli pratici</h2>
+          <ol>
+            <li>Crea le voci (abbreviazione + unità) <em>prima</em> di registrare vani o camminamenti.</li>
+            <li>
+              Controlla che la «voce breve» dello strato sia uguale alla «voce abbreviata» in VOCI
+              (maiuscole/minuscole non contano).
+            </li>
+            <li>
+              Se sbagli l’unità dopo aver collegato VANI/CAMMINAMENTI: in VOCI usa ✎ e cambia solo
+              l’unità; i calcoli si aggiornano.
+            </li>
+            <li>
+              In CAMMINAMENTI usa la spunta <strong>−</strong> per le sottrazioni; i totali
+              positivi/negativi/netto ti aiutano a controllare.
+            </li>
+            <li>
+              Per uscire da VANI o CAMMINAMENTI: pulsante <strong>Chiudi</strong> oppure tasto
+              <span class="guida-kbd">Esc</span>.
+            </li>
+          </ol>
+          <footer class="guida-footer">
+            File della guida: <code>src/guida.html</code> · stili
+            <code>src/styles/guida.css</code> · script <code>src/js/guida.js</code>
+          </footer>
+        </section>
+      </main>
+    </div>
+
+    <button type="button" id="guida-back-top" class="guida-btn guida-back-top" aria-label="Torna all’inizio">
+      ↑ Su
+    </button>
+  </body>
+</html>

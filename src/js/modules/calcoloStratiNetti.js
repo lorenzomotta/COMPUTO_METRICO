@@ -1,7 +1,6 @@
 export function renderStratiNetti({
   stratiNettiBodyEl,
   compilazionePianoId,
-  currentElevazioneId,
   stratiMurElevazione,
   apertureElevazione,
   createCell,
@@ -10,7 +9,7 @@ export function renderStratiNetti({
 }) {
   stratiNettiBodyEl.innerHTML = "";
 
-  if (compilazionePianoId === null || currentElevazioneId === null) {
+  if (compilazionePianoId === null) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
     cell.colSpan = 10;
@@ -21,8 +20,8 @@ export function renderStratiNetti({
     return;
   }
 
-  const strati = stratiMurElevazione.filter((s) => s.idElevazione === currentElevazioneId);
-  const aperture = apertureElevazione.filter((a) => a.idElevazione === currentElevazioneId);
+  const strati = stratiMurElevazione.filter((s) => s.idPiano === compilazionePianoId);
+  const aperture = apertureElevazione.filter((a) => a.idPiano === compilazionePianoId);
 
   if (strati.length === 0) {
     const row = document.createElement("tr");

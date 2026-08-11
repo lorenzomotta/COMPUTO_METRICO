@@ -4,7 +4,7 @@
   line-height: 1.4;
   font-weight: 400;
   color: #10233f;
-  background: linear-gradient(145deg, #eef3fb 0%, #f8fbff 100%);
+  background: linear-gradient(145deg, #d8e2ef 0%, #e4ecf6 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -19,6 +19,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  background: inherit;
 }
 
 .app {
@@ -128,6 +129,31 @@ body {
   margin-bottom: 10px;
 }
 
+.sidebar-left .sidebar-actions--primari {
+  margin-bottom: 8px;
+}
+
+.sidebar-left .sidebar-actions--primari .btn-action {
+  background: linear-gradient(135deg, #1a8f4a 0%, #2ec76a 100%);
+  color: #fff;
+  border: none;
+}
+
+.sidebar-left .sidebar-actions--primari .btn-action:hover {
+  filter: brightness(1.06);
+}
+
+.sidebar-left .sidebar-actions--secondari {
+  margin-top: 8px;
+}
+
+.sidebar-divider {
+  margin: 4px 0 0;
+  border: none;
+  border-top: 1px solid rgba(16, 35, 63, 0.18);
+  height: 0;
+}
+
 .card {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid #dbe5f2;
@@ -177,28 +203,30 @@ body {
 }
 
 .scavo-form,
-.corsello-form,
-.camminamenti-form {
+.corsello-form {
   grid-template-columns: repeat(9, minmax(100px, 1fr)) auto;
   gap: 8px;
   margin-bottom: 12px;
 }
 
 .scavo-form .field,
-.corsello-form .field,
-.camminamenti-form .field {
+.corsello-form .field {
   min-width: 0;
 }
 
 .scavo-form input,
-.scavo-form button[type="submit"],
+.scavo-form button[type="submit"]:not(.btn-form-add-plus),
 .corsello-form input,
-.corsello-form button[type="submit"],
-.camminamenti-form input,
-.camminamenti-form button[type="submit"] {
+.corsello-form button[type="submit"]:not(.btn-form-add-plus) {
   min-height: 34px;
   padding: 7px 8px;
   font-size: 0.84rem;
+}
+
+.scavo-form .btn-form-add-plus,
+.corsello-form .btn-form-add-plus {
+  align-self: end;
+  margin-bottom: 0;
 }
 
 .voce-form {
@@ -430,6 +458,23 @@ button {
   width: min(980px, 96vw);
   max-height: min(92vh, 900px);
   overflow-y: auto;
+}
+
+.voce-dialog-solo-unita-hint {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #1e4a7a;
+  background: #e8f2fc;
+  border: 1px solid #b8d4ef;
+  border-radius: 8px;
+}
+
+#voce-dialog.voce-dialog--solo-unita .voce-form :is(input, select, textarea):disabled,
+#voce-dialog.voce-dialog--solo-unita .voce-btn-cerca:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .voce-misurazioni-manuali-wrap {
@@ -676,53 +721,155 @@ button {
   font-weight: 700;
 }
 
-/* Layout dedicato archivio APERTURE (12 colonne) */
+/* Archivio APERTURE: dialog più largo e tabella a tutta larghezza (le altre .ifc-riepilogo-dialog restano 1200px) */
+#aperture-master-dialog.ifc-riepilogo-dialog {
+  width: min(1400px, 98vw);
+  max-width: 100%;
+}
+
+/* Archivio nomi piano (misurazioni / esterni vari / righe voce) */
+#piani-misura-archivio-dialog.ifc-riepilogo-dialog {
+  width: min(560px, 94vw);
+  max-width: 100%;
+}
+
+/* Layout dedicato archivio APERTURE (13 colonne: ID, PIANO, LOCALE, LRGH, ALT, HDAV, ANTE, …) */
+#aperture-master-dialog .ifc-riepilogo-table-host {
+  width: 100%;
+  overflow-x: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Tabella a tutta larghezza del dialog; colonne “testo” crescono, numeri/azioni restano fissi */
+.table-voce-mm-inline.aperture-master-table {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  table-layout: fixed;
+}
+
 .table-voce-mm-inline.aperture-master-table th,
 .table-voce-mm-inline.aperture-master-table td {
-  padding: 3px 4px;
+  padding: 3px 5px;
+  box-sizing: border-box;
 }
 
+/* 1 ID — cresce con la tabella, niente troncamento se c’è spazio */
 .table-voce-mm-inline.aperture-master-table th:nth-child(1),
 .table-voce-mm-inline.aperture-master-table td:nth-child(1) {
-  width: 78px;
+  width: 10%;
+  min-width: 102px;
+  max-width: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* 2 PIANO */
 .table-voce-mm-inline.aperture-master-table th:nth-child(2),
 .table-voce-mm-inline.aperture-master-table td:nth-child(2) {
-  width: 120px;
+  width: 9%;
+  min-width: 88px;
+  max-width: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* 3 LOCALE — spazio dedicato, testo su più righe; assorbe spazio extra */
 .table-voce-mm-inline.aperture-master-table th:nth-child(3),
-.table-voce-mm-inline.aperture-master-table td:nth-child(3),
+.table-voce-mm-inline.aperture-master-table td:nth-child(3) {
+  width: 22%;
+  min-width: 120px;
+  max-width: none;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* 4 LRGH */
 .table-voce-mm-inline.aperture-master-table th:nth-child(4),
-.table-voce-mm-inline.aperture-master-table td:nth-child(4),
+.table-voce-mm-inline.aperture-master-table td:nth-child(4) {
+  width: 62px;
+  min-width: 62px;
+  max-width: 62px;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 5 ALT */
 .table-voce-mm-inline.aperture-master-table th:nth-child(5),
-.table-voce-mm-inline.aperture-master-table td:nth-child(5),
+.table-voce-mm-inline.aperture-master-table td:nth-child(5) {
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 6 HDAV */
 .table-voce-mm-inline.aperture-master-table th:nth-child(6),
 .table-voce-mm-inline.aperture-master-table td:nth-child(6) {
   width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
+/* 7 ANTE — colonna stretta */
 .table-voce-mm-inline.aperture-master-table th:nth-child(7),
 .table-voce-mm-inline.aperture-master-table td:nth-child(7) {
-  width: 145px;
+  width: 38px;
+  min-width: 38px;
+  max-width: 38px;
+  padding-left: 2px;
+  padding-right: 2px;
+  white-space: nowrap;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
+/* 8 TIPOLOGIA */
 .table-voce-mm-inline.aperture-master-table th:nth-child(8),
-.table-voce-mm-inline.aperture-master-table td:nth-child(8),
+.table-voce-mm-inline.aperture-master-table td:nth-child(8) {
+  width: 18%;
+  min-width: 120px;
+  max-width: none;
+}
+
+/* 9–11 FALSO, SCURO, INFERIATA */
 .table-voce-mm-inline.aperture-master-table th:nth-child(9),
 .table-voce-mm-inline.aperture-master-table td:nth-child(9),
 .table-voce-mm-inline.aperture-master-table th:nth-child(10),
 .table-voce-mm-inline.aperture-master-table td:nth-child(10),
 .table-voce-mm-inline.aperture-master-table th:nth-child(11),
 .table-voce-mm-inline.aperture-master-table td:nth-child(11) {
-  width: 84px;
+  width: 7%;
+  min-width: 72px;
+  max-width: none;
 }
 
+/* 12 ZANZARIERA */
 .table-voce-mm-inline.aperture-master-table th:nth-child(12),
 .table-voce-mm-inline.aperture-master-table td:nth-child(12) {
-  width: 96px;
+  width: 72px;
+  min-width: 68px;
   white-space: nowrap;
+}
+
+/* 13 AZIONI */
+.table-voce-mm-inline.aperture-master-table th:nth-child(13),
+.table-voce-mm-inline.aperture-master-table td:nth-child(13) {
+  width: 88px;
+  min-width: 88px;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura input,
@@ -735,10 +882,11 @@ button {
   padding: 0 4px;
 }
 
-.table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(3) input,
+/* Numeriche: LRGH, ALT, HDAV, ANTE (colonne 4–7 in modalità modifica) */
 .table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(4) input,
 .table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(5) input,
-.table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(6) input {
+.table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(6) input,
+.table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(7) input {
   text-align: center;
 }
 
@@ -852,6 +1000,15 @@ button {
 
 .voce-mm-aperture-saved-wrap {
   margin-bottom: 4px;
+}
+
+.voce-mm-aperture-saved-wrap--vani .voce-mm-aperture-editor-head,
+.voce-mm-aperture-saved-wrap--vani .voce-mm-aperture-editor-inputs {
+  grid-template-columns:
+    minmax(120px, 1fr)
+    minmax(100px, 1fr)
+    minmax(100px, 1fr)
+    minmax(100px, 1fr);
 }
 
 .voce-mm-aperture-saved-row {
@@ -990,10 +1147,8 @@ tr.voce-mm-data-row:hover {
 }
 
 #vista-voci.voce-focus-mode #voce-focus-close-floating {
-  position: fixed;
-  top: 12px;
-  right: 14px;
-  z-index: 1210;
+  position: static;
+  z-index: auto;
 }
 
 #vista-voci.voce-focus-mode .voci-mm-nested-wrap {

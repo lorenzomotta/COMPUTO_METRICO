@@ -5,6 +5,7 @@ import {
   parseNonNegativeDecimal2,
   fmt2,
   altezzaAperturaInclusaNelloStrato,
+  altezzaInclusaNelloStratoConElevazione,
 } from "./utils/numberUtils.js";
 import {
   savePiani as savePianiStorage,
@@ -14,11 +15,35 @@ import {
 } from "./modules/storage.js";
 import {
   updateInterratoPanelSubtitle,
-  updateElevazioneAttivaLabel,
+  updateMurPianoCompilazioneLabel,
   showVistaPiani,
   showVistaCompilazione,
 } from "./modules/viewHelpers.js";
 import { renderStratiNetti as renderStratiNettiModule } from "./modules/calcoloStratiNetti.js";
+import { syncVaniApertureLocalesForPicker } from "./modules/vaniApertureLocales.js";
+import {
+  canonicalPianoMisuraNome,
+  pianoMisuraDedupKey,
+  mergeNomePianoInMap,
+  sortedUniquePianiNomiFromMap,
+  collectPianiStringheDaMurData,
+  loadArchivioPianiMisuraArray,
+  saveArchivioPianiMisuraArray,
+  ARCHIVIO_PIANI_MISURA_STORAGE_KEY,
+  tryEnsurePianoInArchivio,
+  popolaDatalistArchivioPianiMisura,
+  risolviBlurCampoPianoArchivioStorage,
+} from "./modules/archivioPianiMisura.js";
+import {
+  dismissCamminamentiIfOpen,
+  openVistaCamminamenti,
+  wireCamminamentiUi,
+} from "./camminamenti-misurazione.js";
+import { dismissVaniIfOpen, openVistaVani, wireVaniUi } from "./vani-misurazione.js";
+import { openVistaMisureVarie, closeVistaMisureVarie, wireMisureVarieUi } from "./misure-varie.js";
+import { buildRivestimentiRowsFromStorage, buildIntonacoRusticoRowsFromStorage, buildIntonacoCivileRowsFromStorage, buildZoccoloRowsFromStorage } from "./modules/rivestimentiRiepilogo.js";
+import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
+import { syncEsterniMisurazioniNelleVoci } from "./modules/esterniVariSyncVoci.js";
 
 window.addEventListener("DOMContentLoaded", () => {
   const pianoFormEl = document.querySelector("#piano-form");
@@ -34,15 +59,14 @@ window.addEventListener("DOMContentLoaded", () => {
   const altezzaEl = document.querySelector("#altezza");
   const spessoreEl = document.querySelector("#spessore");
   const idvocecapitolatoEl = document.querySelector("#idvocecapitolato");
-  const murEleBodyEl = document.querySelector("#murielevazione-ele-body");
+  const murParamsRiferimentoEl = document.querySelector("#mur-params-riferimento");
+  const murParamsSpessoreEl = document.querySelector("#mur-params-spessore");
   const stratiMurBodyEl = document.querySelector("#strati-mur-body");
   const stratiSubmitButtonEl = stratiFormEl.querySelector("button[type='submit']");
-  const idElevazioneAttivaEl = document.querySelector("#id-elevazione-attiva");
-  const riferimentoElevazioneAttivaEl = document.querySelector("#riferimento-elevazione-attiva");
-  const countMurielevazioniEl = document.querySelector("#count-murielevazioni");
+  const idPianoCompilazioneEl = document.querySelector("#id-piano-compilazione");
+  const riferimentoMurPianoEl = document.querySelector("#riferimento-mur-piano");
   const countStratiEl = document.querySelector("#count-strati");
   const countApertureEl = document.querySelector("#count-aperture");
-  const btnNuovaElevazioneEl = document.querySelector("#btn-nuova-elevazione");
 
   const apertureFormEl = document.querySelector("#aperture-elev-form");
   const apLocaleEl = document.querySelector("#ap-locale");
@@ -64,14 +88,21 @@ window.addEventListener("DOMContentLoaded", () => {
   const tornaPianiButtonEl = document.querySelector("#btn-torna-piani");
   const tornaPianiEsterniButtonEl = document.querySelector("#btn-torna-piani-esterni");
   const sidebarEsterniVariButtonEl = document.querySelector("#btn-sidebar-esterni-vari");
-  const gestionePianiButtonEl = document.querySelector("#btn-gestione-piani");
-  const sidebarLeftActionsEl = document.querySelector(".sidebar-left .sidebar-actions");
+  const misureVarieSidebarButtonEl = document.createElement("button");
+  const sidebarLeftActionsPrimariEl = document.querySelector("#sidebar-left-actions-primari");
+  const sidebarLeftActionsSecondariEl = document.querySelector("#sidebar-left-actions-secondari");
   const apertureMasterSidebarButtonEl = document.createElement("button");
+  const pianiMisuraArchivioSidebarButtonEl = document.createElement("button");
   const grondeSidebarButtonEl = document.createElement("button");
   const davanzaliSidebarButtonEl = document.createElement("button");
   const soglieSidebarButtonEl = document.createElement("button");
   const falsiTelaiSidebarButtonEl = document.createElement("button");
   const falsiTelaiAllSidebarButtonEl = document.createElement("button");
+  const rivestimentiSidebarButtonEl = document.createElement("button");
+  const intonacoRusticoSidebarButtonEl = document.createElement("button");
+  const intonacoCivileSidebarButtonEl = document.createElement("button");
+  const zoccoloSidebarButtonEl = document.createElement("button");
+  const vaniSidebarButtonEl = document.createElement("button");
   const aggiungiVoceButtonEl = document.querySelector("#btn-aggiungi-voce");
   const vediVociButtonEl = document.querySelector("#btn-vedi-voci");
   const apriPdfVociButtonEl = document.querySelector("#btn-apri-pdf-voci");
@@ -79,6 +110,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const esportaXlsButtonEl = document.querySelector("#btn-esporta-xls");
   const esportaJsonButtonEl = document.querySelector("#btn-esporta-json");
   const importaComputoButtonEl = document.querySelector("#btn-importa-computo");
+  const iniziaComputoButtonEl = document.querySelector("#btn-inizia-computo");
   const chiudiAppButtonEl = document.querySelector("#btn-chiudi-app");
   const vistaBimButtonEl = document.querySelector("#btn-vista-bim");
   const importaIfcButtonEl = document.querySelector("#btn-importa-ifc");
@@ -91,6 +123,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const ifcRiepilogoTableWrapEl = document.createElement("div");
   const ifcRiepilogoCloseButtonEl = document.createElement("button");
   const apertureMasterDialogEl = document.createElement("dialog");
+  const pianiMisuraArchivioDialogEl = document.createElement("dialog");
   const useAperturaDialogEl = document.createElement("dialog");
   const confirmDeleteAperturaMasterDialogEl = document.createElement("dialog");
   const confirmEditVoceMmAperturaDialogEl = document.createElement("dialog");
@@ -104,6 +137,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const bimTabButtons = Array.from(document.querySelectorAll(".bim-tab"));
   const compilazioneInterratoPanelEl = document.querySelector("#compilazione-interrato");
   const compilazioneEsterniPanelEl = document.querySelector("#compilazione-esterni-vari");
+  const compilazioneMisureVariePanelEl = document.querySelector("#compilazione-misure-varie");
 
   const interratoSottotitoloEl = document.querySelector("#compilazione-interrato-sottotitolo");
   const esterniSottotitoloEl = document.querySelector("#compilazione-esterni-sottotitolo");
@@ -140,24 +174,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const corselloBodyEl = document.querySelector("#corsello-body");
   const corselloSubmitButtonEl = corselloFormEl.querySelector("button[type='submit']");
   const countCorselliEl = document.querySelector("#count-corselli");
-  const camminamentiFormEl = document.querySelector("#camminamenti-form");
-  const idPlCammEl = document.querySelector("#idplcamm");
-  const camminamentiPianoEl = document.querySelector("#camminamenti-piano");
-  const camminamentiRiferimentoEl = document.querySelector("#camminamenti-riferimento");
-  const camminamentiSottraiEl = document.querySelector("#camminamenti-sottrai");
-  const camminamentiMisura1El = document.querySelector("#camminamenti-misura1");
-  const camminamentiMisura2El = document.querySelector("#camminamenti-misura2");
-  const camminamentiFormulaEl = document.querySelector("#camminamenti-formula");
-  const apriFormulaCamminamentiButtonEl = document.querySelector("#btn-apri-formula-camminamenti");
-  const camminamentiAltezzaEl = document.querySelector("#camminamenti-altezza");
-  const camminamentiIdVoceEl = document.querySelector("#camminamenti-idvoce");
-  const camminamentiBodyEl = document.querySelector("#camminamenti-body");
-  const camminamentiSubmitButtonEl = camminamentiFormEl.querySelector("button[type='submit']");
-  const countCamminamentiEl = document.querySelector("#count-camminamenti");
+  // CAMMINAMENTI non è più in ESTERNI VARI (modulo dedicato in sidebar).
   const sumAreaCorselliEl = document.querySelector("#sum-area-corselli");
   const sumVolumeCorselliEl = document.querySelector("#sum-volume-corselli");
-  const sumAreaCamminamentiEl = document.querySelector("#sum-area-camminamenti");
-  const sumVolumeCamminamentiEl = document.querySelector("#sum-volume-camminamenti");
   const misurazioniFormEl = document.querySelector("#misurazioni-form");
   const idMisurazioneEl = document.querySelector("#idmisurazione");
   const misurazioniIdVoceEl = document.querySelector("#misurazioni-idvoce");
@@ -176,6 +195,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const formulaDialogCancelEl = document.querySelector("#formula-dialog-cancel");
   const voceDialogEl = document.querySelector("#voce-dialog");
   const voceDialogFormEl = document.querySelector("#voce-dialog-form");
+  const voceDialogTitleEl = document.querySelector("#voce-dialog-title");
+  const voceDialogSoloUnitaHintEl = document.querySelector("#voce-dialog-solo-unita-hint");
+  const voceDialogSaveEl = document.querySelector("#voce-dialog-save");
   const voceDialogCancelEl = document.querySelector("#voce-dialog-cancel");
   const voceDeleteDialogEl = document.querySelector("#voce-delete-dialog");
   const voceDeleteDialogFormEl = document.querySelector("#voce-delete-dialog-form");
@@ -185,6 +207,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const voceMmDeleteCancelEl = document.querySelector("#voce-mm-delete-cancel");
   const chiusuraAppDialogEl = document.querySelector("#chiusura-app-dialog");
   const chiusuraAppDialogMsgEl = document.querySelector("#chiusura-app-dialog-msg");
+  const iniziaComputoDialogEl = document.querySelector("#inizia-computo-dialog");
   const computoDirtyIndicatorEl = document.querySelector("#computo-dirty-indicator");
   const voceIdEl = document.querySelector("#voce-id");
   const vocePosizioneEl = document.querySelector("#voce-posizione");
@@ -229,6 +252,10 @@ window.addEventListener("DOMContentLoaded", () => {
   const soglieDialogEl = document.createElement("dialog");
   const falsiTelaiDialogEl = document.createElement("dialog");
   const falsiTelaiAllDialogEl = document.createElement("dialog");
+  const rivestimentiDialogEl = document.createElement("dialog");
+  const intonacoRusticoDialogEl = document.createElement("dialog");
+  const intonacoCivileDialogEl = document.createElement("dialog");
+  const zoccoloDialogEl = document.createElement("dialog");
   const vociBodyEl = document.querySelector("#voci-body");
   const vociTotaleComputoEl = document.querySelector("#voci-totale-computo");
   const btnApriTutteVociEl = document.querySelector("#btn-apri-tutte-voci");
@@ -236,7 +263,6 @@ window.addEventListener("DOMContentLoaded", () => {
   const vociCercaAbbrevInputEl = document.querySelector("#voci-cerca-abbrev");
 
   const STORAGE_PIANI = "computo_metrico_piani";
-  const STORAGE_MUR_LEGACY = "computo_metrico_murielevazione";
   const STORAGE_MUR_ELE = "computo_metrico_murielevazioni";
   const STORAGE_STRATI_MUR = "computo_metrico_strati_murielevazione";
   const STORAGE_APERTURE_ELEV = "computo_metrico_aperture_elevazione";
@@ -248,6 +274,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const STORAGE_VOCI_UNITA_OPTIONS = "computo_metrico_voci_unita_options";
   const STORAGE_IFC_DATA = "computo_metrico_ifc_data";
   const STORAGE_APERTURE_MASTER = "computo_metrico_aperture_master";
+  const STORAGE_ARCHIVIO_PIANI_MISURA = ARCHIVIO_PIANI_MISURA_STORAGE_KEY;
   const STORAGE_DAVANZALI_SBORDI = "computo_metrico_davanzali_sbordi";
   const STORAGE_SOGLIE_SBORDI = "computo_metrico_soglie_sbordi";
   const STORAGE_FALSITELAI_LEGNO_AGGIUNTE = "computo_metrico_falsitelai_legno_aggiunte";
@@ -258,7 +285,6 @@ window.addEventListener("DOMContentLoaded", () => {
   const VOCE_MM_TIPO_MANUALE = "MANUALE";
   const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
   const STORAGE_KEYS = {
-    STORAGE_MUR_LEGACY,
     STORAGE_MUR_ELE,
     STORAGE_STRATI_MUR,
     STORAGE_APERTURE_ELEV,
@@ -268,13 +294,11 @@ window.addEventListener("DOMContentLoaded", () => {
     STORAGE_MISURAZIONI_VARIE,
   };
 
-  /** @type {{ id: number, tipologia: string, edificio: string, piano: string }[]} */
+  /** @type {{ id: number, tipologia: string, edificio: string, piano: string, murRiferimento?: string, murSpessore?: number }[]} */
   let piani = [];
-  /** @type {{ idElevazione: number, idPiano: number }[]} */
-  let murielevazioni = [];
-  /** @type {{ idStratoMur: number, idElevazione: number, idStrato: string, lunghezza: number, altezza: number, spessore: number, idVoceCapitolato: string }[]} */
+  /** @type {{ idStratoMur: number, idPiano: number, idStrato: string, lunghezza: number, altezza: number, spessore: number, idVoceCapitolato: string }[]} */
   let stratiMurElevazione = [];
-  /** @type {{ idAperturaElev: number, idElevazione: number, locale: string, lunghezza: number, altezza: number, ante: number, tipologia: string, falsotelai: boolean, hDavanzale: number, idVoceCapitolato: string }[]} */
+  /** @type {{ idAperturaElev: number, idPiano: number, locale: string, lunghezza: number, altezza: number, ante: number, tipologia: string, falsotelai: boolean, hDavanzale: number, idVoceCapitolato: string }[]} */
   let apertureElevazione = [];
   /** @type {{ idPlScavo: number, piano: string, riferimento: string, sottrai: boolean, misura1: number|null, misura2: number|null, formula: string, formulaValue: number|null, area: number, altezza: number|null, volume: number, idVoce: string }[]} */
   let scaviEsterni = [];
@@ -286,7 +310,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let misurazioniVarie = [];
   /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, canaleGronda?: boolean, grondaCanaleValore?: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[] }[]} */
   let voci = [];
-  /** @type {{ idAperturaMaster: string, locale: string, largh: number, alt: number, hDav: number, ante: number, tipologia: string, falso: string, scuro: string, inferiata: string, zanzariera: string }[]} */
+  /** @type {{ idAperturaMaster: string, piano: string, locale: string, largh: number, alt: number, hDav: number, ante: number, tipologia: string, falso: string, scuro: string, inferiata: string, zanzariera: string }[]} */
   let apertureMaster = [];
   /** @type {string[]} */
   let vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
@@ -301,8 +325,10 @@ window.addEventListener("DOMContentLoaded", () => {
   let apertureMasterEditingId = null;
   let apertureMasterPendingDeleteId = null;
 
+  /** Nomi piano usati in MISURAZIONI VARIE, esterni vari e righe manuali voce (lista univoca, ordinata). */
+  let archivioPianiMisura = [];
+
   let pianoIdCounter = 1;
-  let elevazioneIdCounter = 1;
   let stratoMurIdCounter = 1;
   let aperturaElevIdCounter = 1;
   let scavoIdCounter = 1;
@@ -325,6 +351,8 @@ window.addEventListener("DOMContentLoaded", () => {
   let editingMisurazioneId = null;
   /** modifica riga voce */
   let editingVoceId = null;
+  /** Dialog voce: solo unità di misura (voci collegate a VANI). */
+  let editingVoceSoloUnitaMisura = false;
   /** contesto popup riga misurazione manuale: index null = nuova riga */
   let voceMmDialogContext = { idVoce: /** @type {number | null} */ (null), index: /** @type {number | null} */ (null) };
   /** id voce in attesa conferma eliminazione */
@@ -348,7 +376,7 @@ window.addEventListener("DOMContentLoaded", () => {
   };
   /** @type {any | null} */
   let ifcDataCache = null;
-  /** @type {null | { murielevazioni: any[], stratiMurElevazione: any[], apertureElevazione: any[], elevazioneIdCounter: number, stratoMurIdCounter: number, aperturaElevIdCounter: number, currentElevazioneId: number|null, compilazionePianoId: number|null, murFiltroSoloIdElevazione: number|null }} */
+  /** @type {null | { piani: any[], stratiMurElevazione: any[], apertureElevazione: any[], stratoMurIdCounter: number, aperturaElevIdCounter: number, compilazionePianoId: number|null }} */
   let provaBimWallsBackup = null;
   /** @type {any | null} */
   let bimSelectedElementCache = null;
@@ -1222,10 +1250,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   /** @type {number | null} */
   let compilazionePianoId = null;
-  /** elevazione selezionata per STRATIMURIELEVAZIONE */
-  let currentElevazioneId = null;
-  /** se impostato, in MURIELEVAZIONE si vede solo questa riga (toggle con Filtra / Mostra tutte) */
-  let murFiltroSoloIdElevazione = null;
 
   /**
    * True se ci sono state modifiche dopo l'ultimo "punto sicuro" (avvio, import, export JSON).
@@ -1256,7 +1280,6 @@ window.addEventListener("DOMContentLoaded", () => {
       "#aperture-elev-form",
       "#scavo-form",
       "#corsello-form",
-      "#camminamenti-form",
       "#misurazioni-form",
       "#voce-dialog-form",
       "#voce-mm-riga-dialog-form",
@@ -1272,7 +1295,6 @@ window.addEventListener("DOMContentLoaded", () => {
   function saveMurDati() {
     saveMurDatiStorage(
       STORAGE_KEYS,
-      murielevazioni,
       stratiMurElevazione,
       apertureElevazione,
       scaviEsterni,
@@ -1281,6 +1303,7 @@ window.addEventListener("DOMContentLoaded", () => {
       misurazioniVarie,
     );
     segnaComputoModificatoPerExportJson();
+    syncVaniApertureLocalesForPicker(apertureElevazione, apertureMaster);
   }
 
   function loadPiani() {
@@ -1290,20 +1313,24 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function loadMurDati() {
-    const loaded = loadMurDatiStorage(STORAGE_KEYS, piani);
-    murielevazioni = loaded.murielevazioni;
+    const loaded = loadMurDatiStorage(STORAGE_KEYS);
     stratiMurElevazione = loaded.stratiMurElevazione;
     apertureElevazione = loaded.apertureElevazione;
     scaviEsterni = loaded.scaviEsterni;
     corselliEsterni = loaded.corselliEsterni;
-    camminamentiEsterni = loaded.camminamentiEsterni;
+    // Vecchio archivio «camminamenti in ESTERNI VARI» dismesso: non caricare (doppio con modulo CAMMINAMENTI).
+    camminamentiEsterni = [];
+    try {
+      localStorage.removeItem(STORAGE_CAMMINAMENTI_ESTERNI);
+    } catch {
+      /* ignore */
+    }
     misurazioniVarie = Array.isArray(loaded.misurazioniVarie)
       ? loaded.misurazioniVarie.map((item) => ({
           ...item,
           apertureCollegate: normalizzaApertureCollegateMisurazione(item?.apertureCollegate),
         }))
       : [];
-    elevazioneIdCounter = loaded.elevazioneIdCounter;
     stratoMurIdCounter = loaded.stratoMurIdCounter;
     aperturaElevIdCounter = loaded.aperturaElevIdCounter;
     scavoIdCounter = loaded.scavoIdCounter;
@@ -1311,6 +1338,318 @@ window.addEventListener("DOMContentLoaded", () => {
     camminamentiIdCounter = loaded.camminamentiIdCounter;
     misurazioniIdCounter =
       typeof loaded.misurazioniIdCounter === "number" ? loaded.misurazioniIdCounter : 1;
+
+    if (loaded.pianoMurLegacy && typeof loaded.pianoMurLegacy === "object") {
+      let dirty = false;
+      piani = piani.map((p) => {
+        const leg = loaded.pianoMurLegacy[p.id];
+        if (!leg) return p;
+        const hasMur =
+          (typeof p.murRiferimento === "string" && p.murRiferimento.trim() !== "") ||
+          (typeof p.murSpessore === "number" && p.murSpessore > 0);
+        if (hasMur) return p;
+        dirty = true;
+        return {
+          ...p,
+          murRiferimento: leg.riferimento,
+          murSpessore: leg.spessore,
+        };
+      });
+      if (dirty) savePiani();
+    }
+  }
+
+  function loadArchivioPianiMisuraFromStorage() {
+    archivioPianiMisura = loadArchivioPianiMisuraArray(STORAGE_ARCHIVIO_PIANI_MISURA);
+  }
+
+  function saveArchivioPianiMisuraToStorage() {
+    saveArchivioPianiMisuraArray(STORAGE_ARCHIVIO_PIANI_MISURA, archivioPianiMisura);
+    segnaComputoModificatoPerExportJson();
+  }
+
+  document.addEventListener("computo-archivio-piani-misura-changed", (ev) => {
+    archivioPianiMisura = loadArchivioPianiMisuraArray(STORAGE_ARCHIVIO_PIANI_MISURA);
+    popolaDatalistArchivioPianiMisura(STORAGE_ARCHIVIO_PIANI_MISURA, "datalist-piani-misura-archivio");
+    if (ev.detail?.added) segnaComputoModificatoPerExportJson();
+  });
+
+  document.addEventListener("computo-voci-storage-externally-updated", () => {
+    loadVoci();
+    syncVoceCanali();
+    renderVoci();
+    segnaComputoModificatoPerExportJson();
+  });
+
+  document.addEventListener("computo-vani-richiedi-nuova-apertura", (event) => {
+    const d = event.detail && typeof event.detail === "object" ? event.detail : null;
+    if (!d) return;
+    const parsed = parseVoceMmAperturaDraft({
+      locale: d.locale,
+      largh: d.largh,
+      alt: d.alt,
+      hDav: d.hDav,
+      ante: d.ante,
+      tipologia: d.tipologia,
+      falso: d.falso,
+      scuro: d.scuro,
+      inferiata: d.inferiata,
+      zanzariera: d.zanzariera,
+    });
+    if (!parsed) {
+      window.alert(
+        "Dati apertura non validi. Controlla locale, larghezza, altezza, H davanzale e ante.",
+      );
+      return;
+    }
+    const piano = typeof d.piano === "string" ? d.piano.trim() : "";
+    const id = creaAperturaMasterDaDati({ ...parsed, piano });
+    if (!id) {
+      window.alert("Impossibile creare l’apertura.");
+      return;
+    }
+    saveApertureMaster();
+    syncVaniApertureLocalesForPicker(apertureElevazione, apertureMaster);
+    syncVoceDavanzali();
+    syncVoceSoglie();
+    syncVoceCanali();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
+    renderVoci();
+    document.dispatchEvent(
+      new CustomEvent("computo-vani-apertura-creata", {
+        detail: { idAperturaMaster: id, pareteId: d.pareteId },
+      }),
+    );
+  });
+
+  function refreshArchivioPianiMisuraDatalist() {
+    popolaDatalistArchivioPianiMisura(STORAGE_ARCHIVIO_PIANI_MISURA, "datalist-piani-misura-archivio");
+  }
+
+  /**
+   * Unisce nomi già in archivio con quelli usati nei dati, elimina duplicati (solo maiuscole/spazi),
+   * allinea il testo salvato nelle righe al nome canonico dell’archivio.
+   */
+  function syncArchivioPianiMisuraCompleto() {
+    const map = new Map();
+    const add = (raw) => mergeNomePianoInMap(map, raw);
+    for (const x of archivioPianiMisura) add(x);
+    const collected = collectPianiStringheDaMurData({
+      misurazioniVarie,
+      scaviEsterni,
+      corselliEsterni,
+      camminamentiEsterni,
+      voci,
+    });
+    for (const x of collected) add(x);
+
+    archivioPianiMisura = sortedUniquePianiNomiFromMap(map);
+
+    const canon = (val) => {
+      const c = canonicalPianoMisuraNome(val);
+      if (!c) return "";
+      const k = pianoMisuraDedupKey(c);
+      return map.get(k) ?? c;
+    };
+
+    let dirtyMur = false;
+    misurazioniVarie = misurazioniVarie.map((m) => {
+      const np = canon(m.piano);
+      if (np !== m.piano) dirtyMur = true;
+      return { ...m, piano: np };
+    });
+    scaviEsterni = scaviEsterni.map((m) => {
+      const np = canon(m.piano);
+      if (np !== m.piano) dirtyMur = true;
+      return { ...m, piano: np };
+    });
+    corselliEsterni = corselliEsterni.map((m) => {
+      const np = canon(m.piano);
+      if (np !== m.piano) dirtyMur = true;
+      return { ...m, piano: np };
+    });
+    camminamentiEsterni = camminamentiEsterni.map((m) => {
+      const np = canon(m.piano);
+      if (np !== m.piano) dirtyMur = true;
+      return { ...m, piano: np };
+    });
+
+    let dirtyVoci = false;
+    voci = voci.map((v) => {
+      const mm = normalizzaMisurazioniManualiVoce(v.misurazioniManuali, v.unitaMisura);
+      let rowChanged = false;
+      const mm2 = mm.map((row) => {
+        const np = canon(row.piano);
+        if (np !== row.piano) rowChanged = true;
+        return { ...row, piano: np };
+      });
+      if (rowChanged) dirtyVoci = true;
+      return rowChanged ? { ...v, misurazioniManuali: mm2 } : v;
+    });
+
+    saveArchivioPianiMisuraToStorage();
+    if (dirtyMur) saveMurDati();
+    if (dirtyVoci) saveVoci();
+    refreshArchivioPianiMisuraDatalist();
+  }
+
+  /** Inserisce il piano nell’archivio se manca (chiamare al salvataggio misurazione / nuovo nome). */
+  function ensurePianoMisuraInArchivio(raw) {
+    const r = tryEnsurePianoInArchivio(STORAGE_ARCHIVIO_PIANI_MISURA, raw);
+    if (!r.canonical) return "";
+    document.dispatchEvent(
+      new CustomEvent("computo-archivio-piani-misura-changed", { detail: { added: r.added } }),
+    );
+    return r.canonical;
+  }
+
+  /** Allinea maiuscole al valore già presente in archivio (blur), senza creare nuovi nomi. */
+  function risolviInputPianoMisuraSenzaAggiungere(el) {
+    risolviBlurCampoPianoArchivioStorage(STORAGE_ARCHIVIO_PIANI_MISURA, el);
+  }
+
+  function countRiferimentiPianoMisura(canonicalNome) {
+    const k = pianoMisuraDedupKey(canonicalNome);
+    let n = 0;
+    for (const m of misurazioniVarie) {
+      if (pianoMisuraDedupKey(m.piano) === k) n += 1;
+    }
+    for (const m of scaviEsterni) {
+      if (pianoMisuraDedupKey(m.piano) === k) n += 1;
+    }
+    for (const m of corselliEsterni) {
+      if (pianoMisuraDedupKey(m.piano) === k) n += 1;
+    }
+    for (const m of camminamentiEsterni) {
+      if (pianoMisuraDedupKey(m.piano) === k) n += 1;
+    }
+    for (const v of voci) {
+      const mm = normalizzaMisurazioniManualiVoce(v.misurazioniManuali, v.unitaMisura);
+      for (const row of mm) {
+        if (pianoMisuraDedupKey(row.piano) === k) n += 1;
+      }
+    }
+    return n;
+  }
+
+  /** Risolve id voce (testo come in form) → voce abbreviata. */
+  function lookupVoceAbbreviataDaRefIdVoce(idVoceRef) {
+    const s = String(idVoceRef ?? "").trim();
+    if (!s) return null;
+    const idNum = Number.parseInt(s, 10);
+    const v = voci.find(
+      (x) =>
+        String(x.idVoce) === s ||
+        (Number.isFinite(idNum) && !Number.isNaN(idNum) && x.idVoce === idNum),
+    );
+    if (!v) return null;
+    const ab = String(v.voceAbbreviata ?? "").trim();
+    return ab || `Voce ${v.idVoce}`;
+  }
+
+  /** Elenco univoco di etichette voce (abbreviate) dove il piano compare. */
+  function etichetteVociCheUsanoPianoMisura(canonicalNome) {
+    const k = pianoMisuraDedupKey(canonicalNome);
+    const labels = new Set();
+
+    const addDaRefVoce = (idVoceRef, messaggioSenzaCollegamento) => {
+      const s = String(idVoceRef ?? "").trim();
+      if (!s) {
+        labels.add(messaggioSenzaCollegamento);
+        return;
+      }
+      const ab = lookupVoceAbbreviataDaRefIdVoce(idVoceRef);
+      if (ab) labels.add(ab);
+      else labels.add(`ID voce «${s}» (non presente nell’elenco voci)`);
+    };
+
+    for (const m of misurazioniVarie) {
+      if (pianoMisuraDedupKey(m.piano) !== k) continue;
+      addDaRefVoce(m.idVoce, "Misurazioni varie (nessuna voce collegata)");
+    }
+    for (const m of scaviEsterni) {
+      if (pianoMisuraDedupKey(m.piano) !== k) continue;
+      addDaRefVoce(m.idVoce, "Scavi esterni (voce non indicata)");
+    }
+    for (const m of corselliEsterni) {
+      if (pianoMisuraDedupKey(m.piano) !== k) continue;
+      addDaRefVoce(m.idVoce, "Corselli esterni (voce non indicata)");
+    }
+    for (const m of camminamentiEsterni) {
+      if (pianoMisuraDedupKey(m.piano) !== k) continue;
+      addDaRefVoce(m.idVoce, "Camminamenti esterni (voce non indicata)");
+    }
+    for (const v of voci) {
+      const mm = normalizzaMisurazioniManualiVoce(v.misurazioniManuali, v.unitaMisura);
+      const usa = mm.some((row) => pianoMisuraDedupKey(row.piano) === k);
+      if (!usa) continue;
+      const ab = String(v.voceAbbreviata ?? "").trim();
+      labels.add(ab || `Voce ${v.idVoce}`);
+    }
+
+    return [...labels].sort((a, b) => a.localeCompare(b, "it", { sensitivity: "base" }));
+  }
+
+  function messaggioPianoArchivioNonEliminabile(nomePiano) {
+    const etichette = etichetteVociCheUsanoPianoMisura(nomePiano);
+    if (etichette.length === 0) return "";
+    const lista = etichette.join(", ");
+    if (etichette.length === 1) {
+      return `Il piano non è eliminabile perché è usato nella voce «${etichette[0]}».`;
+    }
+    return `Il piano non è eliminabile perché è usato nelle voci: ${lista}.`;
+  }
+
+  function openArchivioPianiMisuraDialog() {
+    const rows =
+      archivioPianiMisura.length === 0
+        ? `<tr><td colspan="3" class="empty-cell">Nessun piano in archivio. Aggiungine uno qui o salvando una misurazione.</td></tr>`
+        : archivioPianiMisura
+            .map((nome, index) => {
+              const uses = countRiferimentiPianoMisura(nome);
+              return `<tr>
+              <td>${escapeHtml(nome)}</td>
+              <td>${uses}</td>
+              <td class="actions-cell">
+                <button type="button" class="btn-action btn-delete" data-action="delete-archivio-piano-misura" data-index="${index}" title="${uses > 0 ? "Se in uso, comparirà un avviso con le voci coinvolte" : "Rimuovi dall’archivio"}">🗑</button>
+              </td>
+            </tr>`;
+            })
+            .join("");
+    pianiMisuraArchivioDialogEl.innerHTML = `
+      <div class="ifc-riepilogo-dialog-header"><h3>Archivio PIANI (misurazioni)</h3></div>
+      <p class="bim-riepilogo-note">Stesso elenco del campo PIANO nelle misurazioni: non ci sono duplicati che differiscono solo per maiuscole o spazi extra.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">
+        <div class="field" style="flex:1;min-width:160px;margin:0;">
+          <label for="archivio-piani-misura-new">Nuovo piano</label>
+          <input id="archivio-piani-misura-new" type="text" placeholder="Es: INTERRATO" autocomplete="off" list="datalist-piani-misura-archivio" />
+        </div>
+        <button type="button" class="btn-action btn-secondary" data-action="add-archivio-piano-misura">Aggiungi</button>
+      </div>
+      <div class="ifc-riepilogo-table-host">
+        <table class="table-voce-mm-inline" style="min-width:100%">
+          <thead><tr><th>NOME</th><th>Utilizzi</th><th>AZIONI</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="padding-top:12px;display:flex;justify-content:flex-end;">
+        <button type="button" class="btn-action btn-secondary" data-action="close-archivio-piani-misura">Chiudi</button>
+      </div>
+    `;
+    pianiMisuraArchivioDialogEl.showModal();
+  }
+
+  function wireArchivioPianiMisuraComboInputs() {
+    const list = [
+      misurazioniPianoEl,
+      scavoPianoEl,
+      corselloPianoEl,
+      voceMmRigaPianoEl,
+    ].filter(Boolean);
+    for (const el of list) {
+      el.addEventListener("blur", () => risolviInputPianoMisuraSenzaAggiungere(el));
+    }
   }
 
   function saveVoci() {
@@ -1321,6 +1660,7 @@ window.addEventListener("DOMContentLoaded", () => {
   function saveApertureMaster() {
     localStorage.setItem(STORAGE_APERTURE_MASTER, JSON.stringify(apertureMaster));
     segnaComputoModificatoPerExportJson();
+    syncVaniApertureLocalesForPicker(apertureElevazione, apertureMaster);
   }
 
   function saveVociUnitaOptions() {
@@ -1572,6 +1912,58 @@ window.addEventListener("DOMContentLoaded", () => {
     return { ok: true, risultato };
   }
 
+  function calcolaRisultatoSemiautomaticoPerUnita({
+    misura1,
+    misura2,
+    misura3,
+    numero,
+    segno,
+    unitaNorm,
+    vaniVanoId,
+    camminamentiSchedaId,
+    stratoAltezza,
+  }) {
+    if (!Number.isInteger(numero) || numero < 0) return 0;
+    const daModuloSpeciale =
+      (typeof vaniVanoId === "string" && vaniVanoId.trim() !== "") ||
+      (typeof camminamentiSchedaId === "string" && camminamentiSchedaId.trim() !== "");
+    if (!daModuloSpeciale) {
+      const calc = calcolaMisurazioneVoceSemiautomatica(misura1, misura2, misura3, numero, segno);
+      return calc.ok ? Number(calc.risultato || 0) : 0;
+    }
+    const m1 = mmFactorOrOne(misura1);
+    const m2Base =
+      typeof stratoAltezza === "number" && Number.isFinite(stratoAltezza) ? stratoAltezza : misura2;
+    const m2 = mmFactorOrOne(m2Base);
+    const m3 = mmFactorOrOne(misura3);
+    let raw = 0;
+    if (unitaNorm.includes("ml")) raw = Number((m1 * numero).toFixed(3));
+    else if (unitaNorm.includes("mq")) raw = Number((m1 * m2 * numero).toFixed(3));
+    else if (unitaNorm.includes("mc")) raw = Number((m1 * m2 * m3 * numero).toFixed(3));
+    else raw = Number((m1 * m2 * m3 * numero).toFixed(3));
+    return segno ? -Math.abs(raw) : raw;
+  }
+
+  function voceDerivataDaVani(item) {
+    const mm = normalizzaMisurazioniManualiVoce(item?.misurazioniManuali, item?.unitaMisura);
+    return mm.some((m) => {
+      const daVani = typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "";
+      const daCamm =
+        typeof m?.camminamentiSchedaId === "string" && m.camminamentiSchedaId.trim() !== "";
+      const daEsterni = typeof m?.esterniKey === "string" && m.esterniKey.trim() !== "";
+      return daVani || daCamm || daEsterni;
+    });
+  }
+
+  function voceBloccataInVoci(item) {
+    return voceDerivataDaVani(item) || isVoceSpecialeNoTotaleRiferimento(item);
+  }
+
+  function voceIdBloccataInVoci(idVoce) {
+    const voce = voci.find((item) => item.idVoce === idVoce);
+    return !!voce && voceBloccataInVoci(voce);
+  }
+
   function getVoceMmRigaRisultatoPreview() {
     const formula = (voceMmRigaFormulaEl?.value || "").trim();
     const numeroParsed = Number.parseInt(voceMmRigaNumeroEl?.value || "0", 10);
@@ -1612,8 +2004,9 @@ window.addEventListener("DOMContentLoaded", () => {
     voceMmRisultatoPreviewEl.classList.toggle("is-negativo", Number(risultato) < 0);
   }
 
-  function normalizzaMisurazioniManualiVoce(raw) {
+  function normalizzaMisurazioniManualiVoce(raw, unitaVoceRaw = "") {
     if (!Array.isArray(raw)) return [];
+    const unitaNorm = normalizzaUnitaVoceDetrazione(unitaVoceRaw);
     return raw
       .filter(
         (m) =>
@@ -1627,42 +2020,93 @@ window.addEventListener("DOMContentLoaded", () => {
           typeof m?.risultato === "number" &&
           Number.isFinite(m.risultato),
       )
-      .map((m) => ({
-        tipo: normalizzaTipoMisurazioneVoce(m.tipo),
+      .map((m) => {
+        const tipoNorm = normalizzaTipoMisurazioneVoce(m.tipo);
+        const misura1 =
+          typeof m?.misura1 === "number" && Number.isFinite(m.misura1) ? Number(m.misura1.toFixed(3)) : null;
+        const misura2 =
+          typeof m?.misura2 === "number" && Number.isFinite(m.misura2) ? Number(m.misura2.toFixed(3)) : null;
+        const misura3 =
+          typeof m?.misura3 === "number" && Number.isFinite(m.misura3) ? Number(m.misura3.toFixed(3)) : null;
+        const numero = m.numero;
+        const segno = m.segno === true;
+        const vaniVanoId = typeof m?.vaniVanoId === "string" ? m.vaniVanoId : "";
+        const camminamentiSchedaId =
+          typeof m?.camminamentiSchedaId === "string" ? m.camminamentiSchedaId : "";
+        const esterniKey = typeof m?.esterniKey === "string" ? m.esterniKey.trim() : "";
+        const stratoAltezza =
+          typeof m?.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
+            ? Number(m.stratoAltezza.toFixed(3))
+            : null;
+        const risultatoNormalizzato =
+          esterniKey !== ""
+            ? Number(m.risultato || 0)
+            : tipoNorm === VOCE_MM_TIPO_SEMIAUTOMATICA
+              ? calcolaRisultatoSemiautomaticoPerUnita({
+                  misura1,
+                  misura2,
+                  misura3,
+                  numero,
+                  segno,
+                  unitaNorm,
+                  vaniVanoId,
+                  camminamentiSchedaId,
+                  stratoAltezza,
+                })
+              : Number(m.risultato || 0);
+        return {
+        tipo: tipoNorm,
         piano: m.piano,
         riferimento: m.riferimento || m.specifica || "",
         tipoOggetto: typeof m?.tipoOggetto === "string" ? m.tipoOggetto : "",
         specifica: typeof m?.specifica === "string" ? m.specifica : "",
         formula: m.formula,
         formulaValue: m.formulaValue,
-        misura1:
-          typeof m?.misura1 === "number" && Number.isFinite(m.misura1) ? Number(m.misura1.toFixed(3)) : null,
-        misura2:
-          typeof m?.misura2 === "number" && Number.isFinite(m.misura2) ? Number(m.misura2.toFixed(3)) : null,
-        misura3:
-          typeof m?.misura3 === "number" && Number.isFinite(m.misura3) ? Number(m.misura3.toFixed(3)) : null,
+        misura1,
+        misura2,
+        misura3,
         canaleGronda: m?.canaleGronda === true,
         grondaCanaleValore:
           typeof m?.grondaCanaleValore === "number" && Number.isFinite(m.grondaCanaleValore)
             ? Number(m.grondaCanaleValore.toFixed(3))
             : null,
-        numero: m.numero,
-        segno: m.segno === true,
-        risultato: m.risultato,
+        numero,
+        segno,
+        risultato: risultatoNormalizzato,
         apertureCollegate: normalizzaApertureCollegateRefs(m.apertureCollegate),
-      }));
+        vaniVanoId,
+        camminamentiSchedaId,
+        esterniKey,
+        stratoAltezza,
+        stratoElevazione:
+          typeof m?.stratoElevazione === "number" && Number.isFinite(m.stratoElevazione)
+            ? Number(m.stratoElevazione.toFixed(3))
+            : null,
+        stratoNumero:
+          typeof m?.stratoNumero === "number" && Number.isFinite(m.stratoNumero) ? m.stratoNumero : null,
+      };
+    });
   }
 
-  function calcolaMetricheAperturaMisurazione(apertura, m2AltVal, m3Val) {
-    const m2 = typeof m2AltVal === "number" && Number.isFinite(m2AltVal) ? m2AltVal : 0;
+  function calcolaMetricheAperturaMisurazione(apertura, m2AltVal, m3Val, stratoElevazioneVal = null) {
+    const m2 = typeof m2AltVal === "number" && Number.isFinite(m2AltVal) ? m2AltVal : null;
     const m3 = typeof m3Val === "number" && Number.isFinite(m3Val) ? m3Val : 0;
     const largh = Number(apertura?.largh || 0);
-    const altApertura = Number(apertura?.alt || 0);
-    const hDav = Number(apertura?.hDav || 0);
-    const hInclusa = Number(Math.min(altApertura, Math.max(0, m2 - hDav)).toFixed(2));
+    const hInclusaRaw =
+      m2 === null
+        ? null
+        : altezzaInclusaNelloStratoConElevazione(
+            typeof stratoElevazioneVal === "number" && Number.isFinite(stratoElevazioneVal)
+              ? stratoElevazioneVal
+              : 0,
+            m2,
+            apertura,
+          );
+    const hInclusa = Number((hInclusaRaw ?? 0).toFixed(2));
+    const ml = Number((largh || 0).toFixed(2));
     const mq = Number((largh * hInclusa).toFixed(2));
     const mc = Number((mq * m3).toFixed(2));
-    return { hInclusa, mq, mc };
+    return { hInclusa, ml, mq, mc };
   }
 
   function normalizzaUnitaVoceDetrazione(unitaRaw) {
@@ -1676,8 +2120,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const mmTipo = normalizzaTipoMisurazioneVoce(misurazione?.tipo);
     if (mmTipo !== VOCE_MM_TIPO_SEMIAUTOMATICA) return 0;
     const misura2Val =
-      typeof misurazione?.misura2 === "number" && Number.isFinite(misurazione.misura2)
-        ? Number(misurazione.misura2)
+      typeof misurazione?.stratoAltezza === "number" && Number.isFinite(misurazione.stratoAltezza)
+        ? Number(misurazione.stratoAltezza)
+        : typeof misurazione?.misura2 === "number" && Number.isFinite(misurazione.misura2)
+          ? Number(misurazione.misura2)
         : null;
     const misura3Val =
       typeof misurazione?.misura3 === "number" && Number.isFinite(misurazione.misura3)
@@ -1685,19 +2131,31 @@ window.addEventListener("DOMContentLoaded", () => {
         : null;
     let sumMq = 0;
     let sumMc = 0;
+    let sumMl = 0;
     const aperture = risolviApertureCollegateRefs(misurazione?.apertureCollegate);
     aperture.forEach((apertura) => {
-      const metric = calcolaMetricheAperturaMisurazione(apertura, misura2Val, misura3Val);
+      const metric = calcolaMetricheAperturaMisurazione(
+        apertura,
+        misura2Val,
+        misura3Val,
+        typeof misurazione?.stratoElevazione === "number" && Number.isFinite(misurazione.stratoElevazione)
+          ? Number(misurazione.stratoElevazione)
+          : null,
+      );
       sumMq += Number(metric.mq || 0);
       sumMc += Number(metric.mc || 0);
+      sumMl += Number(metric.ml || 0);
     });
     if (unitaNorm.includes("mc")) return Number(sumMc.toFixed(2));
     if (unitaNorm.includes("mq")) return Number(sumMq.toFixed(2));
+    if (unitaNorm.includes("ml")) return Number(sumMl.toFixed(2));
     return 0;
   }
 
   function calcolaDetrazioneApertureVoce(item, mmRows) {
-    const mm = Array.isArray(mmRows) ? mmRows : normalizzaMisurazioniManualiVoce(item?.misurazioniManuali);
+    const mm = Array.isArray(mmRows)
+      ? mmRows
+      : normalizzaMisurazioniManualiVoce(item?.misurazioniManuali, item?.unitaMisura);
     const unitaNorm = normalizzaUnitaVoceDetrazione(item?.unitaMisura);
     const detrazione = mm.reduce(
       (sum, m) => sum + calcolaDetrazioneApertureMisurazione(m, unitaNorm),
@@ -1751,7 +2209,7 @@ window.addEventListener("DOMContentLoaded", () => {
         tipoMisura: normalizzaTipoMisuraVoce(
           item?.tipoMisura ?? item?.tipomisura ?? item?.TIPOMISURA,
         ),
-        misurazioniManuali: normalizzaMisurazioniManualiVoce(item.misurazioniManuali),
+        misurazioniManuali: normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura),
         voce: typeof item?.voce === "string" ? item.voce : "",
         note: typeof item?.note === "string" ? item.note : "",
       })).filter((item) => item.voce !== "");
@@ -1794,7 +2252,7 @@ window.addEventListener("DOMContentLoaded", () => {
   function migraApertureCollegateVociSuMaster() {
     let changed = false;
     voci = voci.map((voce) => {
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali).map((row) => {
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura).map((row) => {
         const refs = normalizzaApertureCollegateRefs(row.apertureCollegate);
         if (JSON.stringify(refs) !== JSON.stringify(row.apertureCollegate || [])) changed = true;
         return { ...row, apertureCollegate: refs };
@@ -1817,6 +2275,7 @@ window.addEventListener("DOMContentLoaded", () => {
         .join("");
     const buildEditableMasterRow = (idRow, ap) => `<tr class="row-edit-master-apertura" data-editing-id="${escapeHtml(idRow)}">
             <td>${escapeHtml(idRow === "__new__" ? "Nuova" : idRow)}</td>
+            <td><input type="text" data-master-field="piano" value="${escapeHtml(String(ap.piano ?? ""))}" placeholder="Piano" /></td>
             <td><input type="text" data-master-field="locale" value="${escapeHtml(ap.locale)}" /></td>
             <td><input type="number" step="0.01" min="0" data-master-field="largh" value="${escapeHtml(String(ap.largh))}" /></td>
             <td><input type="number" step="0.01" min="0" data-master-field="alt" value="${escapeHtml(String(ap.alt))}" /></td>
@@ -1843,6 +2302,7 @@ window.addEventListener("DOMContentLoaded", () => {
           if (!isEditing) {
             return `<tr>
               <td>${escapeHtml(ap.idAperturaMaster)}</td>
+              <td>${escapeHtml(ap.piano || "—")}</td>
               <td>${escapeHtml(ap.locale)}</td>
               <td>${fmt2(ap.largh)}</td>
               <td>${fmt2(ap.alt)}</td>
@@ -1865,6 +2325,7 @@ window.addEventListener("DOMContentLoaded", () => {
       .join("");
     const newRow = apertureMasterEditingId === "__new__"
       ? buildEditableMasterRow("__new__", {
+          piano: "",
           locale: "",
           largh: "",
           alt: "",
@@ -1886,8 +2347,8 @@ window.addEventListener("DOMContentLoaded", () => {
       </div>
       <div class="ifc-riepilogo-table-host">
         <table class="table-voce-mm-inline aperture-master-table">
-          <thead><tr><th>ID</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>FALSO</th><th>SCURO</th><th>INFERIATA</th><th>ZANZARIERA</th><th>AZIONI</th></tr></thead>
-          <tbody>${righe || ""}${newRow || (righe ? "" : `<tr><td colspan="12" class="empty-cell">Nessuna apertura in archivio.</td></tr>`)}</tbody>
+          <thead><tr><th>ID</th><th>PIANO</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>FALSO</th><th>SCURO</th><th>INFERIATA</th><th>ZANZARIERA</th><th>AZIONI</th></tr></thead>
+          <tbody>${righe || ""}${newRow || (righe ? "" : `<tr><td colspan="13" class="empty-cell">Nessuna apertura in archivio.</td></tr>`)}</tbody>
         </table>
       </div>
       <div style="padding:8px;display:flex;justify-content:flex-end;">
@@ -1904,7 +2365,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!row) return null;
     const getValue = (field) =>
       String(row.querySelector(`[data-master-field="${field}"]`)?.value || "").trim();
-    return parseVoceMmAperturaDraft({
+    const parsed = parseVoceMmAperturaDraft({
       locale: getValue("locale"),
       largh: getValue("largh"),
       alt: getValue("alt"),
@@ -1916,13 +2377,15 @@ window.addEventListener("DOMContentLoaded", () => {
       inferiata: getValue("inferiata"),
       zanzariera: getValue("zanzariera"),
     });
+    if (!parsed) return null;
+    return { ...parsed, piano: getValue("piano") };
   }
 
   function eliminaAperturaMaster(id) {
     apertureMaster = apertureMaster.filter((ap) => ap.idAperturaMaster !== id);
     voci = voci.map((voce) => ({
       ...voce,
-      misurazioniManuali: normalizzaMisurazioniManualiVoce(voce.misurazioniManuali).map((mm) => ({
+      misurazioniManuali: normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura).map((mm) => ({
         ...mm,
         apertureCollegate: normalizzaApertureCollegateRefs(mm.apertureCollegate).filter(
           (ref) => ref.idAperturaMaster !== id,
@@ -1944,7 +2407,7 @@ window.addEventListener("DOMContentLoaded", () => {
   function collegaAperturaMasterARigaVoce(idVoce, idx, idAperturaMaster) {
     voci = voci.map((item) => {
       if (item.idVoce !== idVoce) return item;
-      const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
       if (idx < 0 || idx >= mm.length) return item;
       const row = mm[idx];
       const refs = normalizzaApertureCollegateRefs(row.apertureCollegate);
@@ -1962,6 +2425,7 @@ window.addEventListener("DOMContentLoaded", () => {
         (ap) =>
           `<tr data-apertura-master-id="${escapeHtml(ap.idAperturaMaster)}">
             <td>${escapeHtml(ap.idAperturaMaster)}</td>
+            <td>${escapeHtml(ap.piano || "—")}</td>
             <td>${escapeHtml(ap.locale)}</td>
             <td>${fmt2(ap.largh)}</td>
             <td>${fmt2(ap.alt)}</td>
@@ -1978,8 +2442,8 @@ window.addEventListener("DOMContentLoaded", () => {
       </form>
       <div class="ifc-riepilogo-table-host">
         <table class="table-voce-mm-inline">
-          <thead><tr><th>ID</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>AZIONI</th></tr></thead>
-          <tbody>${rows || `<tr><td colspan="8" class="empty-cell">Archivio APERTURE vuoto.</td></tr>`}</tbody>
+          <thead><tr><th>ID</th><th>PIANO</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>AZIONI</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="9" class="empty-cell">Archivio APERTURE vuoto.</td></tr>`}</tbody>
         </table>
       </div>
       <div style="padding:8px;display:flex;justify-content:flex-end;">
@@ -1992,7 +2456,7 @@ window.addEventListener("DOMContentLoaded", () => {
   function buildArchivioGrondeRows() {
     const rows = [];
     voci.forEach((voce) => {
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         if (riga?.canaleGronda !== true) return;
         const grondaVal =
@@ -2042,7 +2506,7 @@ window.addEventListener("DOMContentLoaded", () => {
     /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, altezza: number, aggiunta: number }>} */
     const map = new Map();
     voci.forEach((voce) => {
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         const piano = String(riga?.piano || "").trim() || "-";
         const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
@@ -2121,7 +2585,7 @@ window.addEventListener("DOMContentLoaded", () => {
     /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, altezza: number, aggiunta: number }>} */
     const map = new Map();
     voci.forEach((voce) => {
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         const piano = String(riga?.piano || "").trim() || "-";
         const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
@@ -2196,11 +2660,114 @@ window.addEventListener("DOMContentLoaded", () => {
     falsiTelaiAllDialogEl.showModal();
   }
 
+  function openRiepilogoParetiFlagDialog({
+    dialogEl,
+    rows,
+    titolo,
+    descrizione,
+    emptyMessage,
+    closeAction,
+  }) {
+    /** @type {Map<string, typeof rows>} */
+    const byPiano = new Map();
+    for (const row of rows) {
+      if (!byPiano.has(row.piano)) byPiano.set(row.piano, []);
+      byPiano.get(row.piano).push(row);
+    }
+    const fmtDim = (v) => (typeof v === "number" && Number.isFinite(v) ? fmt2(v) : "—");
+    let tbodyHtml = "";
+    if (rows.length === 0) {
+      tbodyHtml = `<tr><td colspan="6" class="empty-cell">${escapeHtml(emptyMessage)}</td></tr>`;
+    } else {
+      for (const [piano, pianoRows] of byPiano) {
+        tbodyHtml += `<tr class="bim-props-section-row"><td colspan="6">${escapeHtml(`PIANO: ${piano}`)}</td></tr>`;
+        tbodyHtml += pianoRows
+          .map(
+            (row) => `<tr>
+              <td>${escapeHtml(row.locale)}</td>
+              <td>${escapeHtml(row.riferimento)}</td>
+              <td>${escapeHtml(fmtDim(row.lunghezza))}</td>
+              <td>${escapeHtml(fmtDim(row.altezza))}</td>
+              <td>${escapeHtml(fmtDim(row.mqLordi))}</td>
+              <td>${escapeHtml(fmtDim(row.mqNetti))}</td>
+            </tr>`,
+          )
+          .join("");
+      }
+    }
+    dialogEl.innerHTML = `
+      <form method="dialog" class="ifc-riepilogo-dialog-form">
+        <div class="ifc-riepilogo-dialog-header"><h3>${escapeHtml(titolo)}</h3></div>
+        <p style="padding:0 8px 8px;margin:0;font-size:0.9rem;opacity:0.85;">
+          ${escapeHtml(descrizione)}
+        </p>
+        <div class="table-wrap">
+          <table class="table-voce-mm-inline">
+            <thead><tr><th>LOCALE</th><th>PARETE</th><th>LUNGHEZZA</th><th>ALTEZZA</th><th>MQ LORDI</th><th>MQ NETTI</th></tr></thead>
+            <tbody>${tbodyHtml}</tbody>
+          </table>
+        </div>
+        <div style="padding:8px;display:flex;justify-content:flex-end;">
+          <button type="button" class="btn-action btn-secondary" data-action="${escapeHtml(closeAction)}">Chiudi</button>
+        </div>
+      </form>
+    `;
+    dialogEl.showModal();
+  }
+
+  function openRiepilogoRivestimentiDialog() {
+    openRiepilogoParetiFlagDialog({
+      dialogEl: rivestimentiDialogEl,
+      rows: buildRivestimentiRowsFromStorage(),
+      titolo: "RIVESTIMENTI",
+      descrizione:
+        "Pareti con flag Rivestimento attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
+      emptyMessage: "Nessuna parete con rivestimento nei vani registrati.",
+      closeAction: "close-rivestimenti-dialog",
+    });
+  }
+
+  function openRiepilogoIntonacoRusticoDialog() {
+    openRiepilogoParetiFlagDialog({
+      dialogEl: intonacoRusticoDialogEl,
+      rows: buildIntonacoRusticoRowsFromStorage(),
+      titolo: "INTONACO RUSTICO",
+      descrizione:
+        "Pareti con flag Rustico attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
+      emptyMessage: "Nessuna parete con rustico nei vani registrati.",
+      closeAction: "close-intonaco-rustico-dialog",
+    });
+  }
+
+  function openRiepilogoIntonacoCivileDialog() {
+    openRiepilogoParetiFlagDialog({
+      dialogEl: intonacoCivileDialogEl,
+      rows: buildIntonacoCivileRowsFromStorage(),
+      titolo: "INTONACO CIVILE",
+      descrizione:
+        "Pareti con flag Civile attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
+      emptyMessage: "Nessuna parete con civile nei vani registrati.",
+      closeAction: "close-intonaco-civile-dialog",
+    });
+  }
+
+  function openRiepilogoZoccoloDialog() {
+    openRiepilogoParetiFlagDialog({
+      dialogEl: zoccoloDialogEl,
+      rows: buildZoccoloRowsFromStorage(),
+      titolo: "ZOCCOLO",
+      descrizione:
+        "Pareti con flag Zoccolo attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
+      emptyMessage: "Nessuna parete con zoccolo nei vani registrati.",
+      closeAction: "close-zoccolo-dialog",
+    });
+  }
+
   function buildArchivioDavanzaliRows() {
     /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, sbordo: number }>} */
     const map = new Map();
     voci.forEach((voce) => {
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         const piano = String(riga?.piano || "").trim() || "-";
         const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
@@ -2298,7 +2865,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const mapRighe = new Map();
     voci.forEach((voce) => {
       if (voceDavanzaliId !== null && voce.idVoce === voceDavanzaliId) return;
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         const piano = String(riga?.piano || "").trim() || "-";
         const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
@@ -2347,7 +2914,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (!voceDavanzali) return;
 
-    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceDavanzali.misurazioniManuali);
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(
+      voceDavanzali.misurazioniManuali,
+      voceDavanzali.unitaMisura,
+    );
     let nextMmId = nextVoceMmIdForRows(mmEsistenti);
     const nuoveMisurazioni = righeDavanzali.map((row) => {
       const sbordo = Number(Number(row.sbordo || 0.05).toFixed(2));
@@ -2394,7 +2964,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const mapRighe = new Map();
     voci.forEach((voce) => {
       if (voceSoglieId !== null && voce.idVoce === voceSoglieId) return;
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         const piano = String(riga?.piano || "").trim() || "-";
         const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
@@ -2443,7 +3013,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (!voceSoglie) return;
 
-    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceSoglie.misurazioniManuali);
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(
+      voceSoglie.misurazioniManuali,
+      voceSoglie.unitaMisura,
+    );
     let nextMmId = nextVoceMmIdForRows(mmEsistenti);
     const nuoveMisurazioni = righeSoglie.map((row) => {
       const sbordo = Number(Number(row.sbordo || 0.05).toFixed(2));
@@ -2490,7 +3063,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const rows = [];
     voci.forEach((voce) => {
       if (voceCanaliId !== null && voce.idVoce === voceCanaliId) return;
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         if (riga?.canaleGronda !== true) return;
         const grondaVal =
@@ -2525,7 +3098,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (!voceCanali) return;
 
-    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceCanali.misurazioniManuali);
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(
+      voceCanali.misurazioniManuali,
+      voceCanali.unitaMisura,
+    );
     let nextMmId = nextVoceMmIdForRows(mmEsistenti);
     const nuoveMisurazioni = rows.map((row) => {
       const formula = fmt2(row.gronda);
@@ -2569,7 +3145,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const mapRows = new Map();
     voci.forEach((voce) => {
       if (voceFalsiId !== null && voce.idVoce === voceFalsiId) return;
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         const piano = String(riga?.piano || "").trim() || "-";
         const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
@@ -2620,7 +3196,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (!voceFalsi) return;
 
-    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceFalsi.misurazioniManuali);
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(
+      voceFalsi.misurazioniManuali,
+      voceFalsi.unitaMisura,
+    );
     let nextMmId = nextVoceMmIdForRows(mmEsistenti);
     const nuoveMisurazioni = rows.map((row) => {
       const larg = Number(Number(row.larghezza || 0).toFixed(2));
@@ -2667,7 +3246,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const mapRows = new Map();
     voci.forEach((voce) => {
       if (voceFalsiId !== null && voce.idVoce === voceFalsiId) return;
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         const piano = String(riga?.piano || "").trim() || "-";
         const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
@@ -2718,7 +3297,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (!voceFalsi) return;
 
-    const mmEsistenti = normalizzaMisurazioniManualiVoce(voceFalsi.misurazioniManuali);
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(
+      voceFalsi.misurazioniManuali,
+      voceFalsi.unitaMisura,
+    );
     let nextMmId = nextVoceMmIdForRows(mmEsistenti);
     const nuoveMisurazioni = rows.map((row) => {
       const larg = Number(Number(row.larghezza || 0).toFixed(2));
@@ -2805,7 +3387,7 @@ window.addEventListener("DOMContentLoaded", () => {
     /** @type {Map<string, { key: string, piano: string, locale: string, larghezza: number, sbordo: number }>} */
     const map = new Map();
     voci.forEach((voce) => {
-      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura);
       mm.forEach((riga) => {
         const piano = String(riga?.piano || "").trim() || "-";
         const aperture = risolviApertureCollegateRefs(riga?.apertureCollegate);
@@ -2877,31 +3459,41 @@ window.addEventListener("DOMContentLoaded", () => {
     soglieDialogEl.showModal();
   }
 
-  function creaNuovaElevazione(idPiano) {
-    const idElevazione = elevazioneIdCounter++;
-    murielevazioni.push({ idElevazione, idPiano, riferimento: "", spessore: 0 });
-    saveMurDati();
-    return idElevazione;
+  function aggiornaMurRiferimentoPiano(idPiano, riferimento) {
+    piani = piani.map((p) => (p.id === idPiano ? { ...p, murRiferimento: riferimento } : p));
+    savePiani();
   }
 
-  function aggiornaRiferimentoElevazione(idElevazione, riferimento) {
-    murielevazioni = murielevazioni.map((e) =>
-      e.idElevazione === idElevazione ? { ...e, riferimento } : e,
-    );
-    saveMurDati();
-  }
-
-  function aggiornaSpessoreElevazione(idElevazione, spessore) {
-    murielevazioni = murielevazioni.map((e) =>
-      e.idElevazione === idElevazione ? { ...e, spessore } : e,
-    );
-    saveMurDati();
+  function aggiornaMurSpessorePiano(idPiano, spessore) {
+    piani = piani.map((p) => (p.id === idPiano ? { ...p, murSpessore: spessore } : p));
+    savePiani();
   }
 
   function mostraPannelloCompilazione(tipo) {
     compilazioneInterratoPanelEl.hidden = tipo !== "interrato";
     compilazioneEsterniPanelEl.hidden = tipo !== "esterni";
+    if (compilazioneMisureVariePanelEl) {
+      compilazioneMisureVariePanelEl.hidden = tipo !== "misure-varie";
+    }
     altreTipologiePanelEl.hidden = tipo !== "altre";
+  }
+
+  function preparaVistaMisureVarie() {
+    popolaDatalistVocibrevi("datalist-voci-esterni-vari");
+    resetMisurazioniForm();
+    renderMisurazioniVarie();
+  }
+
+  function openCompilazioneMisureVarie() {
+    compilazionePianoId = null;
+    dismissVaniIfOpen();
+    dismissCamminamentiIfOpen();
+    openVistaMisureVarie({
+      onPrepare: () => {
+        mostraPannelloCompilazione("misure-varie");
+        preparaVistaMisureVarie();
+      },
+    });
   }
 
   function openCompilazioneInterrato(piano) {
@@ -2909,20 +3501,17 @@ window.addEventListener("DOMContentLoaded", () => {
     editingStratoMurId = null;
     setStratiFormMode();
     resetAperturaForm();
-    murFiltroSoloIdElevazione = null;
     compilazionePianoId = piano.id;
     mostraPannelloCompilazione("interrato");
-    const nuovaId = creaNuovaElevazione(piano.id);
-    currentElevazioneId = nuovaId;
     showVistaCompilazione(vistaPianiEl, vistaCompilazioneEl, altreTipologiePanelEl);
     vistaVociEl.hidden = true;
     if (vistaBimEl) vistaBimEl.hidden = true;
     updateInterratoPanelSubtitle(interratoSottotitoloEl, piano);
-    updateElevazioneAttivaLabel(
-      idElevazioneAttivaEl,
-      riferimentoElevazioneAttivaEl,
-      currentElevazioneId,
-      murielevazioni,
+    updateMurPianoCompilazioneLabel(
+      idPianoCompilazioneEl,
+      riferimentoMurPianoEl,
+      compilazionePianoId,
+      piani,
     );
     renderMurielevazioni();
     renderStrati();
@@ -2933,7 +3522,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function openCompilazioneEsterniVari() {
     compilazionePianoId = null;
-    currentElevazioneId = null;
     mostraPannelloCompilazione("esterni");
     showVistaCompilazione(vistaPianiEl, vistaCompilazioneEl, altreTipologiePanelEl);
     vistaVociEl.hidden = true;
@@ -2942,16 +3530,23 @@ window.addEventListener("DOMContentLoaded", () => {
       .querySelectorAll("details.collapsible-block")
       .forEach((section) => (section.open = false));
     esterniSottotitoloEl.innerHTML = "Vista indipendente ESTERNI VARI.";
+    popolaDatalistVocibrevi("datalist-voci-esterni-vari");
     resetScavoForm();
     resetCorselloForm();
-    resetCamminamentiForm();
-    resetMisurazioniForm();
     renderScavi();
     renderCorselli();
-    renderCamminamenti();
-    renderMisurazioniVarie();
     tornaPianiEsterniButtonEl.focus();
     window.scrollTo({ top: 0, behavior: "auto" });
+  }
+
+  function syncEsterniVersoVoci() {
+    syncEsterniMisurazioniNelleVoci({
+      scaviEsterni,
+      corselliEsterni,
+      camminamentiEsterni: [],
+      misurazioniVarie,
+    });
+    popolaDatalistVocibrevi("datalist-voci-esterni-vari");
   }
 
   function openCompilazioneEsterniVariDaSidebar() {
@@ -2960,7 +3555,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function openCompilazioneAltreTipologie(piano) {
     compilazionePianoId = null;
-    currentElevazioneId = null;
     showVistaCompilazione(vistaPianiEl, vistaCompilazioneEl, altreTipologiePanelEl);
     vistaVociEl.hidden = true;
     if (vistaBimEl) vistaBimEl.hidden = true;
@@ -2970,6 +3564,8 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function apriVistaVoci() {
+    dismissVaniIfOpen();
+    dismissCamminamentiIfOpen();
     vistaPianiEl.hidden = true;
     vistaCompilazioneEl.hidden = true;
     vistaVociEl.hidden = false;
@@ -2979,6 +3575,8 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function apriVistaBim() {
+    dismissVaniIfOpen();
+    dismissCamminamentiIfOpen();
     vistaPianiEl.hidden = true;
     vistaCompilazioneEl.hidden = true;
     vistaVociEl.hidden = true;
@@ -3001,43 +3599,43 @@ window.addEventListener("DOMContentLoaded", () => {
     aggiornaSuggerimentoSpessoreStrato();
   }
 
-  function prossimoIdStratoPerElevazione(idElevazione) {
-    const stratiElevazione = stratiMurElevazione.filter((item) => item.idElevazione === idElevazione);
-    if (stratiElevazione.length === 0) return 1;
-    const maxIdNumerico = stratiElevazione.reduce((max, item) => {
+  function prossimoIdStratoPerPiano(idPiano) {
+    const stratiPiano = stratiMurElevazione.filter((item) => item.idPiano === idPiano);
+    if (stratiPiano.length === 0) return 1;
+    const maxIdNumerico = stratiPiano.reduce((max, item) => {
       const parsed = Number.parseInt(String(item.idStrato), 10);
       if (Number.isNaN(parsed)) return max;
       return Math.max(max, parsed);
     }, 0);
     if (maxIdNumerico > 0) return maxIdNumerico + 1;
-    return stratiElevazione.length + 1;
+    return stratiPiano.length + 1;
   }
 
   function aggiornaCampoIdStratoAutomatico() {
     if (editingStratoMurId !== null) return;
-    if (currentElevazioneId === null) {
+    if (compilazionePianoId === null) {
       idstratoEl.value = "";
       return;
     }
-    idstratoEl.value = String(prossimoIdStratoPerElevazione(currentElevazioneId));
+    idstratoEl.value = String(prossimoIdStratoPerPiano(compilazionePianoId));
   }
 
-  function getSpessoreElevazioneAttiva() {
-    const elevazione = murielevazioni.find((item) => item.idElevazione === currentElevazioneId);
-    return Number(elevazione?.spessore || 0);
+  function getSpessoreMurPianoCorrente() {
+    const p = compilazionePianoId === null ? null : piani.find((item) => item.id === compilazionePianoId);
+    return Number(p?.murSpessore ?? 0);
   }
 
-  function calcolaSpessoreResiduoPerElevazione(idElevazione, editingId = null) {
-    const elevazione = murielevazioni.find((item) => item.idElevazione === idElevazione);
-    const spessoreElevazione = Number(elevazione?.spessore || 0);
+  function calcolaSpessoreResiduoPerPiano(idPiano, editingId = null) {
+    const pianoRow = piani.find((item) => item.id === idPiano);
+    const spessoreMur = Number(pianoRow?.murSpessore ?? 0);
     const sommaStrati = stratiMurElevazione
-      .filter((item) => item.idElevazione === idElevazione && item.idStratoMur !== editingId)
+      .filter((item) => item.idPiano === idPiano && item.idStratoMur !== editingId)
       .reduce((sum, item) => sum + Number(item.spessore || 0), 0);
-    return Number((spessoreElevazione - sommaStrati).toFixed(2));
+    return Number((spessoreMur - sommaStrati).toFixed(2));
   }
 
   function aggiornaSuggerimentoSpessoreStrato() {
-    if (currentElevazioneId === null) {
+    if (compilazionePianoId === null) {
       spessoreEl.value = "";
       spessoreEl.placeholder = "0.00";
       spessoreEl.removeAttribute("max");
@@ -3045,7 +3643,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const residuo = calcolaSpessoreResiduoPerElevazione(currentElevazioneId, editingStratoMurId);
+    const residuo = calcolaSpessoreResiduoPerPiano(compilazionePianoId, editingStratoMurId);
     const residuoNonNegativo = Math.max(0, residuo);
     spessoreEl.max = String(residuoNonNegativo);
     spessoreEl.placeholder = `Max ${fmt2(residuoNonNegativo)}`;
@@ -3084,8 +3682,15 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function setScavoFormMode() {
-    scavoSubmitButtonEl.textContent = editingScavoId === null ? "Aggiungi scavo" : "Salva modifica scavo";
-    if (editingScavoId === null) {
+    const isEdit = editingScavoId !== null;
+    scavoSubmitButtonEl.textContent = "+";
+    scavoSubmitButtonEl.title = isEdit ? "Salva modifica scavo" : "Aggiungi scavo";
+    scavoSubmitButtonEl.setAttribute(
+      "aria-label",
+      isEdit ? "Salva modifica scavo" : "Aggiungi scavo",
+    );
+    scavoSubmitButtonEl.classList.toggle("btn-form-add-plus--edit", isEdit);
+    if (!isEdit) {
       idPlScavoEl.value = String(scavoIdCounter);
     }
   }
@@ -3099,9 +3704,15 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function setCorselloFormMode() {
-    corselloSubmitButtonEl.textContent =
-      editingCorselloId === null ? "Aggiungi corsello" : "Salva modifica corsello";
-    if (editingCorselloId === null) {
+    const isEdit = editingCorselloId !== null;
+    corselloSubmitButtonEl.textContent = "+";
+    corselloSubmitButtonEl.title = isEdit ? "Salva modifica corsello" : "Aggiungi corsello";
+    corselloSubmitButtonEl.setAttribute(
+      "aria-label",
+      isEdit ? "Salva modifica corsello" : "Aggiungi corsello",
+    );
+    corselloSubmitButtonEl.classList.toggle("btn-form-add-plus--edit", isEdit);
+    if (!isEdit) {
       idPlCorsEl.value = String(corselloIdCounter);
     }
   }
@@ -3115,27 +3726,31 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function setCamminamentiFormMode() {
-    camminamentiSubmitButtonEl.textContent =
-      editingCamminamentiId === null ? "Aggiungi camminamento" : "Salva modifica camminamento";
-    if (editingCamminamentiId === null) {
-      idPlCammEl.value = String(camminamentiIdCounter);
-    }
+    /* CAMMINAMENTI esterni rimosso: no-op */
   }
 
   function resetCamminamentiForm() {
-    camminamentiFormEl.reset();
     editingCamminamentiId = null;
-    setCamminamentiFormMode();
-    updateFormulaButtonState(camminamentiFormulaEl, apriFormulaCamminamentiButtonEl);
-    camminamentiPianoEl.focus();
+  }
+
+  function renderCamminamenti() {
+    /* CAMMINAMENTI esterni rimosso: no-op */
   }
 
   function setMisurazioniFormMode() {
     if (misurazioniSubmitButtonEl) {
-      misurazioniSubmitButtonEl.textContent =
-        editingMisurazioneId === null ? "Aggiungi misurazione" : "Salva modifica misurazione";
+      const isEdit = editingMisurazioneId !== null;
+      misurazioniSubmitButtonEl.textContent = "+";
+      misurazioniSubmitButtonEl.title = isEdit
+        ? "Salva modifica misurazione"
+        : "Aggiungi misurazione";
+      misurazioniSubmitButtonEl.setAttribute(
+        "aria-label",
+        isEdit ? "Salva modifica misurazione" : "Aggiungi misurazione",
+      );
+      misurazioniSubmitButtonEl.classList.toggle("btn-form-add-plus--edit", isEdit);
     }
-    if (editingMisurazioneId === null) {
+    if (editingMisurazioneId === null && idMisurazioneEl) {
       idMisurazioneEl.value = String(misurazioniIdCounter);
     }
   }
@@ -3265,7 +3880,8 @@ window.addEventListener("DOMContentLoaded", () => {
       typeof item?.idAperturaMaster === "string" && item.idAperturaMaster.trim() !== ""
         ? item.idAperturaMaster.trim()
         : fallbackId;
-    return { idAperturaMaster, ...base };
+    const piano = typeof item?.piano === "string" ? item.piano.trim() : "";
+    return { idAperturaMaster, ...base, piano };
   }
 
   function normalizzaApertureMaster(raw) {
@@ -3439,7 +4055,7 @@ window.addEventListener("DOMContentLoaded", () => {
       resetVoceMmRigaFormFields();
     } else {
       const v = voci.find((x) => x.idVoce === idVoce);
-      const mm = normalizzaMisurazioniManualiVoce(v?.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(v?.misurazioniManuali, v?.unitaMisura);
       const row = mm[index];
       if (!row) {
         window.alert("Riga non trovata.");
@@ -3484,7 +4100,8 @@ window.addEventListener("DOMContentLoaded", () => {
   function salvaVoceMmRigaDialog() {
     const { idVoce, index } = voceMmDialogContext;
     if (idVoce === null) return;
-    const piano = voceMmRigaPianoEl.value.trim();
+    const piano = ensurePianoMisuraInArchivio(voceMmRigaPianoEl.value);
+    voceMmRigaPianoEl.value = piano;
     const riferimentoManuale = voceMmRigaRiferimentoEl.value.trim();
     const formula = voceMmRigaFormulaEl.value.trim();
     const segno = voceMmRigaSegnoEl.checked;
@@ -3574,9 +4191,10 @@ window.addEventListener("DOMContentLoaded", () => {
       apertureCollegate:
         index !== null
           ? normalizzaApertureCollegateRefs(
-              normalizzaMisurazioniManualiVoce(voci.find((vv) => vv.idVoce === idVoce)?.misurazioniManuali)[
-                index
-              ]?.apertureCollegate,
+              normalizzaMisurazioniManualiVoce(
+                voci.find((vv) => vv.idVoce === idVoce)?.misurazioniManuali,
+                voci.find((vv) => vv.idVoce === idVoce)?.unitaMisura,
+              )[index]?.apertureCollegate,
             )
           : [],
     };
@@ -3584,7 +4202,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const shouldFocusAfterSave = index === null;
     voci = voci.map((v) => {
       if (v.idVoce !== idVoce) return v;
-      let mm = [...normalizzaMisurazioniManualiVoce(v.misurazioniManuali)];
+      let mm = [...normalizzaMisurazioniManualiVoce(v.misurazioniManuali, v.unitaMisura)];
       if (index === null) {
         mm.push(nuovaRiga);
         targetIndex = mm.length - 1;
@@ -3609,7 +4227,9 @@ window.addEventListener("DOMContentLoaded", () => {
   function eliminaVoceMmRiga(idVoce, index) {
     voci = voci.map((v) => {
       if (v.idVoce !== idVoce) return v;
-      const mm = normalizzaMisurazioniManualiVoce(v.misurazioniManuali).filter((_, i) => i !== index);
+      const mm = normalizzaMisurazioniManualiVoce(v.misurazioniManuali, v.unitaMisura).filter(
+        (_, i) => i !== index,
+      );
       return { ...v, misurazioniManuali: mm };
     });
     saveVoci();
@@ -3623,13 +4243,25 @@ window.addEventListener("DOMContentLoaded", () => {
   function duplicaVoceMmRiga(idVoce, index) {
     const v = voci.find((x) => x.idVoce === idVoce);
     if (!v) return;
-    const mm = normalizzaMisurazioniManualiVoce(v.misurazioniManuali);
+    const mm = normalizzaMisurazioniManualiVoce(v.misurazioniManuali, v.unitaMisura);
     const row = mm[index];
     if (!row) return;
     const tipo = normalizzaTipoMisurazioneVoce(row.tipo);
     const calc =
       tipo === VOCE_MM_TIPO_SEMIAUTOMATICA
-        ? calcolaMisurazioneVoceSemiautomatica(row.misura1, row.misura2, row.misura3, row.numero, row.segno)
+        ? {
+            ok: true,
+            risultato: calcolaRisultatoSemiautomaticoPerUnita({
+              misura1: row.misura1,
+              misura2: row.misura2,
+              misura3: row.misura3,
+              numero: row.numero,
+              segno: row.segno === true,
+              unitaNorm: normalizzaUnitaVoceDetrazione(v.unitaMisura),
+              vaniVanoId: row.vaniVanoId,
+              stratoAltezza: row.stratoAltezza,
+            }),
+          }
         : calcolaMisurazioneVaria(row.formula, row.numero, row.segno);
     if (!calc.ok) {
       window.alert(calc.message);
@@ -3658,7 +4290,7 @@ window.addEventListener("DOMContentLoaded", () => {
     };
     voci = voci.map((vv) => {
       if (vv.idVoce !== idVoce) return vv;
-      const arr = [...normalizzaMisurazioniManualiVoce(vv.misurazioniManuali)];
+      const arr = [...normalizzaMisurazioniManualiVoce(vv.misurazioniManuali, vv.unitaMisura)];
       arr.splice(index + 1, 0, copy);
       return { ...vv, misurazioniManuali: arr };
     });
@@ -3680,7 +4312,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const voceAbbreviataCopia = voceAbbreviataBase
       ? `${voceAbbreviataBase} - COPIA`
       : "COPIA";
-    const mmOriginal = normalizzaMisurazioniManualiVoce(original.misurazioniManuali);
+    const mmOriginal = normalizzaMisurazioniManualiVoce(original.misurazioniManuali, original.unitaMisura);
     const mmCopy = mmOriginal.map((row) => ({
       ...row,
       apertureCollegate: normalizzaApertureCollegateRefs(row.apertureCollegate),
@@ -3703,7 +4335,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function avviaModificaVoceMmApertura(idVoce, idx, aperturaId) {
     const voce = voci.find((item) => item.idVoce === idVoce);
-    const mm = normalizzaMisurazioniManualiVoce(voce?.misurazioniManuali);
+    const mm = normalizzaMisurazioniManualiVoce(voce?.misurazioniManuali, voce?.unitaMisura);
     const row = mm[idx];
     if (!row) return;
     const aperture = risolviApertureCollegateRefs(row.apertureCollegate);
@@ -3726,6 +4358,31 @@ window.addEventListener("DOMContentLoaded", () => {
     renderVoci();
   }
 
+  const VOCE_DIALOG_CAMPI_NON_UM = [
+    vocePosizioneEl,
+    voceAbbreviataEl,
+    vocePrezzoEl,
+    voceTipoMisuraEl,
+    voceTestoEl,
+    voceNoteEl,
+    voceBtnCercaEl,
+  ];
+
+  function setVoceDialogModalitaSoloUnitaMisura(attiva) {
+    editingVoceSoloUnitaMisura = attiva;
+    voceDialogEl?.classList.toggle("voce-dialog--solo-unita", attiva);
+    if (voceDialogSoloUnitaHintEl) voceDialogSoloUnitaHintEl.hidden = !attiva;
+    if (voceDialogSaveEl) voceDialogSaveEl.textContent = attiva ? "Salva unità" : "Salva voce";
+    if (voceDialogTitleEl) {
+      if (attiva) voceDialogTitleEl.textContent = "MODIFICA UNITÀ DI MISURA";
+      else if (editingVoceId !== null) voceDialogTitleEl.textContent = "MODIFICA VOCE";
+      else voceDialogTitleEl.textContent = "NUOVA VOCE";
+    }
+    VOCE_DIALOG_CAMPI_NON_UM.forEach((el) => {
+      if (el) el.disabled = attiva;
+    });
+  }
+
   function resetVoceForm() {
     voceIdEl.value = String(voceIdCounter);
     vocePosizioneEl.value = String(getPrimaPosizioneVoceDisponibile());
@@ -3737,6 +4394,7 @@ window.addEventListener("DOMContentLoaded", () => {
     voceTestoEl.value = "";
     voceNoteEl.value = "";
     editingVoceId = null;
+    setVoceDialogModalitaSoloUnitaMisura(false);
   }
 
   function getPrimaPosizioneVoceDisponibile() {
@@ -3797,14 +4455,16 @@ window.addEventListener("DOMContentLoaded", () => {
       closeButton.addEventListener("click", () => {
         exitVoceFocusMode();
       });
-      vistaVociEl.prepend(closeButton);
+      const headerRight = vistaVociEl.querySelector(".voci-header-right");
+      if (headerRight) headerRight.appendChild(closeButton);
+      else vistaVociEl.prepend(closeButton);
     }
     renderVoci();
   }
 
   function renderVoci() {
     const totaleComputo = voci.reduce((acc, item) => {
-      const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+      const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
       const totaleQuantitaVoce = mm.reduce((sum, m) => sum + Number(m.risultato || 0), 0);
       const detrazioneAperture = calcolaDetrazioneApertureVoce(item, mm);
       const totaleQuantitaVoceNetto = totaleQuantitaVoce - detrazioneAperture;
@@ -3869,6 +4529,8 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     vociDaRenderizzare.forEach((item, index) => {
+      const derivataDaVani = voceDerivataDaVani(item);
+      const bloccataInVoci = voceBloccataInVoci(item);
       const row = document.createElement("tr");
       row.className = "voci-row-principale";
       row.dataset.idVoce = String(item.idVoce);
@@ -3878,6 +4540,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const cellVoceAbbrev = createCell(item.voceAbbreviata || "-");
       cellVoceAbbrev.title = item.voce;
       cellVoceAbbrev.classList.add("voci-cell-open-focus");
+      if (derivataDaVani) cellVoceAbbrev.classList.add("voci-cell-from-vani");
       if (isVoceSpecialeNoTotaleRiferimento(item)) {
         cellVoceAbbrev.classList.add("voci-cell-special-voce");
       }
@@ -3943,6 +4606,28 @@ window.addEventListener("DOMContentLoaded", () => {
       copyButton.title = "Copia voce con misurazioni e aperture collegate";
       copyButton.setAttribute("aria-label", "Copia voce");
 
+      if (bloccataInVoci) {
+        const roTitle = isVoceSpecialeNoTotaleRiferimento(item)
+          ? "Voce automatica: modifica solo dai relativi strumenti (qui sola lettura)"
+          : "Voce da VANI/CAMMINAMENTI: modifica unità di misura con ✎ (qui sola lettura)";
+        if (derivataDaVani && !isVoceSpecialeNoTotaleRiferimento(item)) {
+          editButton.disabled = false;
+          editButton.title =
+            "Modifica unità di misura (i totali delle misurazioni da VANI si aggiornano al salvataggio)";
+          copyButton.disabled = true;
+          copyButton.title = "Voce da VANI: copia non disponibile";
+        } else {
+          [copyButton, editButton].forEach((btn) => {
+            btn.disabled = true;
+            btn.title = roTitle;
+          });
+        }
+        upButton.disabled = ricercaAttiva || index === 0;
+        downButton.disabled = ricercaAttiva || index === vociDaRenderizzare.length - 1;
+        deleteButton.disabled = false;
+        deleteButton.title = "Elimina voce";
+      }
+
       const isVoceManuale =
         normalizzaTipoMisuraVoce(item.tipoMisura) === TIPOMISURA_VOCE_MANUALE;
 
@@ -3964,16 +4649,6 @@ window.addEventListener("DOMContentLoaded", () => {
           isCollapsed ? "Espandi misurazioni manuali" : "Collassa misurazioni manuali",
         );
         actionsCell.appendChild(collapseMmButton);
-
-        const addMmRowButton = document.createElement("button");
-        addMmRowButton.type = "button";
-        addMmRowButton.className = "btn-action btn-voce-mm-add";
-        addMmRowButton.dataset.action = "add-voce-mm";
-        addMmRowButton.dataset.idVoce = String(item.idVoce);
-        addMmRowButton.textContent = "+";
-        addMmRowButton.title = "Aggiungi misurazione (scegli tipologia)";
-        addMmRowButton.setAttribute("aria-label", "Aggiungi misurazione (scegli tipologia)");
-        actionsCell.appendChild(addMmRowButton);
       }
       row.appendChild(actionsCell);
       vociBodyEl.appendChild(row);
@@ -3981,7 +4656,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const mostraMisurazioniManuali =
         isVoceManuale && (voceFocusId === item.idVoce || !vociMmCollapsed.has(item.idVoce));
       if (mostraMisurazioniManuali) {
-        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
         const mmTotalColumns = 14;
         let sumMm = 0;
         mm.forEach((m) => {
@@ -4064,8 +4739,7 @@ window.addEventListener("DOMContentLoaded", () => {
           const ec = document.createElement("td");
           ec.colSpan = mmTotalColumns;
           ec.className = "empty-cell";
-          ec.textContent =
-            "Nessuna misurazione. Usa il + verde dopo la X sulla riga voce (doppio clic su una riga per modificare).";
+          ec.textContent = "Nessuna misurazione.";
           er.appendChild(ec);
           tbody.appendChild(er);
         } else {
@@ -4159,6 +4833,65 @@ window.addEventListener("DOMContentLoaded", () => {
                   const tdAp = document.createElement("td");
                   tdAp.colSpan = mmTotalColumns;
                   tdAp.className = "empty-cell voce-mm-aperture-cell";
+                  const isMisurazioneDaVani =
+                    typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "";
+                  if (isMisurazioneDaVani) {
+                    const misura2Val =
+                      typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
+                        ? Number(m.stratoAltezza)
+                        : typeof m.misura2 === "number"
+                          ? Number(m.misura2)
+                          : null;
+                    const misura3Val =
+                      typeof m.misura3 === "number" ? Number(m.misura3) : null;
+                    const savedWrap = document.createElement("div");
+                    savedWrap.className =
+                      "voce-mm-aperture-editor-wrap voce-mm-aperture-saved-wrap voce-mm-aperture-saved-wrap--vani";
+                    const savedHead = document.createElement("div");
+                    savedHead.className = "voce-mm-aperture-editor-head";
+                    ["Lungh. apertura (m)", "h inclusa (m)", "ML netti (m)", "Mq netti (m²)"].forEach(
+                      (label) => {
+                        const cell = document.createElement("div");
+                        cell.className = "voce-mm-ap-col-label";
+                        cell.textContent = label;
+                        savedHead.appendChild(cell);
+                      },
+                    );
+                    savedWrap.appendChild(savedHead);
+
+                    if (apertureCollegate.length === 0) {
+                      const emptyText = document.createElement("div");
+                      emptyText.className = "voce-mm-aperture-empty";
+                      emptyText.textContent = "Nessuna apertura";
+                      tdAp.appendChild(savedWrap);
+                      tdAp.appendChild(emptyText);
+                    } else {
+                      apertureCollegate.forEach((apertura) => {
+                        const row = document.createElement("div");
+                        row.className = "voce-mm-aperture-editor-inputs voce-mm-aperture-saved-row";
+                        const pushTextCell = (text, extraClass = "") => {
+                          const c = document.createElement("div");
+                          c.className = `voce-mm-ap-col-input voce-mm-ap-saved-cell ${extraClass}`.trim();
+                          c.textContent = text;
+                          row.appendChild(c);
+                        };
+                        const metric = calcolaMetricheAperturaMisurazione(
+                          apertura,
+                          mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
+                          mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
+                          mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.stratoElevazione ?? null) : null,
+                        );
+                        pushTextCell(fmt2(metric.ml), "voce-mm-ap-metric-cell");
+                        pushTextCell(fmt2(metric.hInclusa), "voce-mm-ap-metric-cell");
+                        pushTextCell(fmt2(metric.ml), "voce-mm-ap-metric-cell");
+                        pushTextCell(fmt2(metric.mq), "voce-mm-ap-metric-cell");
+                        savedWrap.appendChild(row);
+                      });
+                      tdAp.appendChild(savedWrap);
+                    }
+                    trAp.appendChild(tdAp);
+                    tbody.appendChild(trAp);
+                  } else {
                   const draftKey = getVoceMmAperturaDraftKey(item.idVoce, idx);
                   const draft = voceMmAperturaDraftByKey.get(draftKey);
                   const editingAperturaMasterId = String(draft?.editingAperturaMasterId || "").trim();
@@ -4190,7 +4923,11 @@ window.addEventListener("DOMContentLoaded", () => {
                   });
                   savedWrap.appendChild(savedHead);
                   const misura2Val =
-                    typeof m.misura2 === "number" ? Number(m.misura2) : null;
+                    typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
+                      ? Number(m.stratoAltezza)
+                      : typeof m.misura2 === "number"
+                        ? Number(m.misura2)
+                        : null;
                   const misura3Val =
                     typeof m.misura3 === "number" ? Number(m.misura3) : null;
 
@@ -4265,6 +5002,7 @@ window.addEventListener("DOMContentLoaded", () => {
                         apertura,
                         mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
                         mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
+                        mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.stratoElevazione ?? null) : null,
                       );
                       const roCell = (text, extraClass = "") => {
                         const c = document.createElement("div");
@@ -4325,6 +5063,7 @@ window.addEventListener("DOMContentLoaded", () => {
                       apertura,
                       mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
                       mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
+                      mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.stratoElevazione ?? null) : null,
                     );
                     pushTextCell(fmt2(metric.hInclusa), "voce-mm-ap-metric-cell");
                     pushTextCell(fmt2(metric.mq), "voce-mm-ap-metric-cell");
@@ -4477,6 +5216,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     },
                     mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
                     mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
+                    mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.stratoElevazione ?? null) : null,
                   );
                   const makeReadonly = (text, extraClass = "") => {
                     const d = document.createElement("div");
@@ -4524,6 +5264,7 @@ window.addEventListener("DOMContentLoaded", () => {
                   tdEditor.appendChild(editorWrap);
                   trEditor.appendChild(tdEditor);
                   tbody.appendChild(trEditor);
+                  }
                   }
                 }
 
@@ -5045,10 +5786,11 @@ window.addEventListener("DOMContentLoaded", () => {
       drawText(marginLeft, y + 6, "Nessuna voce disponibile.", true, voceFontSize);
     } else {
       voices.forEach((item) => {
-        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
         const unitaNormDetrazione = normalizzaUnitaVoceDetrazione(item.unitaMisura);
         const usaMcPerAperturePdf = unitaNormDetrazione.includes("mc");
-        const metricaAperturePdfLabel = usaMcPerAperturePdf ? "MC" : "MQ";
+        const usaMlPerAperturePdf = unitaNormDetrazione.includes("ml");
+        const metricaAperturePdfLabel = usaMcPerAperturePdf ? "MC" : usaMlPerAperturePdf ? "ML" : "MQ";
         const grouped = new Map();
         mm.forEach((m) => {
           const piano = (m.piano || "-").trim() || "-";
@@ -5073,16 +5815,39 @@ window.addEventListener("DOMContentLoaded", () => {
           rifMap.forEach((rows, rif) => {
             let sumRifLordo = 0;
             let sumRifAperture = 0;
-            let intestazioneApertureRifStampata = false;
             ensureSpace(detailLineH);
             drawText(leftTextX, y + 3.8, `RIFERIMENTO: ${rif}`, false, detailFontSize);
             y += detailLineH;
-            rows.forEach((m) => {
+            const haCamminamenti = rows.some(
+              (row) =>
+                typeof row?.camminamentiSchedaId === "string" &&
+                row.camminamentiSchedaId.trim() !== "",
+            );
+            const righeStampa = haCamminamenti
+              ? [...rows.filter((row) => !row.segno), ...rows.filter((row) => row.segno)]
+              : rows;
+            /** Righe aperture da stampare dopo le misure e il Totale lordo. */
+            const apertureDaStampare = [];
+            righeStampa.forEach((m) => {
               ensureSpace(detailLineH);
               const mmTipo = normalizzaTipoMisurazioneVoce(m.tipo);
+              const misurazioneDaCamminamenti =
+                typeof m?.camminamentiSchedaId === "string" && m.camminamentiSchedaId.trim() !== "";
+              const misurazioneDaVani =
+                typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "";
               const detailLine =
                 mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA
-                  ? `${fmt3(m.misura1 ?? 1)} x ${fmt3(m.misura2 ?? 1)} x ${fmt3(m.misura3 ?? 1)};`
+                  ? misurazioneDaCamminamenti
+                    ? `${fmt3(m.misura1 ?? 1)} x ${fmt3(m.misura2 ?? 1)} x ${fmt3(m.misura3 ?? 0)};`
+                    : misurazioneDaVani && usaMlPerAperturePdf
+                      ? `${fmt3(m.misura1 ?? 1)};`
+                      : misurazioneDaVani && !usaMcPerAperturePdf
+                        ? `${fmt3(m.misura1 ?? 1)} x ${fmt3(
+                            typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
+                              ? m.stratoAltezza
+                              : m.misura2 ?? 1,
+                          )};`
+                        : `${fmt3(m.misura1 ?? 1)} x ${fmt3(m.misura2 ?? 1)} x ${fmt3(m.misura3 ?? 1)};`
                   : `${m.formula || "-"};`;
               drawText(leftTextX, y + 3.8, detailLine, false, detailFontSize);
               drawText(partiUgualiX, y + 3.8, String(m.numero), false, detailFontSize);
@@ -5093,42 +5858,35 @@ window.addEventListener("DOMContentLoaded", () => {
               y += detailLineH;
               if (mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA) {
                 const misura2Val =
-                  typeof m.misura2 === "number" && Number.isFinite(m.misura2) ? Number(m.misura2) : null;
+                  typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
+                    ? Number(m.stratoAltezza)
+                    : typeof m.misura2 === "number" && Number.isFinite(m.misura2)
+                      ? Number(m.misura2)
+                      : null;
                 const misura3Val =
                   typeof m.misura3 === "number" && Number.isFinite(m.misura3) ? Number(m.misura3) : null;
                 const apertureCollegate = risolviApertureCollegateRefs(m.apertureCollegate);
-                const detrazioneRigaPrevista = apertureCollegate.reduce((acc, apertura) => {
-                  const metriche = calcolaMetricheAperturaMisurazione(apertura, misura2Val, misura3Val);
-                  const valoreMetrica = usaMcPerAperturePdf ? metriche.mc : metriche.mq;
-                  return acc + Number(valoreMetrica || 0);
-                }, 0);
-                if (!intestazioneApertureRifStampata && detrazioneRigaPrevista > 0.0001) {
-                  ensureSpace(detailLineH);
-                  drawText(leftTextX + 1, y + 3.8, "a sottrarre aperture:", false, detailFontSize - 1);
-                  y += detailLineH;
-                  intestazioneApertureRifStampata = true;
-                }
                 apertureCollegate.forEach((apertura) => {
-                  const metriche = calcolaMetricheAperturaMisurazione(apertura, misura2Val, misura3Val);
-                  const valoreMetrica = usaMcPerAperturePdf ? metriche.mc : metriche.mq;
-                  detrazioneRigaAperture += Number(valoreMetrica || 0);
-                  const aperturePdfFontSize = detailFontSize - 1;
-                  ensureSpace(detailLineH);
-                  drawText(
-                    leftTextX + 2,
-                    y + 3.8,
-                    `${apertura.locale || "-"} - ${fmtRis(apertura.largh)} (lrg) x ${fmtRis(metriche.hInclusa)} (H incl)`,
-                    false,
-                    aperturePdfFontSize,
+                  const metriche = calcolaMetricheAperturaMisurazione(
+                    apertura,
+                    misura2Val,
+                    misura3Val,
+                    m.stratoElevazione ?? null,
                   );
-                  drawTextRight(
-                    resultRightX,
-                    y + 3.8,
-                    `- ${fmtRis(valoreMetrica)}`,
-                    false,
-                    aperturePdfFontSize,
-                  );
-                  y += detailLineH;
+                  const valoreMetrica = usaMcPerAperturePdf
+                    ? metriche.mc
+                    : usaMlPerAperturePdf
+                      ? metriche.ml
+                      : metriche.mq;
+                  const valoreNum = Number(valoreMetrica || 0);
+                  if (valoreNum <= 0.0001) return;
+                  detrazioneRigaAperture += valoreNum;
+                  apertureDaStampare.push({
+                    locale: apertura.locale || "-",
+                    largh: apertura.largh,
+                    hInclusa: metriche.hInclusa,
+                    valoreMetrica: valoreNum,
+                  });
                 });
               }
               sumRifAperture += detrazioneRigaAperture;
@@ -5136,8 +5894,55 @@ window.addEventListener("DOMContentLoaded", () => {
               sumPianoLordo += rv;
               sumPianoAperture += detrazioneRigaAperture;
             });
+            if (haCamminamenti) {
+              const sumPos = rows
+                .filter((row) => !row.segno)
+                .reduce((acc, row) => acc + Math.abs(Number(row.risultato || 0)), 0);
+              const sumNeg = rows
+                .filter((row) => row.segno)
+                .reduce((acc, row) => acc + Math.abs(Number(row.risultato || 0)), 0);
+              if (sumPos > 0.0001) {
+                ensureSpace(detailLineH);
+                drawText(leftTextX, y + 3.8, "Totale valori positivi", false, detailFontSize);
+                drawTextRight(resultRightX, y + 3.8, fmtRis(sumPos), false, detailFontSize);
+                y += detailLineH;
+              }
+              if (sumNeg > 0.0001) {
+                ensureSpace(detailLineH);
+                drawText(leftTextX, y + 3.8, "Totale valori negativi", false, detailFontSize);
+                drawTextRight(resultRightX, y + 3.8, `- ${fmtRis(sumNeg)}`, false, detailFontSize);
+                y += detailLineH;
+              }
+            }
             const sumRifNetto = sumRifLordo - sumRifAperture;
             const aperturePdfFontSize = detailFontSize - 1;
+            if (apertureDaStampare.length > 0) {
+              ensureSpace(detailLineH);
+              drawText(leftTextX, y + 3.8, "Totale lordo", false, detailFontSize);
+              drawTextRight(resultRightX, y + 3.8, fmtRis(sumRifLordo), false, detailFontSize);
+              y += detailLineH;
+              ensureSpace(detailLineH);
+              drawText(leftTextX + 1, y + 3.8, "a sottrarre aperture:", false, aperturePdfFontSize);
+              y += detailLineH;
+              apertureDaStampare.forEach((ap) => {
+                ensureSpace(detailLineH);
+                drawText(
+                  leftTextX + 2,
+                  y + 3.8,
+                  `${ap.locale} - ${fmtRis(ap.largh)} (lrg) x ${fmtRis(ap.hInclusa)} (H incl)`,
+                  false,
+                  aperturePdfFontSize,
+                );
+                drawTextRight(
+                  resultRightX,
+                  y + 3.8,
+                  `- ${fmtRis(ap.valoreMetrica)}`,
+                  false,
+                  aperturePdfFontSize,
+                );
+                y += detailLineH;
+              });
+            }
             if (Math.abs(sumRifAperture) > 0.0001) {
               ensureSpace(detailLineH);
               drawText(
@@ -5245,27 +6050,22 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function buildExportData() {
     const pianiRows = [
-      ["IDPIANO", "TIPOLOGIA", "EDIFICIO", "PIANO"],
-      ...piani.map((item) => [item.id, item.tipologia, item.edificio, item.piano]),
-    ];
-
-    const mapPiani = new Map(piani.map((p) => [p.id, `${p.tipologia} - ${p.piano}`]));
-    const muriRows = [
-      ["IDELEVAZIONE", "IDPIANO", "PIANO", "RIFERIMENTO", "SPESSORE"],
-      ...murielevazioni.map((item) => [
-        item.idElevazione,
-        item.idPiano,
-        mapPiani.get(item.idPiano) || "",
-        item.riferimento || "",
-        item.spessore,
+      ["IDPIANO", "TIPOLOGIA", "EDIFICIO", "PIANO", "MUR_RIFERIMENTO", "MUR_SPESSORE"],
+      ...piani.map((item) => [
+        item.id,
+        item.tipologia,
+        item.edificio,
+        item.piano,
+        typeof item.murRiferimento === "string" ? item.murRiferimento : "",
+        typeof item.murSpessore === "number" ? item.murSpessore : "",
       ]),
     ];
 
     const stratiRows = [
-      ["IDSTRATOMUR", "IDELEVAZIONE", "IDSTRATO", "LUNGHEZZA", "ALTEZZA", "SPESSORE", "IDVOCECAPITOLATO"],
+      ["IDSTRATOMUR", "IDPIANO", "IDSTRATO", "LUNGHEZZA", "ALTEZZA", "SPESSORE", "IDVOCECAPITOLATO"],
       ...stratiMurElevazione.map((item) => [
         item.idStratoMur,
-        item.idElevazione,
+        item.idPiano,
         item.idStrato,
         item.lunghezza,
         item.altezza,
@@ -5277,7 +6077,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const apertureRows = [
       [
         "IDAPERTURAELEV",
-        "IDELEVAZIONE",
+        "IDPIANO",
         "LOCALE",
         "LUNGHEZZA",
         "ALTEZZA",
@@ -5289,7 +6089,7 @@ window.addEventListener("DOMContentLoaded", () => {
       ],
       ...apertureElevazione.map((item) => [
         item.idAperturaElev,
-        item.idElevazione,
+        item.idPiano,
         item.locale,
         item.lunghezza,
         item.altezza,
@@ -5399,9 +6199,10 @@ window.addEventListener("DOMContentLoaded", () => {
           "",
         ]);
 
-        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
         const unitaNormDetrazione = normalizzaUnitaVoceDetrazione(item.unitaMisura);
         const usaMcPerApertureXls = unitaNormDetrazione.includes("mc");
+        const usaMlPerApertureXls = unitaNormDetrazione.includes("ml");
         const groupedByPiano = new Map();
         mm.forEach((m) => {
           const piano = (m.piano || "-").trim() || "-";
@@ -5437,13 +6238,26 @@ window.addEventListener("DOMContentLoaded", () => {
               ]);
               if (mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA) {
                 const misura2Val =
-                  typeof m.misura2 === "number" && Number.isFinite(m.misura2) ? Number(m.misura2) : null;
+                  typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
+                    ? Number(m.stratoAltezza)
+                    : typeof m.misura2 === "number" && Number.isFinite(m.misura2)
+                      ? Number(m.misura2)
+                      : null;
                 const misura3Val =
                   typeof m.misura3 === "number" && Number.isFinite(m.misura3) ? Number(m.misura3) : null;
                 const apertureCollegate = risolviApertureCollegateRefs(m.apertureCollegate);
                 apertureCollegate.forEach((apertura) => {
-                  const metriche = calcolaMetricheAperturaMisurazione(apertura, misura2Val, misura3Val);
-                  const valoreMetrica = usaMcPerApertureXls ? metriche.mc : metriche.mq;
+                  const metriche = calcolaMetricheAperturaMisurazione(
+                    apertura,
+                    misura2Val,
+                    misura3Val,
+                    m.stratoElevazione ?? null,
+                  );
+                  const valoreMetrica = usaMcPerApertureXls
+                    ? metriche.mc
+                    : usaMlPerApertureXls
+                      ? metriche.ml
+                      : metriche.mq;
                   vociRows.push([
                     "",
                     "",
@@ -5513,7 +6327,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
     return {
       pianiRows,
-      muriRows,
       stratiRows,
       apertureRows,
       scavoRows,
@@ -5566,7 +6379,6 @@ window.addEventListener("DOMContentLoaded", () => {
         : null;
     return {
       piani,
-      murielevazioni,
       stratiMurElevazione,
       apertureElevazione,
       scaviEsterni,
@@ -5575,6 +6387,7 @@ window.addEventListener("DOMContentLoaded", () => {
       misurazioniVarie,
       voci,
       apertureMaster,
+      archivioPianiMisura: [...archivioPianiMisura],
       vociUnitaMisuraOptions,
       ifcLink,
     };
@@ -5600,6 +6413,141 @@ window.addEventListener("DOMContentLoaded", () => {
       chiusuraAppDialogEl.addEventListener("close", onClose);
       chiusuraAppDialogEl.showModal();
     });
+  }
+
+  function mostraConfermaIniziaNuovoComputo() {
+    if (!iniziaComputoDialogEl) {
+      return Promise.resolve(
+        window.confirm(
+          "Stai chiudendo il computo attuale per iniziarne uno nuovo. CONFERMA se hai già salvato, altrimenti ANNULLA e salva prima.",
+        ),
+      );
+    }
+    return new Promise((resolve) => {
+      const onClose = () => {
+        iniziaComputoDialogEl.removeEventListener("close", onClose);
+        resolve(iniziaComputoDialogEl.returnValue === "ok");
+      };
+      iniziaComputoDialogEl.addEventListener("close", onClose);
+      iniziaComputoDialogEl.showModal();
+    });
+  }
+
+  function pulisciStorageModuliSpeciali() {
+    const keys = [
+      "computo_metrico_vani_registrati",
+      "computo_metrico_vani_misurazione",
+      "computo_metrico_camminamenti_registrati",
+    ];
+    for (const key of keys) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  /** Chiude il computo corrente e riparte da zero (dopo conferma utente). */
+  function iniziaNuovoComputoVuoto() {
+    dismissVaniIfOpen();
+    dismissCamminamentiIfOpen();
+    if (voceFocusId !== null) exitVoceFocusMode();
+
+    piani = [];
+    stratiMurElevazione = [];
+    apertureElevazione = [];
+    scaviEsterni = [];
+    corselliEsterni = [];
+    camminamentiEsterni = [];
+    misurazioniVarie = [];
+    voci = [];
+    apertureMaster = [];
+    archivioPianiMisura = [];
+    vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
+    davanzaliSbordiByKey = {};
+    soglieSbordiByKey = {};
+    falsiTelaiLegnoAggiunteByKey = {};
+    falsiTelaiAlluminioAggiunteByKey = {};
+    ifcDataCache = null;
+    provaBimWallsBackup = null;
+    bimSelectedElementCache = null;
+    voceMmAperturaDraftByKey.clear();
+    vociMmCollapsed.clear();
+
+    pianoIdCounter = 1;
+    stratoMurIdCounter = 1;
+    aperturaElevIdCounter = 1;
+    scavoIdCounter = 1;
+    corselloIdCounter = 1;
+    camminamentiIdCounter = 1;
+    misurazioniIdCounter = 1;
+    voceIdCounter = 1;
+    apertureMasterIdCounter = 1;
+
+    editingPianoId = null;
+    editingStratoMurId = null;
+    editingAperturaElevId = null;
+    editingScavoId = null;
+    editingCorselloId = null;
+    editingCamminamentiId = null;
+    editingMisurazioneId = null;
+    editingVoceId = null;
+    editingVoceSoloUnitaMisura = false;
+    pendingDeleteVoceId = null;
+    pendingDeleteVoceMm = { idVoce: null, index: null };
+    apertureMasterEditingId = null;
+    apertureMasterPendingDeleteId = null;
+    compilazionePianoId = null;
+    voceMmDialogContext = { idVoce: null, index: null };
+    voceMmUseAperturaContext = { idVoce: null, mmIndex: null };
+    pendingEditVoceMmApertura = { idVoce: null, mmIndex: null, idAperturaMaster: "" };
+
+    pulisciStorageModuliSpeciali();
+
+    savePiani();
+    saveMurDati();
+    saveArchivioPianiMisuraToStorage();
+    saveApertureMaster();
+    saveVoci();
+    saveVociUnitaOptions();
+    saveDavanzaliSbordi();
+    saveSoglieSbordi();
+    saveFalsiTelaiLegnoAggiunte();
+    saveFalsiTelaiAlluminioAggiunte();
+    saveIfcData();
+
+    setPianoFormMode();
+    setStratiFormMode();
+    setAperturaFormMode();
+    setScavoFormMode();
+    setCorselloFormMode();
+    setCamminamentiFormMode();
+    setMisurazioniFormMode();
+    resetVoceForm();
+    renderVociUnitaOptions();
+    renderPiani();
+    renderMurielevazioni();
+    renderStrati();
+    renderAperture();
+    renderScavi();
+    renderCorselli();
+    renderCamminamenti();
+    renderMisurazioniVarie();
+    renderVoci();
+    renderBimSelectedElement(null);
+    setBimStatus("Nessun modello IFC caricato.");
+
+    refreshComputoBaselineSnapshot();
+    apriVistaVoci();
+    document.dispatchEvent(new CustomEvent("computo-nuovo-iniziato"));
+    document.dispatchEvent(new CustomEvent("computo-voci-storage-externally-updated"));
+  }
+
+  async function richiediIniziaNuovoComputo() {
+    const conferma = await mostraConfermaIniziaNuovoComputo();
+    if (!conferma) return;
+    iniziaNuovoComputoVuoto();
   }
 
   async function richiediChiusuraApplicazione() {
@@ -5705,6 +6653,7 @@ window.addEventListener("DOMContentLoaded", () => {
     aggiungiUnitaIfcSeMancanti();
     saveMurDati();
     renderMisurazioniVarie();
+    syncEsterniVersoVoci();
     window.alert(`Importate ${nuoveMisure.length} misurazioni da IFC.`);
   }
 
@@ -6199,16 +7148,14 @@ window.addEventListener("DOMContentLoaded", () => {
       window.alert("Nessuna prova BIM da annullare.");
       return;
     }
-    murielevazioni = cloneStateArray(provaBimWallsBackup.murielevazioni);
+    piani = cloneStateArray(provaBimWallsBackup.piani);
     stratiMurElevazione = cloneStateArray(provaBimWallsBackup.stratiMurElevazione);
     apertureElevazione = cloneStateArray(provaBimWallsBackup.apertureElevazione);
-    elevazioneIdCounter = Number(provaBimWallsBackup.elevazioneIdCounter || 1);
     stratoMurIdCounter = Number(provaBimWallsBackup.stratoMurIdCounter || 1);
     aperturaElevIdCounter = Number(provaBimWallsBackup.aperturaElevIdCounter || 1);
-    currentElevazioneId = provaBimWallsBackup.currentElevazioneId;
     compilazionePianoId = provaBimWallsBackup.compilazionePianoId;
-    murFiltroSoloIdElevazione = provaBimWallsBackup.murFiltroSoloIdElevazione;
     provaBimWallsBackup = null;
+    savePiani();
     saveMurDati();
     renderMurielevazioni();
     renderStrati();
@@ -6272,24 +7219,20 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!conferma) return;
 
     provaBimWallsBackup = {
-      murielevazioni: cloneStateArray(murielevazioni),
+      piani: cloneStateArray(piani),
       stratiMurElevazione: cloneStateArray(stratiMurElevazione),
       apertureElevazione: cloneStateArray(apertureElevazione),
-      elevazioneIdCounter,
       stratoMurIdCounter,
       aperturaElevIdCounter,
-      currentElevazioneId,
       compilazionePianoId,
-      murFiltroSoloIdElevazione,
     };
 
     let muriImportati = 0;
     let apertureImportate = 0;
-    let firstImportedElevazioneId = null;
+    const riferimentiIfcMuro = [];
+    let spessorePrimoMuro = 0;
 
     walls.forEach((wall) => {
-      const idElevazione = elevazioneIdCounter++;
-      if (firstImportedElevazioneId === null) firstImportedElevazioneId = idElevazione;
       const tipoStruttura = readTipostruttura(wall);
       const storey = readIfcStoreyLabel(wall);
       const label = readElementLabel(wall);
@@ -6297,16 +7240,8 @@ window.addEventListener("DOMContentLoaded", () => {
       const riferimentoParts = [label];
       if (tipoStruttura) riferimentoParts.push(`TIPOSTRUTTURA: ${tipoStruttura}`);
       if (storey) riferimentoParts.push(`Piano IFC: ${storey}`);
-      murielevazioni.push({
-        idElevazione,
-        idPiano: pianoIdTarget,
-        riferimento: riferimentoParts.join(" | "),
-        spessore: dimsMuro.spessore,
-        lunghezzaIfc: dimsMuro.lunghezza,
-        altezzaIfc: dimsMuro.altezza,
-        spessoreIfc: dimsMuro.spessore,
-        origineImport: "IFC_PROVA",
-      });
+      riferimentiIfcMuro.push(riferimentoParts.join(" | "));
+      if (muriImportati === 0) spessorePrimoMuro = Number(dimsMuro.spessore) || 0;
       muriImportati += 1;
 
       const wallExpressId = readExpressIdFromAny(wall?.expressID);
@@ -6339,7 +7274,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const openingLabel = readElementLabel(fillElement || opening);
         apertureElevazione.push({
           idAperturaElev: aperturaElevIdCounter++,
-          idElevazione,
+          idPiano: pianoIdTarget,
           locale: openingLabel || `Apertura IFC #${openingId}`,
           lunghezza: dims.lunghezza,
           altezza: dims.altezza,
@@ -6357,9 +7292,18 @@ window.addEventListener("DOMContentLoaded", () => {
       });
     });
 
+    piani = piani.map((p) =>
+      p.id === pianoIdTarget
+        ? {
+            ...p,
+            murRiferimento: riferimentiIfcMuro.join(" || "),
+            murSpessore: spessorePrimoMuro,
+          }
+        : p,
+    );
+    savePiani();
+
     compilazionePianoId = pianoIdTarget;
-    currentElevazioneId = firstImportedElevazioneId;
-    murFiltroSoloIdElevazione = null;
 
     saveMurDati();
     renderMurielevazioni();
@@ -6375,52 +7319,23 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function buildRiepilogoCollegamentiRows() {
-    const muriIfc = murielevazioni.filter((mur) => String(mur?.origineImport || "") === "IFC_PROVA");
     const apertureIfc = apertureElevazione.filter((ap) => String(ap?.origineImport || "") === "IFC_PROVA");
-    const apertureByElevId = new Map();
-    apertureIfc.forEach((ap) => {
-      if (!Number.isFinite(ap?.idElevazione)) return;
-      if (!apertureByElevId.has(ap.idElevazione)) apertureByElevId.set(ap.idElevazione, []);
-      apertureByElevId.get(ap.idElevazione).push(ap);
-    });
-
     const rows = [];
-    muriIfc.forEach((mur) => {
-      const aperture = apertureByElevId.get(mur.idElevazione) || [];
-      if (aperture.length === 0) {
-        rows.push({
-          idElevazione: mur.idElevazione,
-          idPiano: mur.idPiano,
-          riferimento: mur.riferimento || "",
-          lunghezza: fmt2(Number(mur?.lunghezzaIfc || 0)),
-          altezza: fmt2(Number(mur?.altezzaIfc || 0)),
-          spessore: fmt2(Number((mur?.spessoreIfc ?? mur?.spessore) || 0)),
-          apertureCount: 0,
-          aperturaId: "",
-          aperturaLocale: "Nessuna apertura collegata",
-          aperturaLunghezza: "-",
-          aperturaAltezza: "-",
-          aperturaSpessore: "-",
-          aperturaTipologia: "-",
-        });
-        return;
-      }
-      aperture.forEach((ap, index) => {
-        rows.push({
-          idElevazione: mur.idElevazione,
-          idPiano: mur.idPiano,
-          riferimento: index === 0 ? mur.riferimento || "" : "",
-          lunghezza: index === 0 ? fmt2(Number(mur?.lunghezzaIfc || 0)) : "",
-          altezza: index === 0 ? fmt2(Number(mur?.altezzaIfc || 0)) : "",
-          spessore: index === 0 ? fmt2(Number((mur?.spessoreIfc ?? mur?.spessore) || 0)) : "",
-          apertureCount: index === 0 ? aperture.length : "",
-          aperturaId: ap.idAperturaElev,
-          aperturaLocale: ap.locale || "",
-          aperturaLunghezza: fmt2(Number((ap?.lunghezzaIfc ?? ap?.lunghezza) || 0)),
-          aperturaAltezza: fmt2(Number((ap?.altezzaIfc ?? ap?.altezza) || 0)),
-          aperturaSpessore: fmt2(Number(ap?.spessoreIfc || 0)),
-          aperturaTipologia: ap.tipologia || "",
-        });
+    apertureIfc.forEach((ap) => {
+      const p = piani.find((x) => x.id === ap.idPiano);
+      rows.push({
+        idPiano: ap.idPiano,
+        riferimento: typeof p?.murRiferimento === "string" ? p.murRiferimento : "",
+        lunghezza: "-",
+        altezza: "-",
+        spessore:
+          typeof p?.murSpessore === "number" ? fmt2(p.murSpessore) : "-",
+        aperturaId: ap.idAperturaElev,
+        aperturaLocale: ap.locale || "",
+        aperturaLunghezza: fmt2(Number((ap?.lunghezzaIfc ?? ap?.lunghezza) || 0)),
+        aperturaAltezza: fmt2(Number((ap?.altezzaIfc ?? ap?.altezza) || 0)),
+        aperturaSpessore: fmt2(Number(ap?.spessoreIfc || 0)),
+        aperturaTipologia: ap.tipologia || "",
       });
     });
     return rows;
@@ -6428,27 +7343,20 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function renderRiepilogoCollegamentiDialog() {
     const rows = buildRiepilogoCollegamentiRows();
-    const muriIfc = murielevazioni.filter((m) => String(m?.origineImport || "") === "IFC_PROVA");
     const apertureIfc = apertureElevazione.filter((a) => String(a?.origineImport || "") === "IFC_PROVA");
-    const totaleMuri = muriIfc.length;
-    const muriConAperture = muriIfc.filter((m) =>
-      apertureIfc.some((a) => a.idElevazione === m.idElevazione),
-    ).length;
     const totaleAperture = apertureIfc.length;
 
     const tableRowsHtml =
       rows.length === 0
-        ? `<tr><td colspan="13" class="empty-cell">Nessun muro disponibile in tabella.</td></tr>`
+        ? `<tr><td colspan="11" class="empty-cell">Nessuna apertura IFC importata per questo piano.</td></tr>`
         : rows
             .map(
               (r) => `<tr>
           <td>${escapeHtml(r.idPiano)}</td>
-          <td>${escapeHtml(r.idElevazione)}</td>
           <td>${escapeHtml(r.riferimento)}</td>
           <td>${escapeHtml(r.lunghezza)}</td>
           <td>${escapeHtml(r.altezza)}</td>
           <td>${escapeHtml(r.spessore)}</td>
-          <td>${escapeHtml(r.apertureCount)}</td>
           <td>${escapeHtml(r.aperturaId)}</td>
           <td>${escapeHtml(r.aperturaLocale)}</td>
           <td>${escapeHtml(r.aperturaLunghezza)}</td>
@@ -6461,21 +7369,17 @@ window.addEventListener("DOMContentLoaded", () => {
 
     ifcRiepilogoTableWrapEl.innerHTML = `
       <p class="bim-riepilogo-note">
-        Muri totali: <strong>${totaleMuri}</strong> |
-        Muri con aperture: <strong>${muriConAperture}</strong> |
-        Aperture totali: <strong>${totaleAperture}</strong>
+        Aperture IFC (prova): <strong>${totaleAperture}</strong>
       </p>
       <div class="table-wrap bim-riepilogo-table-wrap">
         <table class="data-table bim-riepilogo-table">
           <thead>
             <tr>
               <th>ID Piano</th>
-              <th>ID Elevazione (muro)</th>
-              <th>Riferimento muro</th>
-              <th>Lunghezza</th>
-              <th>Altezza</th>
-              <th>Spessore</th>
-              <th>N. aperture muro</th>
+              <th>Riferimento muro (piano)</th>
+              <th>Lung. muro</th>
+              <th>Alt. muro</th>
+              <th>Spess. muro</th>
               <th>ID Apertura</th>
               <th>Apertura / locale</th>
               <th>Apertura Lunghezza</th>
@@ -6499,7 +7403,6 @@ window.addEventListener("DOMContentLoaded", () => {
  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
  xmlns:html="http://www.w3.org/TR/REC-html40">
   <Worksheet ss:Name="GESTIONE_PIANI">${jsonRowsToWorksheetXml(data.pianiRows)}</Worksheet>
-  <Worksheet ss:Name="MURI_ELEVAZIONE">${jsonRowsToWorksheetXml(data.muriRows)}</Worksheet>
   <Worksheet ss:Name="STRATI_MURI">${jsonRowsToWorksheetXml(data.stratiRows)}</Worksheet>
   <Worksheet ss:Name="APERTURE">${jsonRowsToWorksheetXml(data.apertureRows)}</Worksheet>
   <Worksheet ss:Name="SCAVO">${jsonRowsToWorksheetXml(data.scavoRows)}</Worksheet>
@@ -6538,14 +7441,30 @@ window.addEventListener("DOMContentLoaded", () => {
         ? payload.gestionePiani
         : [];
     const importedPiani = pianiSource
-      ? pianiSource.filter(
-          (item) =>
-            typeof item?.id === "number" &&
-            typeof item?.tipologia === "string" &&
-            (typeof item?.edificio === "string" || typeof item?.edificio === "undefined") &&
-            typeof item?.piano === "string",
-        )
-          .map((item) => ({ ...item, edificio: typeof item?.edificio === "string" ? item.edificio : "" }))
+      ? pianiSource
+          .filter(
+            (item) =>
+              typeof item?.id === "number" &&
+              typeof item?.tipologia === "string" &&
+              (typeof item?.edificio === "string" || typeof item?.edificio === "undefined") &&
+              typeof item?.piano === "string",
+          )
+          .map((item) => ({
+            ...item,
+            edificio: typeof item?.edificio === "string" ? item.edificio : "",
+            murRiferimento:
+              typeof item?.murRiferimento === "string"
+                ? item.murRiferimento
+                : typeof item?.mur_riferimento === "string"
+                  ? item.mur_riferimento
+                  : "",
+            murSpessore:
+              typeof item?.murSpessore === "number"
+                ? item.murSpessore
+                : typeof item?.mur_spessore === "number"
+                  ? item.mur_spessore
+                  : undefined,
+          }))
       : [];
 
     const murielevazioniSource = Array.isArray(payload.murielevazioni)
@@ -6568,34 +7487,60 @@ window.addEventListener("DOMContentLoaded", () => {
           }))
       : [];
 
-    const importedStrati = Array.isArray(payload.stratiMurElevazione)
-      ? payload.stratiMurElevazione.filter(
-          (item) =>
-            typeof item?.idStratoMur === "number" &&
-            typeof item?.idElevazione === "number" &&
-            typeof item?.idStrato === "string" &&
-            typeof item?.lunghezza === "number" &&
-            typeof item?.altezza === "number" &&
-            typeof item?.spessore === "number" &&
-            typeof item?.idVoceCapitolato === "string",
-        )
-      : [];
+    const elevToPianoImport = new Map(
+      importedMurielevazioni.map((m) => [m.idElevazione, m.idPiano]),
+    );
 
-    const importedAperture = Array.isArray(payload.apertureElevazione)
-      ? payload.apertureElevazione.filter(
-          (item) =>
-            typeof item?.idAperturaElev === "number" &&
-            typeof item?.idElevazione === "number" &&
-            typeof item?.locale === "string" &&
-            typeof item?.lunghezza === "number" &&
-            typeof item?.altezza === "number" &&
-            typeof item?.ante === "number" &&
-            typeof item?.tipologia === "string" &&
-            typeof item?.falsotelai === "boolean" &&
-            typeof item?.hDavanzale === "number" &&
-            typeof item?.idVoceCapitolato === "string",
-        )
-      : [];
+    const stratiRaw = Array.isArray(payload.stratiMurElevazione) ? payload.stratiMurElevazione : [];
+    const importedStrati = stratiRaw
+      .map((item) => {
+        if (
+          !item ||
+          typeof item.idStratoMur !== "number" ||
+          typeof item.idStrato !== "string" ||
+          typeof item.lunghezza !== "number" ||
+          typeof item.altezza !== "number" ||
+          typeof item.spessore !== "number" ||
+          typeof item.idVoceCapitolato !== "string"
+        ) {
+          return null;
+        }
+        let idPiano = typeof item.idPiano === "number" ? item.idPiano : null;
+        if (idPiano === null && typeof item.idElevazione === "number") {
+          idPiano = elevToPianoImport.get(item.idElevazione) ?? null;
+        }
+        if (typeof idPiano !== "number") return null;
+        const { idElevazione: _ig, ...rest } = item;
+        return { ...rest, idPiano };
+      })
+      .filter(Boolean);
+
+    const apertureRaw = Array.isArray(payload.apertureElevazione) ? payload.apertureElevazione : [];
+    const importedAperture = apertureRaw
+      .map((item) => {
+        if (
+          !item ||
+          typeof item.idAperturaElev !== "number" ||
+          typeof item.locale !== "string" ||
+          typeof item.lunghezza !== "number" ||
+          typeof item.altezza !== "number" ||
+          typeof item.ante !== "number" ||
+          typeof item.tipologia !== "string" ||
+          typeof item.falsotelai !== "boolean" ||
+          typeof item.hDavanzale !== "number" ||
+          typeof item.idVoceCapitolato !== "string"
+        ) {
+          return null;
+        }
+        let idPiano = typeof item.idPiano === "number" ? item.idPiano : null;
+        if (idPiano === null && typeof item.idElevazione === "number") {
+          idPiano = elevToPianoImport.get(item.idElevazione) ?? null;
+        }
+        if (typeof idPiano !== "number") return null;
+        const { idElevazione: _ig, ...rest } = item;
+        return { ...rest, idPiano };
+      })
+      .filter(Boolean);
 
     const importedScavi = Array.isArray(payload.scaviEsterni)
       ? payload.scaviEsterni
@@ -6727,7 +7672,7 @@ window.addEventListener("DOMContentLoaded", () => {
       tipoMisura: normalizzaTipoMisuraVoce(
         item?.tipoMisura ?? item?.tipomisura ?? item?.TIPOMISURA,
       ),
-      misurazioniManuali: normalizzaMisurazioniManualiVoce(item.misurazioniManuali),
+      misurazioniManuali: normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura),
       voce: item.voce,
       note: typeof item?.note === "string" ? item.note : "",
     }));
@@ -6740,16 +7685,41 @@ window.addEventListener("DOMContentLoaded", () => {
       : [];
     const importedApertureMaster = normalizzaApertureMaster(payload.apertureMaster);
 
-    piani = importedPiani;
-    murielevazioni = importedMurielevazioni;
+    piani = importedPiani.map((p) => {
+      const fromMur = importedMurielevazioni.find((m) => m.idPiano === p.id);
+      const murRiferimento =
+        typeof p.murRiferimento === "string" && p.murRiferimento.trim() !== ""
+          ? p.murRiferimento
+          : fromMur
+            ? fromMur.riferimento
+            : "";
+      const murSpessore =
+        typeof p.murSpessore === "number"
+          ? p.murSpessore
+          : fromMur
+            ? fromMur.spessore
+            : 0;
+      return { ...p, murRiferimento, murSpessore };
+    });
     stratiMurElevazione = importedStrati;
     apertureElevazione = importedAperture;
     scaviEsterni = importedScavi;
     corselliEsterni = importedCorselli;
-    camminamentiEsterni = importedCamminamenti;
+    camminamentiEsterni = [];
     misurazioniVarie = importedMisurazioni;
     voci = importedVoci;
     apertureMaster = importedApertureMaster;
+
+    if (Array.isArray(payload.archivioPianiMisura)) {
+      const mapImp = new Map();
+      for (const item of payload.archivioPianiMisura) {
+        if (typeof item === "string") mergeNomePianoInMap(mapImp, item);
+      }
+      archivioPianiMisura = sortedUniquePianiNomiFromMap(mapImp);
+    } else {
+      archivioPianiMisura = [];
+    }
+    syncArchivioPianiMisuraCompleto();
 
     const uniqueUnita = [];
     [...UNITA_MISURA_DEFAULT_OPTIONS, ...importedUnita, ...voci.map((v) => v.unitaMisura)].forEach(
@@ -6760,8 +7730,6 @@ window.addEventListener("DOMContentLoaded", () => {
     vociUnitaMisuraOptions = uniqueUnita;
 
     pianoIdCounter = piani.reduce((max, item) => Math.max(max, item.id), 0) + 1;
-    elevazioneIdCounter =
-      murielevazioni.reduce((max, item) => Math.max(max, item.idElevazione), 0) + 1;
     stratoMurIdCounter =
       stratiMurElevazione.reduce((max, item) => Math.max(max, item.idStratoMur), 0) + 1;
     aperturaElevIdCounter =
@@ -6793,16 +7761,10 @@ window.addEventListener("DOMContentLoaded", () => {
     if (compilazionePianoId !== null && !pianiValidIds.has(compilazionePianoId)) {
       compilazionePianoId = null;
     }
-    const elevazioniValidIds = new Set(murielevazioni.map((item) => item.idElevazione));
-    if (currentElevazioneId !== null && !elevazioniValidIds.has(currentElevazioneId)) {
-      currentElevazioneId = null;
-    }
-    if (murFiltroSoloIdElevazione !== null && !elevazioniValidIds.has(murFiltroSoloIdElevazione)) {
-      murFiltroSoloIdElevazione = null;
-    }
 
     savePiani();
     saveMurDati();
+    saveArchivioPianiMisuraToStorage();
     saveApertureMaster();
     saveVoci();
     saveVociUnitaOptions();
@@ -6825,6 +7787,7 @@ window.addEventListener("DOMContentLoaded", () => {
     renderCamminamenti();
     renderMisurazioniVarie();
     renderVoci();
+    syncEsterniVersoVoci();
 
     let ifcAutoLoaded = false;
     let ifcAutoLoadMessage = "";
@@ -6897,154 +7860,60 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function renderMurielevazioni() {
-    murEleBodyEl.innerHTML = "";
-    const totaleElevazioniPiano =
-      compilazionePianoId === null
-        ? 0
-        : murielevazioni.filter((e) => e.idPiano === compilazionePianoId).length;
-    countMurielevazioniEl.textContent = `(${totaleElevazioniPiano})`;
+  function syncMurParamsInputsDaPianoCorrente() {
+    if (!murParamsRiferimentoEl || !murParamsSpessoreEl) return;
     if (compilazionePianoId === null) {
-      const row = document.createElement("tr");
-      const cell = document.createElement("td");
-      cell.colSpan = 4;
-      cell.className = "empty-cell";
-      cell.textContent = "—";
-      row.appendChild(cell);
-      murEleBodyEl.appendChild(row);
+      murParamsRiferimentoEl.value = "";
+      murParamsSpessoreEl.value = "";
+      murParamsRiferimentoEl.disabled = true;
+      murParamsSpessoreEl.disabled = true;
       return;
     }
+    const p = piani.find((e) => e.id === compilazionePianoId);
+    murParamsRiferimentoEl.disabled = false;
+    murParamsSpessoreEl.disabled = false;
+    murParamsRiferimentoEl.value = typeof p?.murRiferimento === "string" ? p.murRiferimento : "";
+    murParamsSpessoreEl.value = fmt2(typeof p?.murSpessore === "number" ? p.murSpessore : 0);
+  }
 
-    const listaCompleta = murielevazioni.filter((e) => e.idPiano === compilazionePianoId);
-    if (
-      murFiltroSoloIdElevazione !== null &&
-      !listaCompleta.some((e) => e.idElevazione === murFiltroSoloIdElevazione)
-    ) {
-      murFiltroSoloIdElevazione = null;
-    }
-
-    const lista =
-      murFiltroSoloIdElevazione === null
-        ? listaCompleta
-        : listaCompleta.filter((e) => e.idElevazione === murFiltroSoloIdElevazione);
-
-    if (listaCompleta.length === 0) {
-      const row = document.createElement("tr");
-      const cell = document.createElement("td");
-      cell.colSpan = 4;
-      cell.className = "empty-cell";
-      cell.textContent = "Nessuna elevazione per questo piano.";
-      row.appendChild(cell);
-      murEleBodyEl.appendChild(row);
-      return;
-    }
-
-    if (lista.length === 0) {
-      murFiltroSoloIdElevazione = null;
-      renderMurielevazioni();
-      return;
-    }
-
-    lista.forEach((e) => {
-      const row = document.createElement("tr");
-      row.classList.add("mur-ele-row-selectable");
-      row.dataset.elevazioneId = String(e.idElevazione);
-      row.setAttribute("role", "button");
-      row.setAttribute("tabindex", "0");
-      row.setAttribute(
-        "aria-label",
-        `Elevazione ${e.idElevazione}, seleziona per compilare gli strati`,
-      );
-      if (currentElevazioneId === e.idElevazione) {
-        row.classList.add("row-elevazione-selezionata");
-        row.setAttribute("aria-current", "true");
-      }
-      row.appendChild(createCell(String(e.idElevazione)));
-
-      const rifCell = document.createElement("td");
-      rifCell.className = "td-riferimento";
-      const rifInput = document.createElement("input");
-      rifInput.type = "text";
-      rifInput.className = "input-riferimento-elevazione";
-      rifInput.placeholder = "Es: prospetto nord";
-      rifInput.value = e.riferimento ?? "";
-      rifInput.dataset.rifElevazione = String(e.idElevazione);
-      rifInput.setAttribute("aria-label", "Riferimento elevazione");
-      rifCell.appendChild(rifInput);
-      row.appendChild(rifCell);
-
-      const spCell = document.createElement("td");
-      spCell.className = "td-riferimento";
-      const spInput = document.createElement("input");
-      spInput.type = "number";
-      spInput.step = "0.01";
-      spInput.min = "0";
-      spInput.className = "input-spessore-elevazione";
-      spInput.placeholder = "0.00";
-      spInput.value = fmt2(typeof e.spessore === "number" ? e.spessore : 0);
-      spInput.dataset.spessoreElevazione = String(e.idElevazione);
-      spInput.setAttribute("aria-label", "Spessore elevazione");
-      spCell.appendChild(spInput);
-      row.appendChild(spCell);
-
-      const actionsCell = document.createElement("td");
-      actionsCell.className = "actions-cell";
-
-      const filtraBtn = document.createElement("button");
-      filtraBtn.type = "button";
-      filtraBtn.className = "btn-action btn-filtra";
-      filtraBtn.dataset.action = "filtra-mur-elevazione";
-      filtraBtn.dataset.id = String(e.idElevazione);
-      filtraBtn.textContent =
-        murFiltroSoloIdElevazione === e.idElevazione ? "Mostra tutte" : "Filtra";
-
-      const delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "btn-action btn-delete";
-      delBtn.dataset.action = "elimina-elevazione";
-      delBtn.dataset.id = String(e.idElevazione);
-      delBtn.textContent = "Elimina";
-
-      actionsCell.append(filtraBtn, delBtn);
-      row.appendChild(actionsCell);
-      murEleBodyEl.appendChild(row);
-    });
+  function renderMurielevazioni() {
+    syncMurParamsInputsDaPianoCorrente();
   }
 
   function renderStrati() {
     stratiMurBodyEl.innerHTML = "";
-    updateElevazioneAttivaLabel(
-      idElevazioneAttivaEl,
-      riferimentoElevazioneAttivaEl,
-      currentElevazioneId,
-      murielevazioni,
+    updateMurPianoCompilazioneLabel(
+      idPianoCompilazioneEl,
+      riferimentoMurPianoEl,
+      compilazionePianoId,
+      piani,
     );
     const totaleStrati =
-      currentElevazioneId === null
+      compilazionePianoId === null
         ? 0
-        : stratiMurElevazione.filter((s) => s.idElevazione === currentElevazioneId).length;
+        : stratiMurElevazione.filter((s) => s.idPiano === compilazionePianoId).length;
     countStratiEl.textContent = `(${totaleStrati})`;
 
     try {
-      if (compilazionePianoId === null || currentElevazioneId === null) {
+      if (compilazionePianoId === null) {
         const row = document.createElement("tr");
         const cell = document.createElement("td");
         cell.colSpan = 8;
         cell.className = "empty-cell";
         cell.textContent =
-          "Seleziona un'elevazione nella tabella MURIELEVAZIONE (o apri Compila su un piano Interrato).";
+          "Apri Compila su un piano Interrato: serve un piano attivo e i campi Riferimento / Spessore muro sopra.";
         row.appendChild(cell);
         stratiMurBodyEl.appendChild(row);
         return;
       }
 
-      const visibili = stratiMurElevazione.filter((s) => s.idElevazione === currentElevazioneId);
+      const visibili = stratiMurElevazione.filter((s) => s.idPiano === compilazionePianoId);
       if (visibili.length === 0) {
         const row = document.createElement("tr");
         const cell = document.createElement("td");
         cell.colSpan = 8;
         cell.className = "empty-cell";
-        cell.textContent = "Nessuno strato per questa elevazione.";
+        cell.textContent = "Nessuno strato per questo piano.";
         row.appendChild(cell);
         stratiMurBodyEl.appendChild(row);
         return;
@@ -7053,7 +7922,7 @@ window.addEventListener("DOMContentLoaded", () => {
       visibili.forEach((item) => {
         const row = document.createElement("tr");
         row.appendChild(createCell(String(item.idStratoMur)));
-        row.appendChild(createCell(String(item.idElevazione)));
+        row.appendChild(createCell(String(item.idPiano)));
         row.appendChild(createCell(item.idStrato));
         row.appendChild(createCell(String(item.lunghezza)));
         row.appendChild(createCell(String(item.altezza)));
@@ -7083,8 +7952,8 @@ window.addEventListener("DOMContentLoaded", () => {
       });
 
       const spessoreSomma = visibili.reduce((sum, item) => sum + Number(item.spessore || 0), 0);
-      const elevazioneAttiva = murielevazioni.find((e) => e.idElevazione === currentElevazioneId);
-      const spessoreElevazione = Number(elevazioneAttiva?.spessore || 0);
+      const pianoAttivo = piani.find((e) => e.id === compilazionePianoId);
+      const spessoreElevazione = Number(pianoAttivo?.murSpessore ?? 0);
       const mismatch = spessoreSomma !== spessoreElevazione;
 
       const totalRow = document.createElement("tr");
@@ -7101,7 +7970,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
       const confrontoCell = document.createElement("td");
       confrontoCell.className = "strati-total-target";
-      confrontoCell.textContent = `Spessore MURIELEVAZIONE: ${fmt2(spessoreElevazione)}`;
+      confrontoCell.textContent = `Spessore muro (piano): ${fmt2(spessoreElevazione)}`;
 
       const esitoCell = document.createElement("td");
       esitoCell.className = "strati-total-status";
@@ -7122,7 +7991,6 @@ window.addEventListener("DOMContentLoaded", () => {
     renderStratiNettiModule({
       stratiNettiBodyEl,
       compilazionePianoId,
-      currentElevazioneId,
       stratiMurElevazione,
       apertureElevazione,
       createCell,
@@ -7133,38 +8001,38 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function renderAperture() {
     apertureElevBodyEl.innerHTML = "";
-    updateElevazioneAttivaLabel(
-      idElevazioneAttivaEl,
-      riferimentoElevazioneAttivaEl,
-      currentElevazioneId,
-      murielevazioni,
+    updateMurPianoCompilazioneLabel(
+      idPianoCompilazioneEl,
+      riferimentoMurPianoEl,
+      compilazionePianoId,
+      piani,
     );
     const totaleAperture =
-      currentElevazioneId === null
+      compilazionePianoId === null
         ? 0
-        : apertureElevazione.filter((a) => a.idElevazione === currentElevazioneId).length;
+        : apertureElevazione.filter((a) => a.idPiano === compilazionePianoId).length;
     countApertureEl.textContent = `(${totaleAperture})`;
 
     try {
-      if (compilazionePianoId === null || currentElevazioneId === null) {
+      if (compilazionePianoId === null) {
         const row = document.createElement("tr");
         const cell = document.createElement("td");
         cell.colSpan = 11;
         cell.className = "empty-cell";
         cell.textContent =
-          "Seleziona un'elevazione nella tabella MURIELEVAZIONE per gestire le aperture.";
+          "Apri Compila su un piano Interrato e verifica Riferimento / Spessore muro sopra per gestire le aperture.";
         row.appendChild(cell);
         apertureElevBodyEl.appendChild(row);
         return;
       }
 
-      const visibili = apertureElevazione.filter((a) => a.idElevazione === currentElevazioneId);
+      const visibili = apertureElevazione.filter((a) => a.idPiano === compilazionePianoId);
       if (visibili.length === 0) {
         const row = document.createElement("tr");
         const cell = document.createElement("td");
         cell.colSpan = 11;
         cell.className = "empty-cell";
-        cell.textContent = "Nessuna apertura per questa elevazione.";
+        cell.textContent = "Nessuna apertura per questo piano.";
         row.appendChild(cell);
         apertureElevBodyEl.appendChild(row);
         return;
@@ -7173,7 +8041,7 @@ window.addEventListener("DOMContentLoaded", () => {
       visibili.forEach((item) => {
         const row = document.createElement("tr");
         row.appendChild(createCell(String(item.idAperturaElev)));
-        row.appendChild(createCell(String(item.idElevazione)));
+        row.appendChild(createCell(String(item.idPiano)));
         row.appendChild(createCell(item.locale));
         row.appendChild(createCell(fmt2(item.lunghezza)));
         row.appendChild(createCell(fmt2(item.altezza)));
@@ -7327,63 +8195,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function renderCamminamenti() {
-    camminamentiBodyEl.innerHTML = "";
-    const visibili = camminamentiEsterni;
-    countCamminamentiEl.textContent = `(${visibili.length})`;
-    const sumArea = visibili.reduce((sum, item) => sum + Number(item.area || 0), 0);
-    const sumVolume = visibili.reduce((sum, item) => sum + Number(item.volume || 0), 0);
-    sumAreaCamminamentiEl.textContent = `Mq. ${fmt2(sumArea)}`;
-    sumVolumeCamminamentiEl.textContent = `Mc. ${fmt2(sumVolume)}`;
-
-    if (visibili.length === 0) {
-      const row = document.createElement("tr");
-      const cell = document.createElement("td");
-      cell.colSpan = 11;
-      cell.className = "empty-cell";
-      cell.textContent = "Nessuna riga CAMMINAMENTI.";
-      row.appendChild(cell);
-      camminamentiBodyEl.appendChild(row);
-      return;
-    }
-
-    visibili.forEach((item) => {
-      const row = document.createElement("tr");
-      if (item.sottrai) row.classList.add("row-sottrai");
-      row.appendChild(createCell(String(item.idPlCamm)));
-      row.appendChild(createCell(item.piano));
-      row.appendChild(createCell(item.riferimento));
-      row.appendChild(createCell(item.misura1 === null ? "-" : fmt2(item.misura1)));
-      row.appendChild(createCell(item.misura2 === null ? "-" : fmt2(item.misura2)));
-      row.appendChild(createCell(item.formula || "-"));
-      row.appendChild(createCell(fmt2(item.area)));
-      row.appendChild(createCell(item.altezza === null ? "-" : fmt2(item.altezza)));
-      row.appendChild(createCell(fmt2(item.volume)));
-      row.appendChild(createCell(item.idVoce || "-"));
-
-      const actionsCell = document.createElement("td");
-      actionsCell.className = "actions-cell";
-
-      const editButton = document.createElement("button");
-      editButton.type = "button";
-      editButton.className = "btn-action btn-edit";
-      editButton.dataset.action = "edit-camminamenti";
-      editButton.dataset.id = String(item.idPlCamm);
-      editButton.textContent = "Modifica";
-
-      const deleteButton = document.createElement("button");
-      deleteButton.type = "button";
-      deleteButton.className = "btn-action btn-delete";
-      deleteButton.dataset.action = "delete-camminamenti";
-      deleteButton.dataset.id = String(item.idPlCamm);
-      deleteButton.textContent = "Elimina";
-
-      actionsCell.append(editButton, deleteButton);
-      row.appendChild(actionsCell);
-      camminamentiBodyEl.appendChild(row);
-    });
-  }
-
   function renderMisurazioniVarie() {
     if (!misurazioniBodyEl || !countMisurazioniEl) return;
     misurazioniBodyEl.innerHTML = "";
@@ -7484,7 +8295,14 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!tipologia || !edificio || !piano) return;
 
     if (editingPianoId === null) {
-      piani.push({ id: pianoIdCounter, tipologia, edificio, piano });
+      piani.push({
+        id: pianoIdCounter,
+        tipologia,
+        edificio,
+        piano,
+        murRiferimento: "",
+        murSpessore: 0,
+      });
       pianoIdCounter += 1;
     } else {
       piani = piani.map((item) =>
@@ -7499,8 +8317,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   stratiFormEl.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (compilazionePianoId === null || currentElevazioneId === null) {
-      window.alert("Seleziona prima un'elevazione (tabella MURIELEVAZIONE).");
+    if (compilazionePianoId === null) {
+      window.alert("Apri Compila su un piano Interrato: serve un piano attivo.");
       return;
     }
     const lunghezza = parseNumber(lunghezzaEl.value);
@@ -7514,17 +8332,17 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const spessoreElevazione = getSpessoreElevazioneAttiva();
-    if (spessoreElevazione <= 0) {
+    const spessoreMur = getSpessoreMurPianoCorrente();
+    if (spessoreMur <= 0) {
       window.alert(
-        "Prima di aggiungere uno strato devi inserire lo SPESSORE in MURI ELEVAZIONE.",
+        "Prima di aggiungere uno strato devi inserire lo SPESSORE nel campo sopra (muro del piano).",
       );
       return;
     }
 
-    const residuo = calcolaSpessoreResiduoPerElevazione(currentElevazioneId, editingStratoMurId);
+    const residuo = calcolaSpessoreResiduoPerPiano(compilazionePianoId, editingStratoMurId);
     if (residuo <= 0) {
-      window.alert("Hai gia' raggiunto lo spessore massimo della MURIELEVAZIONE.");
+      window.alert("Hai gia' raggiunto lo spessore massimo del muro per questo piano.");
       return;
     }
 
@@ -7537,10 +8355,10 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (editingStratoMurId === null) {
-      const idStrato = String(prossimoIdStratoPerElevazione(currentElevazioneId));
+      const idStrato = String(prossimoIdStratoPerPiano(compilazionePianoId));
       stratiMurElevazione.push({
         idStratoMur: stratoMurIdCounter++,
-        idElevazione: currentElevazioneId,
+        idPiano: compilazionePianoId,
         idStrato,
         lunghezza,
         altezza,
@@ -7562,8 +8380,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   apertureFormEl.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (compilazionePianoId === null || currentElevazioneId === null) {
-      window.alert("Seleziona prima un'elevazione (tabella MURIELEVAZIONE).");
+    if (compilazionePianoId === null) {
+      window.alert("Apri Compila su un piano Interrato: serve un piano attivo.");
       return;
     }
     const locale = apLocaleEl.value.trim();
@@ -7589,7 +8407,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (editingAperturaElevId === null) {
       apertureElevazione.push({
         idAperturaElev: aperturaElevIdCounter++,
-        idElevazione: currentElevazioneId,
+        idPiano: compilazionePianoId,
         locale,
         lunghezza,
         altezza,
@@ -7624,7 +8442,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   scavoFormEl.addEventListener("submit", (event) => {
     event.preventDefault();
-    const piano = scavoPianoEl.value.trim();
+    const piano = ensurePianoMisuraInArchivio(scavoPianoEl.value);
+    scavoPianoEl.value = piano;
     const riferimento = scavoRiferimentoEl.value.trim();
     const sottrai = scavoSottraiEl.checked;
     const misura1 = scavoMisura1El.value.trim() === "" ? null : parseNonNegativeDecimal2(scavoMisura1El.value);
@@ -7684,6 +8503,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     saveMurDati();
     renderScavi();
+    syncEsterniVersoVoci();
     resetScavoForm();
     updateFormulaButtonState(scavoFormulaEl, apriFormulaScavoButtonEl);
   });
@@ -7691,7 +8511,8 @@ window.addEventListener("DOMContentLoaded", () => {
   corselloFormEl.addEventListener("submit", (event) => {
     event.preventDefault();
 
-    const piano = corselloPianoEl.value.trim();
+    const piano = ensurePianoMisuraInArchivio(corselloPianoEl.value);
+    corselloPianoEl.value = piano;
     const riferimento = corselloRiferimentoEl.value.trim();
     const sottrai = corselloSottraiEl.checked;
     const misura1 =
@@ -7754,91 +8575,17 @@ window.addEventListener("DOMContentLoaded", () => {
 
     saveMurDati();
     renderCorselli();
+    syncEsterniVersoVoci();
     resetCorselloForm();
     updateFormulaButtonState(corselloFormulaEl, apriFormulaCorselloButtonEl);
-  });
-
-  camminamentiFormEl.addEventListener("submit", (event) => {
-    event.preventDefault();
-
-    const piano = camminamentiPianoEl.value.trim();
-    const riferimento = camminamentiRiferimentoEl.value.trim();
-    const sottrai = camminamentiSottraiEl.checked;
-    const misura1 =
-      camminamentiMisura1El.value.trim() === ""
-        ? null
-        : parseNonNegativeDecimal2(camminamentiMisura1El.value);
-    const misura2 =
-      camminamentiMisura2El.value.trim() === ""
-        ? null
-        : parseNonNegativeDecimal2(camminamentiMisura2El.value);
-    const formula = camminamentiFormulaEl.value.trim();
-    const formulaValue = evalFormulaValue(formula);
-    const altezza =
-      camminamentiAltezzaEl.value.trim() === ""
-        ? null
-        : parseNonNegativeDecimal2(camminamentiAltezzaEl.value);
-    const idVoce = camminamentiIdVoceEl.value.trim();
-
-    if (!piano || !riferimento) return;
-    if (misura1 === null && camminamentiMisura1El.value.trim() !== "") return;
-    if (misura2 === null && camminamentiMisura2El.value.trim() !== "") return;
-    if (formula && formulaValue === null) {
-      window.alert("FORMULA non valida. Usa solo numeri, operatori (+ - * /) e parentesi.");
-      return;
-    }
-
-    const areaBase = calcolaAreaScavo(misura1, misura2, formulaValue);
-    const area = applySegno(areaBase, sottrai);
-    const volume = applySegno(calcolaVolume(areaBase, altezza), sottrai);
-
-    if (editingCamminamentiId === null) {
-      camminamentiEsterni.push({
-        idPlCamm: camminamentiIdCounter++,
-        piano,
-        riferimento,
-        sottrai,
-        misura1,
-        misura2,
-        formula,
-        formulaValue,
-        area,
-        altezza,
-        volume,
-        idVoce,
-      });
-    } else {
-      camminamentiEsterni = camminamentiEsterni.map((item) =>
-        item.idPlCamm === editingCamminamentiId
-          ? {
-              ...item,
-              piano,
-              riferimento,
-              sottrai,
-              misura1,
-              misura2,
-              formula,
-              formulaValue,
-              area,
-              altezza,
-              volume,
-              idVoce,
-            }
-          : item,
-      );
-    }
-
-    saveMurDati();
-    renderCamminamenti();
-    resetCamminamentiForm();
-    updateFormulaButtonState(camminamentiFormulaEl, apriFormulaCamminamentiButtonEl);
   });
 
   if (misurazioniFormEl) {
     misurazioniFormEl.addEventListener("submit", (event) => {
       event.preventDefault();
       const idVoce = misurazioniIdVoceEl.value.trim();
-      const piano = misurazioniPianoEl.value.trim();
+      const piano = ensurePianoMisuraInArchivio(misurazioniPianoEl.value);
+      misurazioniPianoEl.value = piano;
       const riferimento = misurazioniRiferimentoEl.value.trim();
       const formula = misurazioniFormulaEl.value.trim();
       const segno = misurazioniSegnoEl.checked;
@@ -7883,6 +8630,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
       saveMurDati();
       renderMisurazioniVarie();
+      syncEsterniVersoVoci();
       resetMisurazioniForm();
       updateFormulaButtonState(misurazioniFormulaEl, apriFormulaMisurazioniButtonEl);
     });
@@ -7894,10 +8642,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   apriFormulaCorselloButtonEl.addEventListener("click", () => {
     openFormulaDialog(corselloFormulaEl);
-  });
-
-  apriFormulaCamminamentiButtonEl.addEventListener("click", () => {
-    openFormulaDialog(camminamentiFormulaEl);
   });
 
   apriFormulaMisurazioniButtonEl?.addEventListener("click", () => {
@@ -7917,9 +8661,6 @@ window.addEventListener("DOMContentLoaded", () => {
     } else if (targetId === corselloFormulaEl.id) {
       corselloFormulaEl.value = formulaDialogTextEl.value.trim();
       updateFormulaButtonState(corselloFormulaEl, apriFormulaCorselloButtonEl);
-    } else if (targetId === camminamentiFormulaEl.id) {
-      camminamentiFormulaEl.value = formulaDialogTextEl.value.trim();
-      updateFormulaButtonState(camminamentiFormulaEl, apriFormulaCamminamentiButtonEl);
     } else if (targetId === misurazioniFormulaEl?.id) {
       misurazioniFormulaEl.value = formulaDialogTextEl.value.trim();
       updateFormulaButtonState(misurazioniFormulaEl, apriFormulaMisurazioniButtonEl);
@@ -8056,6 +8797,14 @@ window.addEventListener("DOMContentLoaded", () => {
     const idVoce = Number(tr.dataset.idVoce);
     const idx = Number(tr.dataset.mmIndex);
     if (Number.isNaN(idVoce) || Number.isNaN(idx)) return;
+    if (voceIdBloccataInVoci(idVoce)) {
+      const voce = voci.find((item) => item.idVoce === idVoce);
+      const msg = voce && isVoceSpecialeNoTotaleRiferimento(voce)
+        ? "Questa voce automatica è in sola lettura in VOCI. Modifica dai relativi strumenti."
+        : "Questa voce deriva da VANI o CAMMINAMENTI: in VOCI puoi modificare solo l'unità di misura (✎).";
+      window.alert(msg);
+      return;
+    }
     openVoceMmRigaDialog(idVoce, idx);
   });
 
@@ -8063,6 +8812,14 @@ window.addEventListener("DOMContentLoaded", () => {
     resetVoceForm();
     voceDialogEl.showModal();
     setTimeout(() => vocePosizioneEl.focus(), 0);
+  });
+
+  document.addEventListener("computo-apri-dialog-nuova-voce", () => {
+    if (!voceDialogEl) return;
+    resetVoceForm();
+    if (voceTipoMisuraEl) voceTipoMisuraEl.value = TIPOMISURA_VOCE_MANUALE;
+    voceDialogEl.showModal();
+    setTimeout(() => vocePosizioneEl?.focus(), 0);
   });
 
   voceBtnCercaEl?.addEventListener("click", () => {
@@ -8088,7 +8845,12 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   voceDialogCancelEl.addEventListener("click", () => {
+    resetVoceForm();
     voceDialogEl.close();
+  });
+
+  voceDialogEl?.addEventListener("close", () => {
+    if (editingVoceSoloUnitaMisura) setVoceDialogModalitaSoloUnitaMisura(false);
   });
 
   voceDeleteCancelEl.addEventListener("click", () => {
@@ -8132,6 +8894,42 @@ window.addEventListener("DOMContentLoaded", () => {
 
   voceDialogFormEl.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (editingVoceId !== null && editingVoceSoloUnitaMisura) {
+      const voceEsistente = voci.find((v) => v.idVoce === editingVoceId);
+      if (!voceEsistente) {
+        resetVoceForm();
+        voceDialogEl.close();
+        return;
+      }
+      const unitaMisura = voceUnitaMisuraEl.value.trim();
+      if (!unitaMisura) return;
+      if (
+        unitaMisura &&
+        !vociUnitaMisuraOptions.some((u) => u.toLowerCase() === unitaMisura.toLowerCase())
+      ) {
+        vociUnitaMisuraOptions.push(unitaMisura);
+        saveVociUnitaOptions();
+        renderVociUnitaOptions(unitaMisura);
+      }
+      voci = voci.map((item) =>
+        item.idVoce === editingVoceId
+          ? {
+              ...item,
+              unitaMisura,
+              misurazioniManuali: normalizzaMisurazioniManualiVoce(
+                item.misurazioniManuali,
+                unitaMisura,
+              ),
+            }
+          : item,
+      );
+      normalizzaPosizioniVoci();
+      saveVoci();
+      renderVoci();
+      resetVoceForm();
+      voceDialogEl.close();
+      return;
+    }
     const posizione = Number.parseInt(vocePosizioneEl.value, 10);
     const voceAbbreviata = voceAbbreviataEl.value.trim();
     const unitaMisura = voceUnitaMisuraEl.value.trim();
@@ -8143,7 +8941,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const voceEsistente = editingVoceId !== null ? voci.find((v) => v.idVoce === editingVoceId) : null;
     const misurazioniManualiSalvate =
       tipoMisura === TIPOMISURA_VOCE_MANUALE
-        ? normalizzaMisurazioniManualiVoce(voceEsistente?.misurazioniManuali)
+        ? normalizzaMisurazioniManualiVoce(voceEsistente?.misurazioniManuali, unitaMisura)
         : [];
     if (editingVoceId === null) {
       const newId = voceIdCounter++;
@@ -8193,10 +8991,35 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const button = event.target.closest("button[data-action]");
     if (!button) return;
-
-    if (button.dataset.action === "add-voce-mm") {
-      const idVoce = Number(button.dataset.idVoce);
-      if (!Number.isNaN(idVoce)) openVoceMmRigaDialog(idVoce, null);
+    const azione = String(button.dataset.action || "").trim();
+    const idVoceLock = Number(button.dataset.idVoce ?? button.dataset.id ?? NaN);
+    const azioniBloccateDaVani = new Set([
+      "duplicate-voce-mm-row",
+      "open-voce-mm-apertura-editor",
+      "use-voce-mm-apertura",
+      "edit-voce-mm-apertura",
+      "cancel-voce-mm-apertura-draft",
+      "save-voce-mm-apertura-draft",
+      "delete-voce-mm-apertura",
+      "duplicate-voce-mm-apertura",
+      "delete-voce-mm-row",
+      "copy-voce",
+    ]);
+    if (azione === "edit-voce" && !Number.isNaN(idVoceLock)) {
+      const voceEdit = voci.find((item) => item.idVoce === idVoceLock);
+      if (voceEdit && isVoceSpecialeNoTotaleRiferimento(voceEdit)) {
+        window.alert(
+          "Questa voce automatica è in sola lettura in VOCI. Modifica dai relativi strumenti.",
+        );
+        return;
+      }
+    }
+    if (azioniBloccateDaVani.has(azione) && !Number.isNaN(idVoceLock) && voceIdBloccataInVoci(idVoceLock)) {
+      const voce = voci.find((item) => item.idVoce === idVoceLock);
+      const msg = voce && isVoceSpecialeNoTotaleRiferimento(voce)
+        ? "Questa voce automatica è in sola lettura in VOCI. Modifica dai relativi strumenti."
+        : "Questa voce deriva da VANI o CAMMINAMENTI: in VOCI puoi modificare solo l'unità di misura (✎).";
+      window.alert(msg);
       return;
     }
 
@@ -8273,19 +9096,20 @@ window.addEventListener("DOMContentLoaded", () => {
       const editingAperturaMasterId = String(draftRaw?.editingAperturaMasterId || "").trim();
       voci = voci.map((item) => {
         if (item.idVoce !== idVoce) return item;
-        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
         if (idx < 0 || idx >= mm.length) return item;
         const row = mm[idx];
+        const pianoDaMisurazione = String(row.piano || "").trim();
         const refs = normalizzaApertureCollegateRefs(row.apertureCollegate);
         if (editingAperturaMasterId) {
           apertureMaster = apertureMaster.map((apertura) =>
             apertura.idAperturaMaster === editingAperturaMasterId
-              ? { ...apertura, ...parsedApertura }
+              ? { ...apertura, ...parsedApertura, piano: pianoDaMisurazione }
               : apertura,
           );
           mm[idx] = { ...row, apertureCollegate: refs };
         } else {
-          const nuovoId = creaAperturaMasterDaDati(parsedApertura);
+          const nuovoId = creaAperturaMasterDaDati({ ...parsedApertura, piano: pianoDaMisurazione });
           if (nuovoId) mm[idx] = { ...row, apertureCollegate: [...refs, { idAperturaMaster: nuovoId }] };
         }
         return { ...item, misurazioniManuali: mm };
@@ -8316,7 +9140,7 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       voci = voci.map((item) => {
         if (item.idVoce !== idVoce) return item;
-        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
         if (idx < 0 || idx >= mm.length) return item;
         const row = mm[idx];
         const aperture = normalizzaApertureCollegateRefs(row.apertureCollegate);
@@ -8338,7 +9162,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (Number.isNaN(idVoce) || Number.isNaN(idx) || !aperturaId) return;
       voci = voci.map((item) => {
         if (item.idVoce !== idVoce) return item;
-        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali);
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
         if (idx < 0 || idx >= mm.length) return item;
         const row = mm[idx];
         const aperture = normalizzaApertureCollegateRefs(row.apertureCollegate);
@@ -8346,7 +9170,11 @@ window.addEventListener("DOMContentLoaded", () => {
         if (!source) return item;
         const sourceMaster = apertureMaster.find((ap) => ap.idAperturaMaster === source.idAperturaMaster);
         if (!sourceMaster) return item;
-        const cloneMaster = { ...sourceMaster, idAperturaMaster: nextAperturaMasterId() };
+        const cloneMaster = {
+          ...sourceMaster,
+          idAperturaMaster: nextAperturaMasterId(),
+          piano: String(row.piano || "").trim(),
+        };
         apertureMaster.push(cloneMaster);
         const newMasterId = cloneMaster.idAperturaMaster;
         mm[idx] = { ...row, apertureCollegate: [...aperture, { idAperturaMaster: newMasterId }] };
@@ -8374,7 +9202,15 @@ window.addEventListener("DOMContentLoaded", () => {
     if (button.dataset.action === "edit-voce") {
       const row = voci.find((item) => item.idVoce === id);
       if (!row) return;
+      if (isVoceSpecialeNoTotaleRiferimento(row)) {
+        window.alert(
+          "Questa voce automatica è in sola lettura in VOCI. Modifica dai relativi strumenti.",
+        );
+        return;
+      }
       editingVoceId = id;
+      const soloUnita = voceDerivataDaVani(row);
+      setVoceDialogModalitaSoloUnitaMisura(soloUnita);
       voceIdEl.value = String(row.idVoce);
       vocePosizioneEl.value = String(row.posizione);
       voceAbbreviataEl.value = row.voceAbbreviata || "";
@@ -8385,7 +9221,7 @@ window.addEventListener("DOMContentLoaded", () => {
       voceTestoEl.value = row.voce;
       voceNoteEl.value = row.note;
       voceDialogEl.showModal();
-      setTimeout(() => vocePosizioneEl.focus(), 0);
+      setTimeout(() => (soloUnita ? voceUnitaMisuraEl : vocePosizioneEl)?.focus(), 0);
       return;
     }
 
@@ -8497,6 +9333,13 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  iniziaComputoButtonEl?.addEventListener("click", () => {
+    richiediIniziaNuovoComputo().catch((err) => {
+      console.error(err);
+      window.alert("Errore durante l’avvio del nuovo computo.");
+    });
+  });
+
   importaComputoButtonEl.addEventListener("click", () => {
     const fileInput = document.createElement("input");
     fileInput.type = "file";
@@ -8553,140 +9396,24 @@ window.addEventListener("DOMContentLoaded", () => {
     voceUnitaAddButtonEl.click();
   });
 
-  murEleBodyEl.addEventListener("change", (event) => {
-    const input = event.target.closest("input.input-riferimento-elevazione");
-    if (input) {
-      const id = Number(input.dataset.rifElevazione);
-      if (Number.isNaN(id)) return;
-      aggiornaRiferimentoElevazione(id, input.value.trim());
-      return;
-    }
+  murParamsRiferimentoEl?.addEventListener("change", () => {
+    if (compilazionePianoId === null) return;
+    aggiornaMurRiferimentoPiano(compilazionePianoId, murParamsRiferimentoEl.value.trim());
+    updateMurPianoCompilazioneLabel(
+      idPianoCompilazioneEl,
+      riferimentoMurPianoEl,
+      compilazionePianoId,
+      piani,
+    );
+  });
 
-    const spInput = event.target.closest("input.input-spessore-elevazione");
-    if (!spInput) return;
-    const id = Number(spInput.dataset.spessoreElevazione);
-    if (Number.isNaN(id)) return;
-    const parsed = parseNonNegativeDecimal2(spInput.value);
+  murParamsSpessoreEl?.addEventListener("change", () => {
+    if (compilazionePianoId === null) return;
+    const parsed = parseNonNegativeDecimal2(murParamsSpessoreEl.value);
     const spessore = parsed === null ? 0 : parsed;
-    aggiornaSpessoreElevazione(id, spessore);
-    spInput.value = fmt2(spessore);
+    aggiornaMurSpessorePiano(compilazionePianoId, spessore);
+    murParamsSpessoreEl.value = fmt2(spessore);
     aggiornaSuggerimentoSpessoreStrato();
-  });
-
-  function selezionaElevazionePerStrati(idElevazione, opts = {}) {
-    const refocusRif = opts.refocusRif === true;
-    const refocusSpessore = opts.refocusSpessore === true;
-    if (currentElevazioneId === idElevazione) return;
-
-    currentElevazioneId = idElevazione;
-    resetStratiForm();
-    resetAperturaForm();
-    renderMurielevazioni();
-    renderStrati();
-    renderAperture();
-
-    if (refocusRif) {
-      requestAnimationFrame(() => {
-        murEleBodyEl
-          .querySelector(`input.input-riferimento-elevazione[data-rif-elevazione="${idElevazione}"]`)
-          ?.focus();
-      });
-    } else if (refocusSpessore) {
-      requestAnimationFrame(() => {
-        murEleBodyEl
-          .querySelector(
-            `input.input-spessore-elevazione[data-spessore-elevazione="${idElevazione}"]`,
-          )
-          ?.focus();
-      });
-    } else {
-      lunghezzaEl.focus();
-    }
-  }
-
-  murEleBodyEl.addEventListener("click", (event) => {
-    const filtraBtn = event.target.closest("button[data-action='filtra-mur-elevazione']");
-    if (filtraBtn) {
-      event.stopPropagation();
-      const id = Number(filtraBtn.dataset.id);
-      if (Number.isNaN(id)) return;
-      if (murFiltroSoloIdElevazione === id) {
-        murFiltroSoloIdElevazione = null;
-      } else {
-        murFiltroSoloIdElevazione = id;
-        if (currentElevazioneId !== id) {
-          currentElevazioneId = id;
-          resetStratiForm();
-          resetAperturaForm();
-          renderStrati();
-          renderAperture();
-        }
-      }
-      aggiornaSuggerimentoSpessoreStrato();
-      renderMurielevazioni();
-      tornaPianiButtonEl.focus();
-      window.scrollTo({ top: 0, behavior: "auto" });
-      return;
-    }
-
-    const delBtn = event.target.closest("button[data-action='elimina-elevazione']");
-    if (delBtn) {
-      event.stopPropagation();
-      const id = Number(delBtn.dataset.id);
-      if (Number.isNaN(id)) return;
-      if (!window.confirm("Eliminare questa elevazione, i suoi strati e le aperture collegate?")) return;
-      murielevazioni = murielevazioni.filter((e) => e.idElevazione !== id);
-      stratiMurElevazione = stratiMurElevazione.filter((s) => s.idElevazione !== id);
-      apertureElevazione = apertureElevazione.filter((a) => a.idElevazione !== id);
-      if (murFiltroSoloIdElevazione === id) {
-        murFiltroSoloIdElevazione = null;
-      }
-      if (currentElevazioneId === id) {
-        const restanti = murielevazioni.filter((e) => e.idPiano === compilazionePianoId);
-        currentElevazioneId = restanti.length ? restanti[restanti.length - 1].idElevazione : null;
-        resetStratiForm();
-        resetAperturaForm();
-      }
-      aggiornaSuggerimentoSpessoreStrato();
-      saveMurDati();
-      renderMurielevazioni();
-      renderStrati();
-      renderAperture();
-      return;
-    }
-
-    const rifInputClick = event.target.closest("input.input-riferimento-elevazione");
-    if (rifInputClick) {
-      const id = Number(rifInputClick.dataset.rifElevazione);
-      if (Number.isNaN(id)) return;
-      selezionaElevazionePerStrati(id, { refocusRif: true });
-      return;
-    }
-
-    const spInputClick = event.target.closest("input.input-spessore-elevazione");
-    if (spInputClick) {
-      const id = Number(spInputClick.dataset.spessoreElevazione);
-      if (Number.isNaN(id)) return;
-      selezionaElevazionePerStrati(id, { refocusSpessore: true });
-      return;
-    }
-
-    const row = event.target.closest("tr[data-elevazione-id]");
-    if (!row) return;
-    const id = Number(row.dataset.elevazioneId);
-    if (Number.isNaN(id)) return;
-    selezionaElevazionePerStrati(id);
-  });
-
-  murEleBodyEl.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    if (event.target.closest("input, button")) return;
-    const row = event.target.closest("tr[data-elevazione-id]");
-    if (!row) return;
-    event.preventDefault();
-    const id = Number(row.dataset.elevazioneId);
-    if (Number.isNaN(id)) return;
-    selezionaElevazionePerStrati(id);
   });
 
   stratiMurBodyEl.addEventListener("click", (event) => {
@@ -8781,6 +9508,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (editingScavoId === id) resetScavoForm();
       saveMurDati();
       renderScavi();
+      syncEsterniVersoVoci();
     }
   });
 
@@ -8815,40 +9543,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (editingCorselloId === id) resetCorselloForm();
       saveMurDati();
       renderCorselli();
-    }
-  });
-
-  camminamentiBodyEl.addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-action]");
-    if (!button) return;
-    const id = Number(button.dataset.id);
-    if (Number.isNaN(id)) return;
-
-    if (button.dataset.action === "edit-camminamenti") {
-      const row = camminamentiEsterni.find((item) => item.idPlCamm === id);
-      if (!row) return;
-      editingCamminamentiId = id;
-      idPlCammEl.value = String(row.idPlCamm);
-      camminamentiPianoEl.value = row.piano;
-      camminamentiRiferimentoEl.value = row.riferimento;
-      camminamentiSottraiEl.checked = row.sottrai === true;
-      camminamentiMisura1El.value = row.misura1 === null ? "" : fmt2(row.misura1);
-      camminamentiMisura2El.value = row.misura2 === null ? "" : fmt2(row.misura2);
-      camminamentiFormulaEl.value = row.formula;
-      camminamentiAltezzaEl.value = fmt2(row.altezza);
-      camminamentiIdVoceEl.value = row.idVoce;
-      setCamminamentiFormMode();
-      updateFormulaButtonState(camminamentiFormulaEl, apriFormulaCamminamentiButtonEl);
-      camminamentiPianoEl.focus();
-      return;
-    }
-
-    if (button.dataset.action === "delete-camminamenti") {
-      if (!window.confirm("Eliminare questa riga CAMMINAMENTI?")) return;
-      camminamentiEsterni = camminamentiEsterni.filter((item) => item.idPlCamm !== id);
-      if (editingCamminamentiId === id) resetCamminamentiForm();
-      saveMurDati();
-      renderCamminamenti();
+      syncEsterniVersoVoci();
     }
   });
 
@@ -8881,6 +9576,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (editingMisurazioneId === id) resetMisurazioniForm();
       saveMurDati();
       renderMisurazioniVarie();
+      syncEsterniVersoVoci();
       return;
     }
 
@@ -8923,18 +9619,6 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  btnNuovaElevazioneEl.addEventListener("click", () => {
-    if (compilazionePianoId === null) return;
-    const nuovaId = creaNuovaElevazione(compilazionePianoId);
-    currentElevazioneId = nuovaId;
-    resetStratiForm();
-    resetAperturaForm();
-    renderMurielevazioni();
-    renderStrati();
-    renderAperture();
-    idstratoEl.focus();
-  });
-
   pianiBodyEl.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button) return;
@@ -8970,14 +9654,11 @@ window.addEventListener("DOMContentLoaded", () => {
     if (button.dataset.action === "delete-piano") {
       if (!window.confirm("Vuoi eliminare questo piano?")) return;
       piani = piani.filter((item) => item.id !== id);
-      const eleIds = murielevazioni.filter((e) => e.idPiano === id).map((e) => e.idElevazione);
-      murielevazioni = murielevazioni.filter((e) => e.idPiano !== id);
-      stratiMurElevazione = stratiMurElevazione.filter((s) => !eleIds.includes(s.idElevazione));
-      apertureElevazione = apertureElevazione.filter((a) => !eleIds.includes(a.idElevazione));
+      stratiMurElevazione = stratiMurElevazione.filter((s) => s.idPiano !== id);
+      apertureElevazione = apertureElevazione.filter((a) => a.idPiano !== id);
       if (editingPianoId === id) resetPianoForm();
       if (compilazionePianoId === id) {
         compilazionePianoId = null;
-        currentElevazioneId = null;
         resetStratiForm();
         resetAperturaForm();
         resetScavoForm();
@@ -9014,11 +9695,19 @@ window.addEventListener("DOMContentLoaded", () => {
     openCompilazioneEsterniVariDaSidebar();
   });
 
-  gestionePianiButtonEl.addEventListener("click", () => {
-    vistaVociEl.hidden = true;
-    if (vistaBimEl) vistaBimEl.hidden = true;
-    showVistaPiani(vistaPianiEl, vistaCompilazioneEl, altreTipologiePanelEl);
-    renderPiani();
+  misureVarieSidebarButtonEl.id = "btn-sidebar-misure-varie";
+  misureVarieSidebarButtonEl.type = "button";
+  misureVarieSidebarButtonEl.className = "btn-action btn-secondary";
+  misureVarieSidebarButtonEl.textContent = "MISURE VARIE";
+  misureVarieSidebarButtonEl.title = "Misurazioni varie collegate alle voci";
+  misureVarieSidebarButtonEl.addEventListener("click", () => {
+    openCompilazioneMisureVarie();
+  });
+  wireMisureVarieUi({
+    onBack: () => {
+      closeVistaMisureVarie();
+      renderPiani();
+    },
   });
 
   vistaBimButtonEl?.addEventListener("click", () => {
@@ -9199,6 +9888,87 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   document.body.appendChild(apertureMasterDialogEl);
 
+  pianiMisuraArchivioDialogEl.id = "piani-misura-archivio-dialog";
+  pianiMisuraArchivioDialogEl.className = "ifc-riepilogo-dialog";
+  pianiMisuraArchivioDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const action = button.dataset.action;
+    if (action === "close-archivio-piani-misura") {
+      pianiMisuraArchivioDialogEl.close();
+      return;
+    }
+    if (action === "add-archivio-piano-misura") {
+      const input = pianiMisuraArchivioDialogEl.querySelector("#archivio-piani-misura-new");
+      const raw = input instanceof HTMLInputElement ? input.value : "";
+      const c = ensurePianoMisuraInArchivio(raw);
+      if (!c) {
+        window.alert("Inserisci un nome piano.");
+        return;
+      }
+      if (input instanceof HTMLInputElement) input.value = "";
+      openArchivioPianiMisuraDialog();
+      return;
+    }
+    if (action === "delete-archivio-piano-misura") {
+      const idx = Number.parseInt(button.dataset.index || "", 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= archivioPianiMisura.length) return;
+      const nome = archivioPianiMisura[idx];
+      if (countRiferimentiPianoMisura(nome) > 0) {
+        const msg = messaggioPianoArchivioNonEliminabile(nome);
+        window.alert(
+          msg ||
+            "Il piano non è eliminabile perché è ancora usato in una o più misurazioni.",
+        );
+        return;
+      }
+      archivioPianiMisura = archivioPianiMisura.filter((_, i) => i !== idx);
+      saveArchivioPianiMisuraToStorage();
+      refreshArchivioPianiMisuraDatalist();
+      openArchivioPianiMisuraDialog();
+    }
+  });
+  document.body.appendChild(pianiMisuraArchivioDialogEl);
+
+  pianiMisuraArchivioSidebarButtonEl.id = "btn-apri-archivio-piani-misura";
+  pianiMisuraArchivioSidebarButtonEl.type = "button";
+  pianiMisuraArchivioSidebarButtonEl.className = "btn-action btn-secondary";
+  pianiMisuraArchivioSidebarButtonEl.title = "Archivio nomi piano (misurazioni)";
+  pianiMisuraArchivioSidebarButtonEl.textContent = "PIANI";
+  pianiMisuraArchivioSidebarButtonEl.addEventListener("click", () => {
+    openArchivioPianiMisuraDialog();
+  });
+  sidebarLeftActionsPrimariEl?.appendChild(pianiMisuraArchivioSidebarButtonEl);
+
+  vaniSidebarButtonEl.id = "btn-vani-open";
+  vaniSidebarButtonEl.type = "button";
+  vaniSidebarButtonEl.className = "btn-action btn-secondary";
+  vaniSidebarButtonEl.textContent = "VANI";
+  vaniSidebarButtonEl.addEventListener("click", () => {
+    openVistaVani();
+  });
+  sidebarLeftActionsPrimariEl?.appendChild(vaniSidebarButtonEl);
+  wireVaniUi();
+
+  const camminamentiSidebarButtonEl = document.createElement("button");
+  camminamentiSidebarButtonEl.id = "btn-camm-open";
+  camminamentiSidebarButtonEl.type = "button";
+  camminamentiSidebarButtonEl.className = "btn-action btn-secondary";
+  camminamentiSidebarButtonEl.textContent = "CAMMINAMENTI";
+  camminamentiSidebarButtonEl.addEventListener("click", () => {
+    openVistaCamminamenti();
+  });
+  sidebarLeftActionsPrimariEl?.appendChild(camminamentiSidebarButtonEl);
+  wireCamminamentiUi();
+
+  // ESTERNI VARI e MISURE VARIE nel gruppo primario (in fondo alla zona alta).
+  if (sidebarEsterniVariButtonEl && sidebarLeftActionsPrimariEl) {
+    sidebarLeftActionsPrimariEl.appendChild(sidebarEsterniVariButtonEl);
+  }
+  if (misureVarieSidebarButtonEl && sidebarLeftActionsPrimariEl) {
+    sidebarLeftActionsPrimariEl.appendChild(misureVarieSidebarButtonEl);
+  }
+
   apertureMasterSidebarButtonEl.id = "btn-apri-archivio-aperture";
   apertureMasterSidebarButtonEl.type = "button";
   apertureMasterSidebarButtonEl.className = "btn-action btn-secondary";
@@ -9206,16 +9976,7 @@ window.addEventListener("DOMContentLoaded", () => {
   apertureMasterSidebarButtonEl.addEventListener("click", () => {
     openApertureMasterDialog();
   });
-  sidebarLeftActionsEl?.appendChild(apertureMasterSidebarButtonEl);
-
-  grondeSidebarButtonEl.id = "btn-apri-archivio-gronde";
-  grondeSidebarButtonEl.type = "button";
-  grondeSidebarButtonEl.className = "btn-action btn-secondary";
-  grondeSidebarButtonEl.textContent = "CANALI";
-  grondeSidebarButtonEl.addEventListener("click", () => {
-    openArchivioGrondeDialog();
-  });
-  sidebarLeftActionsEl?.appendChild(grondeSidebarButtonEl);
+  sidebarLeftActionsSecondariEl?.appendChild(apertureMasterSidebarButtonEl);
 
   davanzaliSidebarButtonEl.id = "btn-apri-archivio-davanzali";
   davanzaliSidebarButtonEl.type = "button";
@@ -9224,7 +9985,7 @@ window.addEventListener("DOMContentLoaded", () => {
   davanzaliSidebarButtonEl.addEventListener("click", () => {
     openArchivioDavanzaliDialog();
   });
-  sidebarLeftActionsEl?.appendChild(davanzaliSidebarButtonEl);
+  sidebarLeftActionsSecondariEl?.appendChild(davanzaliSidebarButtonEl);
 
   soglieSidebarButtonEl.id = "btn-apri-archivio-soglie";
   soglieSidebarButtonEl.type = "button";
@@ -9233,7 +9994,16 @@ window.addEventListener("DOMContentLoaded", () => {
   soglieSidebarButtonEl.addEventListener("click", () => {
     openArchivioSoglieDialog();
   });
-  sidebarLeftActionsEl?.appendChild(soglieSidebarButtonEl);
+  sidebarLeftActionsSecondariEl?.appendChild(soglieSidebarButtonEl);
+
+  grondeSidebarButtonEl.id = "btn-apri-archivio-gronde";
+  grondeSidebarButtonEl.type = "button";
+  grondeSidebarButtonEl.className = "btn-action btn-secondary";
+  grondeSidebarButtonEl.textContent = "CANALI";
+  grondeSidebarButtonEl.addEventListener("click", () => {
+    openArchivioGrondeDialog();
+  });
+  sidebarLeftActionsSecondariEl?.appendChild(grondeSidebarButtonEl);
 
   falsiTelaiSidebarButtonEl.id = "btn-apri-archivio-falsi-telai";
   falsiTelaiSidebarButtonEl.type = "button";
@@ -9242,7 +10012,7 @@ window.addEventListener("DOMContentLoaded", () => {
   falsiTelaiSidebarButtonEl.addEventListener("click", () => {
     openArchivioFalsiTelaiDialog();
   });
-  sidebarLeftActionsEl?.appendChild(falsiTelaiSidebarButtonEl);
+  sidebarLeftActionsSecondariEl?.appendChild(falsiTelaiSidebarButtonEl);
 
   falsiTelaiAllSidebarButtonEl.id = "btn-apri-archivio-falsi-telai-alluminio";
   falsiTelaiAllSidebarButtonEl.type = "button";
@@ -9251,7 +10021,47 @@ window.addEventListener("DOMContentLoaded", () => {
   falsiTelaiAllSidebarButtonEl.addEventListener("click", () => {
     openArchivioFalsiTelaiAlluminioDialog();
   });
-  sidebarLeftActionsEl?.appendChild(falsiTelaiAllSidebarButtonEl);
+  sidebarLeftActionsSecondariEl?.appendChild(falsiTelaiAllSidebarButtonEl);
+
+  rivestimentiSidebarButtonEl.id = "btn-apri-riepilogo-rivestimenti";
+  rivestimentiSidebarButtonEl.type = "button";
+  rivestimentiSidebarButtonEl.className = "btn-action btn-secondary";
+  rivestimentiSidebarButtonEl.textContent = "RIVESTIMENTI";
+  rivestimentiSidebarButtonEl.title = "Pareti con rivestimento attivo nei vani registrati";
+  rivestimentiSidebarButtonEl.addEventListener("click", () => {
+    openRiepilogoRivestimentiDialog();
+  });
+  sidebarLeftActionsSecondariEl?.appendChild(rivestimentiSidebarButtonEl);
+
+  intonacoRusticoSidebarButtonEl.id = "btn-apri-riepilogo-intonaco-rustico";
+  intonacoRusticoSidebarButtonEl.type = "button";
+  intonacoRusticoSidebarButtonEl.className = "btn-action btn-secondary";
+  intonacoRusticoSidebarButtonEl.textContent = "INTONACO RUSTICO";
+  intonacoRusticoSidebarButtonEl.title = "Pareti con rustico attivo nei vani registrati";
+  intonacoRusticoSidebarButtonEl.addEventListener("click", () => {
+    openRiepilogoIntonacoRusticoDialog();
+  });
+  sidebarLeftActionsSecondariEl?.appendChild(intonacoRusticoSidebarButtonEl);
+
+  intonacoCivileSidebarButtonEl.id = "btn-apri-riepilogo-intonaco-civile";
+  intonacoCivileSidebarButtonEl.type = "button";
+  intonacoCivileSidebarButtonEl.className = "btn-action btn-secondary";
+  intonacoCivileSidebarButtonEl.textContent = "INTONACO CIVILE";
+  intonacoCivileSidebarButtonEl.title = "Pareti con civile attivo nei vani registrati";
+  intonacoCivileSidebarButtonEl.addEventListener("click", () => {
+    openRiepilogoIntonacoCivileDialog();
+  });
+  sidebarLeftActionsSecondariEl?.appendChild(intonacoCivileSidebarButtonEl);
+
+  zoccoloSidebarButtonEl.id = "btn-apri-riepilogo-zoccolo";
+  zoccoloSidebarButtonEl.type = "button";
+  zoccoloSidebarButtonEl.className = "btn-action btn-secondary";
+  zoccoloSidebarButtonEl.textContent = "ZOCCOLO";
+  zoccoloSidebarButtonEl.title = "Pareti con zoccolo attivo nei vani registrati";
+  zoccoloSidebarButtonEl.addEventListener("click", () => {
+    openRiepilogoZoccoloDialog();
+  });
+  sidebarLeftActionsSecondariEl?.appendChild(zoccoloSidebarButtonEl);
 
   useAperturaDialogEl.id = "use-apertura-dialog";
   useAperturaDialogEl.className = "ifc-riepilogo-dialog";
@@ -9403,6 +10213,50 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   document.body.appendChild(falsiTelaiAllDialogEl);
 
+  rivestimentiDialogEl.id = "rivestimenti-dialog";
+  rivestimentiDialogEl.className = "ifc-riepilogo-dialog";
+  rivestimentiDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-rivestimenti-dialog") {
+      rivestimentiDialogEl.close();
+    }
+  });
+  document.body.appendChild(rivestimentiDialogEl);
+
+  intonacoRusticoDialogEl.id = "intonaco-rustico-dialog";
+  intonacoRusticoDialogEl.className = "ifc-riepilogo-dialog";
+  intonacoRusticoDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-intonaco-rustico-dialog") {
+      intonacoRusticoDialogEl.close();
+    }
+  });
+  document.body.appendChild(intonacoRusticoDialogEl);
+
+  intonacoCivileDialogEl.id = "intonaco-civile-dialog";
+  intonacoCivileDialogEl.className = "ifc-riepilogo-dialog";
+  intonacoCivileDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-intonaco-civile-dialog") {
+      intonacoCivileDialogEl.close();
+    }
+  });
+  document.body.appendChild(intonacoCivileDialogEl);
+
+  zoccoloDialogEl.id = "zoccolo-dialog";
+  zoccoloDialogEl.className = "ifc-riepilogo-dialog";
+  zoccoloDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-zoccolo-dialog") {
+      zoccoloDialogEl.close();
+    }
+  });
+  document.body.appendChild(zoccoloDialogEl);
+
   confirmDeleteAperturaMasterDialogEl.id = "confirm-delete-apertura-master-dialog";
   confirmDeleteAperturaMasterDialogEl.className = "ifc-riepilogo-dialog";
   confirmDeleteAperturaMasterDialogEl.innerHTML = `
@@ -9475,13 +10329,16 @@ window.addEventListener("DOMContentLoaded", () => {
 
   loadPiani();
   loadMurDati();
+  loadArchivioPianiMisuraFromStorage();
   loadVociUnitaOptions();
   loadDavanzaliSbordi();
   loadSoglieSbordi();
   loadFalsiTelaiLegnoAggiunte();
   loadFalsiTelaiAlluminioAggiunte();
   loadApertureMaster();
+  syncVaniApertureLocalesForPicker(apertureElevazione, apertureMaster);
   loadVoci();
+  syncArchivioPianiMisuraCompleto();
   migraApertureCollegateVociSuMaster();
   syncVoceDavanzali();
   syncVoceSoglie();
@@ -9506,7 +10363,6 @@ window.addEventListener("DOMContentLoaded", () => {
   toggleVoceMmFieldsByTipo(VOCE_MM_TIPO_MANUALE);
   updateFormulaButtonState(scavoFormulaEl, apriFormulaScavoButtonEl);
   updateFormulaButtonState(corselloFormulaEl, apriFormulaCorselloButtonEl);
-  updateFormulaButtonState(camminamentiFormulaEl, apriFormulaCamminamentiButtonEl);
   updateFormulaButtonState(misurazioniFormulaEl, apriFormulaMisurazioniButtonEl);
   apFalsotelaiEl.value = "no";
   mostraPannelloCompilazione("interrato");
@@ -9516,11 +10372,11 @@ window.addEventListener("DOMContentLoaded", () => {
   if (vistaBimEl) vistaBimEl.hidden = true;
   altreTipologiePanelEl.hidden = true;
   window.scrollTo({ top: 0, behavior: "auto" });
-  updateElevazioneAttivaLabel(
-    idElevazioneAttivaEl,
-    riferimentoElevazioneAttivaEl,
-    currentElevazioneId,
-    murielevazioni,
+  updateMurPianoCompilazioneLabel(
+    idPianoCompilazioneEl,
+    riferimentoMurPianoEl,
+    compilazionePianoId,
+    piani,
   );
   renderPiani();
   renderMurielevazioni();
@@ -9530,6 +10386,7 @@ window.addEventListener("DOMContentLoaded", () => {
   renderCorselli();
   renderCamminamenti();
   renderMisurazioniVarie();
+  syncEsterniVersoVoci();
   chiudiTutteLeVociManuali();
   aggiornaUndoButtonProvaBim();
 
@@ -9565,8 +10422,11 @@ window.addEventListener("DOMContentLoaded", () => {
       if (draft.note != null) voceNoteEl.value = draft.note;
     }
     voceDialogEl.showModal();
-    setTimeout(() => vocePosizioneEl?.focus(), 0);
+    const focusTesto = draft && draft.focusVoceTesto === true;
+    setTimeout(() => (focusTesto ? voceTestoEl : vocePosizioneEl)?.focus(), 0);
   })();
+
+  wireArchivioPianiMisuraComboInputs();
 
   refreshComputoBaselineSnapshot();
 });

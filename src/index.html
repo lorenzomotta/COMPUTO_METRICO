@@ -9,17 +9,20 @@
   </head>
 
   <body>
+    <datalist id="datalist-piani-misura-archivio"></datalist>
+    <datalist id="datalist-voci-esterni-vari"></datalist>
     <main class="app">
       <div class="app-layout">
         <aside class="sidebar sidebar-left" aria-label="Sidebar sinistra">
           <div class="sidebar-card">
             <h2 class="sidebar-title">Sidebar Sinistra</h2>
-            <div class="sidebar-actions">
-              <button id="btn-gestione-piani" type="button" class="btn-action btn-back">GESTIONE PIANI</button>
+            <div class="sidebar-actions sidebar-actions--primari" id="sidebar-left-actions-primari">
+              <button id="btn-sidebar-esterni-vari" type="button" class="btn-action btn-secondary">
+                ESTERNI VARI
+              </button>
             </div>
-            <button id="btn-sidebar-esterni-vari" type="button" class="btn-action btn-secondary">
-              ESTERNI VARI
-            </button>
+            <hr class="sidebar-divider" aria-hidden="true" />
+            <div class="sidebar-actions sidebar-actions--secondari" id="sidebar-left-actions-secondari"></div>
             <p class="sidebar-text">Area pronta per menu e strumenti.</p>
           </div>
         </aside>
@@ -92,43 +95,28 @@
           <div class="sub-block">
             <div class="sub-block-header-inline">
               <h3 class="sub-block-title">
-                MURI ELEVAZIONE <span id="count-murielevazioni" class="sub-block-count">(0)</span>
-              </h3>
-              <button id="btn-nuova-elevazione" type="button" class="btn-action btn-secondary">
-                AGGIUNGI ELEVAZIONE
-              </button>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>IDELEVAZIONE</th>
-                    <th>RIFERIMENTO</th>
-                    <th>SPESSORE</th>
-                    <th>AZIONI</th>
-                  </tr>
-                </thead>
-                <tbody id="murielevazione-ele-body"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <hr class="section-divider" />
-
-          <div class="sub-block">
-            <div class="sub-block-header-inline">
-              <h3 class="sub-block-title">
                 STRATIMURIELEVAZIONE <span id="count-strati" class="sub-block-count">(0)</span>
               </h3>
               <p class="sub-block-desc">
-                Strati collegati all'elevazione attiva:
+                Strati collegati al piano in compilazione:
                 <strong>
-                  IDELEVAZIONE <span id="id-elevazione-attiva" class="id-elevazione-attiva-inline">—</span> -
+                  IDPIANO <span id="id-piano-compilazione" class="id-piano-compilazione-inline">—</span> -
                   RIFERIMENTO
-                  <span id="riferimento-elevazione-attiva" class="riferimento-elevazione-attiva-inline">—</span>
+                  <span id="riferimento-mur-piano" class="riferimento-mur-piano-inline">—</span>
                 </strong>
               </p>
             </div>
+
+            <form id="mur-params-piano-form" class="piano-form mur-form mur-params-piano-form" autocomplete="off">
+              <div class="field">
+                <label for="mur-params-riferimento">Riferimento muro</label>
+                <input id="mur-params-riferimento" type="text" placeholder="Es: prospetto nord" />
+              </div>
+              <div class="field">
+                <label for="mur-params-spessore">Spessore totale muro (m)</label>
+                <input id="mur-params-spessore" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+            </form>
 
             <form id="strati-mur-form" class="piano-form mur-form">
               <div class="field">
@@ -164,7 +152,7 @@
                 <thead>
                   <tr>
                     <th>IDSTRATMUR</th>
-                    <th>IDELEVAZIONE</th>
+                    <th>IDPIANO</th>
                     <th>IDSTRATO</th>
                     <th>LUNGHEZZA</th>
                     <th>ALTEZZA</th>
@@ -186,10 +174,10 @@
                 APERTUREELEVAZIONE <span id="count-aperture" class="sub-block-count">(0)</span>
               </h3>
               <p class="sub-block-desc">
-                Aperture collegate all'elevazione attiva:
+                Aperture collegate al piano in compilazione:
                 <strong>
-                  IDELEVAZIONE <span class="id-elevazione-attiva-inline">—</span> - RIFERIMENTO
-                  <span class="riferimento-elevazione-attiva-inline">—</span>
+                  IDPIANO <span class="id-piano-compilazione-inline">—</span> - RIFERIMENTO
+                  <span class="riferimento-mur-piano-inline">—</span>
                 </strong>
               </p>
             </div>
@@ -266,7 +254,7 @@
                 <thead>
                   <tr>
                     <th title="IDAPERTURAELEV">ID APERT.</th>
-                    <th title="IDELEVAZIONE">ID ELEV.</th>
+                    <th title="IDPIANO">ID PIANO</th>
                     <th>LOCALE</th>
                     <th title="Lunghezza">LUNG.</th>
                     <th title="Altezza">ALT.</th>
@@ -289,10 +277,10 @@
             <div class="sub-block-header-inline">
               <h3 class="sub-block-title">Calcolo strati netti</h3>
               <p class="sub-block-desc">
-                Calcolo collegato all'elevazione attiva:
+                Calcolo collegato al piano in compilazione:
                 <strong>
-                  IDELEVAZIONE <span class="id-elevazione-attiva-inline">—</span> - RIFERIMENTO
-                  <span class="riferimento-elevazione-attiva-inline">—</span>
+                  IDPIANO <span class="id-piano-compilazione-inline">—</span> - RIFERIMENTO
+                  <span class="riferimento-mur-piano-inline">—</span>
                 </strong>
               </p>
             </div>
@@ -341,88 +329,6 @@
           <details class="sub-block collapsible-block" open>
             <summary class="sub-block-header-inline collapsible-summary">
               <h3 class="sub-block-title">
-                MISURAZIONI VARIE <span id="count-misurazioni" class="sub-block-count">(0)</span>
-              </h3>
-            </summary>
-
-            <form id="misurazioni-form" class="piano-form misurazioni-form">
-              <div class="field">
-                <label for="idmisurazione">IDMISURAZIONE</label>
-                <input id="idmisurazione" type="text" readonly placeholder="Automatico" />
-              </div>
-
-              <div class="field">
-                <label for="misurazioni-idvoce">IDVOCE</label>
-                <input id="misurazioni-idvoce" type="text" placeholder="Opzionale" />
-              </div>
-
-              <div class="field">
-                <label for="misurazioni-piano">PIANO</label>
-                <input id="misurazioni-piano" type="text" placeholder="Es: ESTERNO NORD" required />
-              </div>
-
-              <div class="field">
-                <label for="misurazioni-riferimento">RIFERIMENTO</label>
-                <input id="misurazioni-riferimento" type="text" placeholder="Es: Dettaglio misura" required />
-              </div>
-
-              <div class="field">
-                <label for="misurazioni-formula">FORMULA</label>
-                <div class="formula-input-row">
-                  <input id="misurazioni-formula" type="text" readonly hidden />
-                  <button id="btn-apri-formula-misurazioni" type="button" class="btn-action formula-state-button">
-                    INSERISCI
-                  </button>
-                </div>
-              </div>
-
-              <div class="field">
-                <label for="misurazioni-numero">NUMERO</label>
-                <input
-                  id="misurazioni-numero"
-                  type="number"
-                  step="1"
-                  min="0"
-                  placeholder="0"
-                  required
-                />
-              </div>
-
-              <div class="field field-sottrai">
-                <label for="misurazioni-segno">SEGNO (negativo)</label>
-                <div class="checkbox-wrap">
-                  <input id="misurazioni-segno" type="checkbox" />
-                </div>
-              </div>
-
-              <button type="submit">Aggiungi misurazione</button>
-            </form>
-
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>IDMISURAZIONE</th>
-                    <th>IDVOCE</th>
-                    <th>PIANO</th>
-                    <th>RIFERIMENTO</th>
-                    <th>FORMULA</th>
-                    <th>NUMERO</th>
-                    <th>SEGNO</th>
-                    <th>RISULTATO</th>
-                    <th>AZIONI</th>
-                  </tr>
-                </thead>
-                <tbody id="misurazioni-body"></tbody>
-              </table>
-            </div>
-          </details>
-
-          <hr class="section-divider" />
-
-          <details class="sub-block collapsible-block" open>
-            <summary class="sub-block-header-inline collapsible-summary">
-              <h3 class="sub-block-title">
                 SCAVO
                 <span id="count-scavi" class="sub-block-count">(0)</span>
                 <span id="sum-area-scavi" class="sub-block-count">Mq. 0.00</span>
@@ -438,7 +344,14 @@
 
               <div class="field">
                 <label for="scavo-piano">PIANO</label>
-                <input id="scavo-piano" type="text" placeholder="Es: ESTERNO NORD" required />
+                <input
+                  id="scavo-piano"
+                  type="text"
+                  placeholder="Scegli o scrivi (archivio)"
+                  list="datalist-piani-misura-archivio"
+                  autocomplete="off"
+                  required
+                />
               </div>
 
               <div class="field">
@@ -485,11 +398,25 @@
               </div>
 
               <div class="field">
-                <label for="scavo-idvoce">IDVOCE</label>
-                <input id="scavo-idvoce" type="text" placeholder="Opzionale" />
+                <label for="scavo-idvoce">VOCE</label>
+                <input
+                  id="scavo-idvoce"
+                  type="text"
+                  list="datalist-voci-esterni-vari"
+                  placeholder="Voce abbreviata (opzionale)"
+                  autocomplete="off"
+                />
               </div>
 
-              <button type="submit">Aggiungi scavo</button>
+              <button
+                type="submit"
+                class="btn-action btn-form-add-plus"
+                id="btn-aggiungi-scavo"
+                title="Aggiungi scavo"
+                aria-label="Aggiungi scavo"
+              >
+                +
+              </button>
             </form>
 
             <div class="table-wrap">
@@ -505,7 +432,7 @@
                     <th>AREA</th>
                     <th>ALTEZZA</th>
                     <th>VOLUME</th>
-                    <th>IDVOCE</th>
+                    <th>VOCE</th>
                     <th>AZIONI</th>
                   </tr>
                 </thead>
@@ -533,7 +460,14 @@
 
               <div class="field">
                 <label for="corsello-piano">PIANO</label>
-                <input id="corsello-piano" type="text" placeholder="Es: ESTERNO SUD" required />
+                <input
+                  id="corsello-piano"
+                  type="text"
+                  placeholder="Scegli o scrivi (archivio)"
+                  list="datalist-piani-misura-archivio"
+                  autocomplete="off"
+                  required
+                />
               </div>
 
               <div class="field">
@@ -574,11 +508,25 @@
               </div>
 
               <div class="field">
-                <label for="corsello-idvoce">IDVOCE</label>
-                <input id="corsello-idvoce" type="text" placeholder="Opzionale" />
+                <label for="corsello-idvoce">VOCE</label>
+                <input
+                  id="corsello-idvoce"
+                  type="text"
+                  list="datalist-voci-esterni-vari"
+                  placeholder="Voce abbreviata (opzionale)"
+                  autocomplete="off"
+                />
               </div>
 
-              <button type="submit">Aggiungi corsello</button>
+              <button
+                type="submit"
+                class="btn-action btn-form-add-plus"
+                id="btn-aggiungi-corsello"
+                title="Aggiungi corsello"
+                aria-label="Aggiungi corsello"
+              >
+                +
+              </button>
             </form>
 
             <div class="table-wrap">
@@ -594,111 +542,11 @@
                     <th>AREA</th>
                     <th>SPESSORE</th>
                     <th>VOLUME</th>
-                    <th>IDVOCE</th>
+                    <th>VOCE</th>
                     <th>AZIONI</th>
                   </tr>
                 </thead>
                 <tbody id="corsello-body"></tbody>
-              </table>
-            </div>
-          </details>
-
-          <hr class="section-divider" />
-
-          <details class="sub-block collapsible-block" open>
-            <summary class="sub-block-header-inline collapsible-summary">
-              <h3 class="sub-block-title">
-                CAMMINAMENTI <span id="count-camminamenti" class="sub-block-count">(0)</span>
-                <span id="sum-area-camminamenti" class="sub-block-count">Mq. 0.00</span>
-                <span id="sum-volume-camminamenti" class="sub-block-count">Mc. 0.00</span>
-              </h3>
-            </summary>
-
-            <form id="camminamenti-form" class="piano-form camminamenti-form">
-              <div class="field">
-                <label for="idplcamm">IDPLCAMM</label>
-                <input id="idplcamm" type="text" readonly placeholder="Automatico" />
-              </div>
-
-              <div class="field">
-                <label for="camminamenti-piano">PIANO</label>
-                <input id="camminamenti-piano" type="text" placeholder="Es: ESTERNO OVEST" required />
-              </div>
-
-              <div class="field">
-                <label for="camminamenti-riferimento">RIFERIMENTO</label>
-                <input
-                  id="camminamenti-riferimento"
-                  type="text"
-                  placeholder="Es: Camminamento principale"
-                  required
-                />
-              </div>
-
-              <div class="field field-sottrai">
-                <label for="camminamenti-sottrai">SOTTRAI</label>
-                <div class="checkbox-wrap">
-                  <input id="camminamenti-sottrai" type="checkbox" />
-                </div>
-              </div>
-
-              <div class="field">
-                <label for="camminamenti-misura1">MISURA1</label>
-                <input id="camminamenti-misura1" type="number" step="0.01" min="0" placeholder="0.00" />
-              </div>
-
-              <div class="field">
-                <label for="camminamenti-misura2">MISURA2</label>
-                <input id="camminamenti-misura2" type="number" step="0.01" min="0" placeholder="0.00" />
-              </div>
-
-              <div class="field">
-                <label for="camminamenti-formula">FORMULA</label>
-                <div class="formula-input-row">
-                  <input id="camminamenti-formula" type="text" readonly hidden />
-                  <button id="btn-apri-formula-camminamenti" type="button" class="btn-action formula-state-button">
-                    INSERISCI
-                  </button>
-                </div>
-              </div>
-
-              <div class="field">
-                <label for="camminamenti-altezza">SPESSORE</label>
-                <input
-                  id="camminamenti-altezza"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div class="field">
-                <label for="camminamenti-idvoce">IDVOCE</label>
-                <input id="camminamenti-idvoce" type="text" placeholder="Opzionale" />
-              </div>
-
-              <button type="submit">Aggiungi camminamento</button>
-            </form>
-
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>IDPLCAMM</th>
-                    <th>PIANO</th>
-                    <th>RIFERIMENTO</th>
-                    <th>MISURA1</th>
-                    <th>MISURA2</th>
-                    <th>FORMULA</th>
-                    <th>AREA</th>
-                    <th>SPESSORE</th>
-                    <th>VOLUME</th>
-                    <th>IDVOCE</th>
-                    <th>AZIONI</th>
-                  </tr>
-                </thead>
-                <tbody id="camminamenti-body"></tbody>
               </table>
             </div>
           </details>
@@ -717,7 +565,121 @@
         </dialog>
           </section>
 
-          <section id="compilazione-altre-tipologie" class="card compilazione-placeholder" hidden>
+        <section id="compilazione-misure-varie" class="card compilazione-panel" hidden>
+          <div class="compilazione-topbar">
+            <button id="btn-torna-piani-misure-varie" type="button" class="btn-action btn-back">
+              ← Torna ai Piani
+            </button>
+          </div>
+
+          <header class="section-header section-header-inline">
+            <h2>MISURE VARIE</h2>
+            <p id="compilazione-misure-varie-sottotitolo">
+              Misurazioni libere collegate alle voci di capitolato.
+            </p>
+          </header>
+
+          <div class="misure-varie-block">
+            <h3 class="sub-block-title">
+              Elenco <span id="count-misurazioni" class="sub-block-count">(0)</span>
+            </h3>
+
+            <form id="misurazioni-form" class="piano-form misurazioni-form">
+              <div class="field">
+                <label for="idmisurazione">IDMISURAZIONE</label>
+                <input id="idmisurazione" type="text" readonly placeholder="Automatico" />
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-idvoce">VOCE</label>
+                <input
+                  id="misurazioni-idvoce"
+                  type="text"
+                  list="datalist-voci-esterni-vari"
+                  placeholder="Voce abbreviata (opzionale)"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-piano">PIANO</label>
+                <input
+                  id="misurazioni-piano"
+                  type="text"
+                  placeholder="Scegli o scrivi (archivio)"
+                  list="datalist-piani-misura-archivio"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-riferimento">RIFERIMENTO</label>
+                <input id="misurazioni-riferimento" type="text" placeholder="Es: Dettaglio misura" required />
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-formula">FORMULA</label>
+                <div class="formula-input-row">
+                  <input id="misurazioni-formula" type="text" readonly hidden />
+                  <button id="btn-apri-formula-misurazioni" type="button" class="btn-action formula-state-button">
+                    INSERISCI
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="misurazioni-numero">NUMERO</label>
+                <input
+                  id="misurazioni-numero"
+                  type="number"
+                  step="1"
+                  min="0"
+                  placeholder="0"
+                  required
+                />
+              </div>
+
+              <div class="field field-sottrai">
+                <label for="misurazioni-segno">SEGNO (negativo)</label>
+                <div class="checkbox-wrap">
+                  <input id="misurazioni-segno" type="checkbox" />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                class="btn-action btn-form-add-plus"
+                id="btn-aggiungi-misurazione"
+                title="Aggiungi misurazione"
+                aria-label="Aggiungi misurazione"
+              >
+                +
+              </button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IDMISURAZIONE</th>
+                    <th>VOCE</th>
+                    <th>PIANO</th>
+                    <th>RIFERIMENTO</th>
+                    <th>FORMULA</th>
+                    <th>NUMERO</th>
+                    <th>SEGNO</th>
+                    <th>RISULTATO</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="misurazioni-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="compilazione-altre-tipologie" class="card compilazione-placeholder" hidden>
             <h2>Compilazione tipologia</h2>
             <p id="compilazione-altre-testo">
               Per questa tipologia la schermata di compilazione sara' aggiunta a breve.
@@ -745,7 +707,9 @@
                     spellcheck="false"
                   />
                 </div>
-                <p id="voci-totale-computo">TOTALE COMPUTO: €. 0,00</p>
+                <div class="voci-header-right">
+                  <p id="voci-totale-computo">TOTALE COMPUTO: €. 0,00</p>
+                </div>
               </header>
               <div class="table-wrap">
                 <table class="table-voci">
@@ -834,6 +798,9 @@
           <div class="sidebar-card">
             <h2 class="sidebar-title">Sidebar Destra</h2>
             <div class="sidebar-actions">
+              <button id="btn-inizia-computo" type="button" class="btn-action btn-inizia-computo">
+                INIZIA COMPUTO
+              </button>
               <a href="cercavoce.html?v=9" class="btn-action btn-secondary sidebar-link-btn">CERCA VOCE</a>
               <button id="btn-aggiungi-voce" type="button" class="btn-action btn-secondary">AGGIUNGI VOCE</button>
               <button id="btn-vedi-voci" type="button" class="btn-action btn-compila">VEDI VOCI</button>
@@ -859,7 +826,11 @@
 
       <dialog id="voce-dialog" class="formula-dialog">
         <form id="voce-dialog-form" method="dialog">
-          <h3>NUOVA VOCE</h3>
+          <h3 id="voce-dialog-title">NUOVA VOCE</h3>
+          <p id="voce-dialog-solo-unita-hint" class="voce-dialog-solo-unita-hint" hidden>
+            Voce collegata a VANI: puoi modificare solo l'unità di misura. Al salvataggio i totali delle
+            misurazioni collegate ai vani vengono ricalcolati.
+          </p>
           <div class="piano-form voce-form">
             <div class="voce-form-riga-uno">
               <div class="field voce-field-compatta">
@@ -926,7 +897,14 @@
               </div>
               <div class="field">
                 <label for="voce-mm-riga-piano">PIANO</label>
-                <input id="voce-mm-riga-piano" type="text" placeholder="Es: FONDAZIONI" autocomplete="off" required />
+                <input
+                  id="voce-mm-riga-piano"
+                  type="text"
+                  placeholder="Scegli o scrivi (archivio)"
+                  list="datalist-piani-misura-archivio"
+                  autocomplete="off"
+                  required
+                />
               </div>
               <div class="field">
                 <label for="voce-mm-riga-riferimento">RIFERIMENTO</label>
@@ -1067,6 +1045,245 @@
           </div>
         </form>
       </dialog>
+
+      <dialog id="inizia-computo-dialog" class="formula-dialog">
+        <form id="inizia-computo-dialog-form" method="dialog">
+          <h3>INIZIA NUOVO COMPUTO</h3>
+          <p id="inizia-computo-dialog-msg">
+            Stai chiudendo il computo attuale per iniziarne uno nuovo. CONFERMA se hai già salvato,
+            altrimenti ANNULLA e salva prima.
+          </p>
+          <div class="formula-dialog-actions">
+            <button type="submit" value="cancel" class="btn-action btn-secondary">ANNULLA</button>
+            <button type="submit" value="ok" class="btn-action btn-inizia-computo">CONFERMA</button>
+          </div>
+        </form>
+      </dialog>
+
+      <section
+        id="vista-vani"
+        class="vista-vani-overlay"
+        hidden
+        aria-label="Misurazione VANI"
+      >
+        <div class="vani-shell">
+          <header class="vani-header">
+            <h1 class="vani-header-title">Misurazione VANI</h1>
+            <div class="vani-header-actions">
+              <button
+                type="button"
+                id="btn-vani-help-toggle"
+                class="vani-btn-help"
+                aria-expanded="false"
+                aria-controls="vani-help-inline"
+                title="Guida rapida"
+                aria-label="Apri o chiudi la guida rapida VANI"
+              >
+                <span aria-hidden="true">?</span>
+              </button>
+              <button type="button" id="btn-vani-chiudi" class="btn-action btn-back">
+                Chiudi
+              </button>
+            </div>
+          </header>
+
+          <div
+            id="vani-help-inline"
+            class="vani-help-inline"
+            role="region"
+            aria-label="Guida rapida Misurazione VANI"
+            hidden
+          >
+            <p class="vani-help-inline__p">
+              Compila <strong>un vano alla volta</strong> (piano e locale sulla riga in alto, poi pareti e aperture). Poi usa
+              <strong>REGISTRA VANO</strong>: il dato viene salvato nell’elenco a sinistra e la scheda si svuota per il vano successivo.
+              Se avevi aperto un vano dalla lista a sinistra, <strong>non si crea una copia</strong>: la stessa voce viene aggiornata.
+            </p>
+            <p class="vani-help-inline__p vani-help-inline__p--muted">
+              Il pulsante <strong>aggiungi parete</strong> (sulla riga Piano/Locale) aggiunge una parete nello stesso vano; l’<strong>icona due fogli</strong> nella colonna destra duplica quella parete (puoi cambiarne misure o strati dopo). <strong>+S</strong> aggiunge uno strato di finitura sotto quella parete (STRATIAPERTURA arriverà dopo).
+              Le aperture dipendono dal testo LOCALE (campo sotto «Piano»). Clic su un vano nella sidebar lo ricarica in modifica; l’<strong>icona cestino</strong> accanto elimina quel vano dall’elenco (chiede conferma) e rimuove le righe collegate nelle VOCI. Nel campo LOCALE, clic per selezionare tutto e cambiare nome se serve.
+            </p>
+            <p class="vani-help-inline__p vani-help-inline__p--muted">
+              Per ogni strato: in <strong>lordo</strong>, <strong>Lungh. parete</strong> × <strong>H strato</strong> → <strong>Mq lordi</strong>.
+              Il dettaglio <strong>«Aperture sottratte»</strong> compare solo se sulla parete hai selezionato almeno un’apertura (<strong>stesso nome locale</strong> negli archivi).
+              Con aperture: <strong>lungh.</strong>, <strong>h</strong> inclusa nella fascia strato, <strong>ML/Mq netti</strong> e poi il <strong>mq netto dello strato</strong> (<strong>Mq lordi</strong> − somma mq aperture).
+            </p>
+          </div>
+
+          <div class="vani-body-layout">
+            <aside class="vani-sidebar" aria-label="Elenco vani">
+              <div class="vani-sidebar-head">
+                <h2 class="vani-sidebar-title">Vani</h2>
+                <button type="button" id="btn-vani-registra" class="btn-action btn-secondary vani-btn-registra">
+                  REGISTRA VANO
+                </button>
+              </div>
+              <p id="vani-registra-feedback" class="vani-registra-feedback" role="status" aria-live="polite"></p>
+              <ul id="vani-sidebar-list" class="vani-sidebar-list"></ul>
+            </aside>
+
+            <div class="vani-main-column">
+              <form id="vani-misurazione-form" class="vani-form card-like vani-form-vano" autocomplete="off">
+                <datalist id="vani-archivio-locale-datalist"></datalist>
+                <datalist id="vani-vocibrevi-datalist"></datalist>
+
+                <div id="vani-gerarchia-host" class="vani-gerarchia-host"></div>
+              </form>
+
+              <dialog id="vani-conferma-elimina-dialog" class="formula-dialog vani-conferma-elimina-dialog" aria-modal="true">
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3 id="vani-conferma-elimina-title">CONFERMA ELIMINAZIONE</h3>
+                  <p id="vani-conferma-elimina-msg" class="vani-conferma-elimina-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="vani-conferma-elimina-annulla" class="btn-action btn-secondary">
+                      Annulla
+                    </button>
+                    <button type="button" id="vani-conferma-elimina-conferma" class="btn-action btn-delete">
+                      Elimina
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+
+              <dialog id="vani-nuova-apertura-dialog" class="formula-dialog vani-nuova-apertura-dialog" aria-modal="true">
+                <form id="vani-nuova-apertura-form" method="dialog" class="vani-nuova-apertura-form">
+                  <h3>Nuova apertura sulla parete</h3>
+                  <p class="vani-nuova-apertura-hint">
+                    L’apertura viene salvata nell’archivio APERTURE e collegata a questa parete. L’elenco si aggiorna subito.
+                  </p>
+                  <div class="vani-nuova-apertura-grid">
+                    <label class="field">
+                      <span>Piano</span>
+                      <input id="vani-nap-piano" type="text" autocomplete="off" />
+                    </label>
+                    <label class="field">
+                      <span>Locale</span>
+                      <input id="vani-nap-locale" type="text" required autocomplete="off" />
+                    </label>
+                    <label class="field">
+                      <span>Larghezza (m)</span>
+                      <input id="vani-nap-largh" type="number" step="0.01" min="0" required />
+                    </label>
+                    <label class="field">
+                      <span>Altezza (m)</span>
+                      <input id="vani-nap-alt" type="number" step="0.01" min="0" required />
+                    </label>
+                    <label class="field">
+                      <span>H davanzale (m)</span>
+                      <input id="vani-nap-hdav" type="number" step="0.01" min="0" value="0" required />
+                    </label>
+                    <label class="field">
+                      <span>Ante</span>
+                      <input id="vani-nap-ante" type="number" step="1" min="0" value="1" required />
+                    </label>
+                    <label class="field">
+                      <span>Tipologia</span>
+                      <select id="vani-nap-tipologia" required>
+                        <option value="FINESTRA">FINESTRA</option>
+                        <option value="PORTA FINESTRA">PORTA FINESTRA</option>
+                        <option value="BOCCA LUPO">BOCCA LUPO</option>
+                        <option value="FIN CANTINA">FIN CANTINA</option>
+                        <option value="PORTONCINO">PORTONCINO</option>
+                        <option value="PORTA CANTINA">PORTA CANTINA</option>
+                        <option value="PORTA REI">PORTA REI</option>
+                        <option value="PORTA INTERNA">PORTA INTERNA</option>
+                        <option value="SCRIGNO">SCRIGNO</option>
+                        <option value="BASCULANTE">BASCULANTE</option>
+                        <option value="SEZIONALE">SEZIONALE</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Falso</span>
+                      <select id="vani-nap-falso">
+                        <option value="NO">NO</option>
+                        <option value="ALLUMINIO">ALLUMINIO</option>
+                        <option value="LEGNO">LEGNO</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Scuro</span>
+                      <select id="vani-nap-scuro">
+                        <option value="NO">NO</option>
+                        <option value="PERSIANA">PERSIANA</option>
+                        <option value="TAPPARELLA">TAPPARELLA</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Inferiata</span>
+                      <select id="vani-nap-inferiata">
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Zanzariera</span>
+                      <select id="vani-nap-zanzariera">
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="vani-nap-annulla" class="btn-action btn-secondary">Annulla</button>
+                    <button type="submit" id="vani-nap-salva" class="btn-action btn-secondary">Salva e collega</button>
+                  </div>
+                </form>
+              </dialog>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="vista-camminamenti"
+        class="vista-camm-overlay"
+        hidden
+        aria-label="Misurazione CAMMINAMENTI"
+      >
+        <div class="camm-shell">
+          <header class="camm-header">
+            <h1 class="camm-header-title">Misurazione CAMMINAMENTI</h1>
+            <div class="camm-header-actions">
+              <button type="button" id="btn-camm-chiudi" class="btn-action btn-back">Chiudi</button>
+            </div>
+          </header>
+
+          <div class="camm-body-layout">
+            <aside class="camm-sidebar" aria-label="Elenco camminamenti">
+              <div class="camm-sidebar-head">
+                <h2 class="camm-sidebar-title">Camminamenti</h2>
+                <button type="button" id="btn-camm-registra" class="btn-action btn-secondary camm-btn-registra">
+                  REGISTRA
+                </button>
+              </div>
+              <p id="camm-registra-feedback" class="camm-registra-feedback" role="status" aria-live="polite"></p>
+              <ul id="camm-sidebar-list" class="camm-sidebar-list"></ul>
+            </aside>
+
+            <div class="camm-main-column">
+              <form id="camm-misurazione-form" class="camm-form card-like" autocomplete="off">
+                <datalist id="camm-vocibrevi-datalist"></datalist>
+                <div id="camm-gerarchia-host" class="camm-gerarchia-host"></div>
+              </form>
+
+              <dialog id="camm-conferma-elimina-dialog" class="formula-dialog camm-conferma-dialog" aria-modal="true">
+                <div class="camm-conferma-dialog-inner">
+                  <h3>CONFERMA ELIMINAZIONE</h3>
+                  <p id="camm-conferma-elimina-msg" class="camm-conferma-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="camm-conferma-elimina-annulla" class="btn-action btn-secondary">
+                      Annulla
+                    </button>
+                    <button type="button" id="camm-conferma-elimina-conferma" class="btn-action btn-delete">
+                      Elimina
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </body>
 </html>

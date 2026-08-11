@@ -111,6 +111,16 @@
         opacity: 0.5;
         cursor: not-allowed;
       }
+      .btn-aggiungi-computo {
+        background: #1a8f4a;
+        color: #fff;
+        border-color: #1a8f4a;
+        font-weight: 600;
+      }
+      .btn-aggiungi-computo:hover {
+        background: #157a3f;
+        border-color: #157a3f;
+      }
       #status {
         font-size: 0.85rem;
         color: var(--muted);
@@ -264,7 +274,8 @@
           <h1>Cerca voce (prezziario)</h1>
           <p class="sub">
             A <strong>sinistra</strong> le voci trovate; a <strong>destra</strong> le sottovoci dopo il clic. Componi il
-            riepilogo e copialo nel campo <strong>VOCE</strong> del Computo.
+            riepilogo e usa <strong>Aggiungi a Computo</strong> per inserirlo nel campo
+            <strong>VOCE</strong> di Nuova voce (oppure <strong>Copia negli appunti</strong>).
           </p>
         </div>
         <a href="index.html" class="btn btn-torna-voci" id="btn-torna-voci">← Torna alle voci</a>
@@ -342,10 +353,13 @@
 
       <div class="panel" style="margin-top: 1rem">
         <h2>Testo voce (riepilogo)</h2>
-        <p class="hint">Modifica liberamente prima di copiare nel Computo.</p>
+        <p class="hint">Modifica liberamente prima di aggiungerlo al Computo o di copiarlo.</p>
         <textarea id="riepilogo" placeholder="Il testo composto apparirà qui…"></textarea>
         <div class="riep-actions">
           <button type="button" class="btn btn-primary" id="btn-copy">Copia negli appunti</button>
+          <button type="button" class="btn btn-aggiungi-computo" id="btn-aggiungi-computo">
+            Aggiungi a Computo
+          </button>
           <button type="button" class="btn" id="btn-clear-riepilogo">Svuota</button>
         </div>
       </div>
@@ -371,6 +385,7 @@
         const btnApply = document.getElementById("btn-apply-riepilogo");
         const riepilogoEl = document.getElementById("riepilogo");
         const btnCopy = document.getElementById("btn-copy");
+        const btnAggiungiComputo = document.getElementById("btn-aggiungi-computo");
         const btnClearRiepilogo = document.getElementById("btn-clear-riepilogo");
         const ricercaInizioTestoEl = document.getElementById("ricerca-inizio-testo");
         const ricercaModoHintEl = document.getElementById("ricerca-modo-hint");
@@ -1267,6 +1282,25 @@
           riepilogoEl.value = lines.join("\n\n");
         }
 
+        /** Ultimo prezzo in euro presente nel testo riepilogo (preferisce le righe «Prezzo unitario»). */
+        function estraiUltimoPrezzoDaRiepilogo(text) {
+          const lines = String(text || "").split(/\r?\n/);
+          let last = null;
+          for (const line of lines) {
+            const mPreferito = line.match(
+              /Prezzo unitario\s*\(prezziario\)\s*:\s*([0-9][0-9.,]*)\s*€/i,
+            );
+            const mGenerico = !mPreferito
+              ? line.match(/([0-9][0-9.,]*)\s*€/)
+              : null;
+            const raw = mPreferito ? mPreferito[1] : mGenerico ? mGenerico[1] : null;
+            if (!raw) continue;
+            const n = parsePrezzoListino(raw);
+            if (!Number.isNaN(n) && n >= 0) last = n;
+          }
+          return last;
+        }
+
         btnApply.addEventListener("click", function () {
           buildRiepilogoFromDetail();
         });
@@ -1285,6 +1319,42 @@
             document.execCommand("copy");
             setStatus("Copiato (metodo alternativo).", false);
           }
+        });
+
+        btnAggiungiComputo?.addEventListener("click", function () {
+          const testo = riepilogoEl.value.trim();
+          if (!testo) {
+            setStatus("Compila prima il riepilogo (o premi «Aggiorna riepilogo»).", true);
+            return;
+          }
+          let draft = {};
+          try {
+            const raw = sessionStorage.getItem("voceDialogDraft");
+            if (raw) draft = JSON.parse(raw) || {};
+          } catch (_) {
+            draft = {};
+          }
+          if (!draft || typeof draft !== "object") draft = {};
+          draft.testo = riepilogoEl.value;
+          draft.focusVoceTesto = true;
+
+          const prezzoNum = estraiUltimoPrezzoDaRiepilogo(riepilogoEl.value);
+          if (prezzoNum != null) {
+            draft.prezzo = Number(prezzoNum).toFixed(2);
+          }
+
+          try {
+            sessionStorage.setItem("voceDialogDraft", JSON.stringify(draft));
+          } catch (_) {
+            setStatus("Impossibile salvare il testo per il Computo.", true);
+            return;
+          }
+          const msgPrezzo =
+            prezzoNum != null
+              ? ` Prezzo ${Number(prezzoNum).toFixed(2)} € inviato a Nuova voce.`
+              : " (nessun prezzo trovato nel riepilogo).";
+          setStatus("Apertura Nuova voce…" + msgPrezzo, false);
+          window.location.href = "index.html?openVoceDialog=1";
         });
 
         btnClearRiepilogo.addEventListener("click", function () {

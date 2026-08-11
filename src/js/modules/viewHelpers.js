@@ -1,30 +1,41 @@
+import { dismissCamminamentiIfOpen } from "../camminamenti-misurazione.js";
+import { dismissVaniIfOpen } from "../vani-misurazione.js";
+
+function dismissOverlayMisurazioni() {
+  dismissVaniIfOpen();
+  dismissCamminamentiIfOpen();
+}
+
 export function updateInterratoPanelSubtitle(targetEl, piano) {
   targetEl.innerHTML = `Piano selezionato: IDPIANO <strong>${piano.id}</strong> — ${piano.edificio} / ${piano.piano}`;
 }
 
-export function updateElevazioneAttivaLabel(
+/** Aggiorna le etichette "piano in compilazione" (ID piano + riferimento muro sul piano). */
+export function updateMurPianoCompilazioneLabel(
   idEl,
   riferimentoEl,
-  currentElevazioneId,
-  murielevazioni = [],
+  compilazionePianoId,
+  piani = [],
 ) {
-  const t = currentElevazioneId === null ? "—" : String(currentElevazioneId);
+  const p =
+    compilazionePianoId === null ? null : piani.find((item) => item.id === compilazionePianoId);
+  const t = compilazionePianoId === null ? "—" : String(compilazionePianoId);
   const riferimento =
-    currentElevazioneId === null
-      ? "—"
-      : murielevazioni.find((item) => item.idElevazione === currentElevazioneId)?.riferimento?.trim() ||
-        "—";
+    p && typeof p.murRiferimento === "string" && p.murRiferimento.trim() !== ""
+      ? p.murRiferimento.trim()
+      : "—";
   idEl.textContent = t;
   if (riferimentoEl) riferimentoEl.textContent = riferimento;
-  document.querySelectorAll(".id-elevazione-attiva-inline").forEach((el) => {
+  document.querySelectorAll(".id-piano-compilazione-inline").forEach((el) => {
     el.textContent = t;
   });
-  document.querySelectorAll(".riferimento-elevazione-attiva-inline").forEach((el) => {
+  document.querySelectorAll(".riferimento-mur-piano-inline").forEach((el) => {
     el.textContent = riferimento;
   });
 }
 
 export function showVistaPiani(vistaPianiEl, vistaCompilazioneEl, altreTipologiePanelEl) {
+  dismissOverlayMisurazioni();
   vistaPianiEl.hidden = false;
   vistaCompilazioneEl.hidden = true;
   altreTipologiePanelEl.hidden = true;
@@ -32,6 +43,7 @@ export function showVistaPiani(vistaPianiEl, vistaCompilazioneEl, altreTipologie
 }
 
 export function showVistaCompilazione(vistaPianiEl, vistaCompilazioneEl, altreTipologiePanelEl) {
+  dismissOverlayMisurazioni();
   vistaPianiEl.hidden = true;
   vistaCompilazioneEl.hidden = false;
   altreTipologiePanelEl.hidden = true;
