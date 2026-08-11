@@ -3,21 +3,37 @@
  * File dedicato: HTML banner + CSS in styles/aggiornamenti.css
  */
 
+const MSG_UPDATE_AVAILABLE =
+  "E' disponibile una nuova versione del programma.";
+
 function getInvoke() {
   return window.__TAURI__?.core?.invoke ?? null;
 }
 
 function ensureBanner() {
   let banner = document.querySelector("#app-update-banner");
+  let backdrop = document.querySelector("#app-update-backdrop");
+
+  if (!backdrop) {
+    backdrop = document.createElement("div");
+    backdrop.id = "app-update-backdrop";
+    backdrop.className = "app-update-backdrop";
+    backdrop.hidden = true;
+    document.body.appendChild(backdrop);
+  }
+
   if (banner) return banner;
 
   banner = document.createElement("div");
   banner.id = "app-update-banner";
   banner.className = "app-update-banner";
   banner.hidden = true;
+  banner.setAttribute("role", "dialog");
+  banner.setAttribute("aria-modal", "true");
+  banner.setAttribute("aria-labelledby", "app-update-banner-title");
   banner.innerHTML = `
     <div class="app-update-banner__text">
-      <strong class="app-update-banner__title">Aggiornamento disponibile</strong>
+      <strong id="app-update-banner-title" class="app-update-banner__title">Aggiornamento disponibile</strong>
       <p class="app-update-banner__desc"></p>
     </div>
     <div class="app-update-banner__actions">
@@ -27,6 +43,13 @@ function ensureBanner() {
   `;
   document.body.appendChild(banner);
   return banner;
+}
+
+function setUpdateDialogVisible(visible) {
+  const banner = document.querySelector("#app-update-banner");
+  const backdrop = document.querySelector("#app-update-backdrop");
+  if (banner) banner.hidden = !visible;
+  if (backdrop) backdrop.hidden = !visible;
 }
 
 function setBannerBusy(banner, busy, message) {
@@ -39,7 +62,7 @@ function setBannerBusy(banner, busy, message) {
 }
 
 /**
- * Avvia il controllo aggiornamenti e mostra il banner se serve.
+ * Avvia il controllo aggiornamenti e mostra il dialog se serve.
  */
 export function wireAggiornamentiAutomatici() {
   const invoke = getInvoke();
@@ -47,6 +70,7 @@ export function wireAggiornamentiAutomatici() {
 
   const banner = ensureBanner();
   const descEl = banner.querySelector(".app-update-banner__desc");
+  const titleEl = banner.querySelector(".app-update-banner__title");
 
   banner.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-update-action]");
@@ -54,7 +78,7 @@ export function wireAggiornamentiAutomatici() {
     const action = button.getAttribute("data-update-action");
 
     if (action === "later") {
-      banner.hidden = true;
+      setUpdateDialogVisible(false);
       return;
     }
 
@@ -73,19 +97,31 @@ export function wireAggiornamentiAutomatici() {
     }
   });
 
+  document.querySelector("#app-update-backdrop")?.addEventListener("click", () => {
+    setUpdateDialogVisible(false);
+  });
+
   // Piccolo ritardo: lascia caricare l'interfaccia prima del check di rete
   window.setTimeout(async () => {
     try {
       const update = await invoke("check_app_update");
       if (!update || !update.version) return;
-      const notes = (update.body || "").trim();
-      descEl.textContent = notes
-        ? `Versione ${update.version} (ora hai ${update.currentVersion}). ${notes}`
-        : `Versione ${update.version} disponibile (ora hai ${update.currentVersion}).`;
-      banner.hidden = false;
+      if (titleEl) titleEl.textContent = "Aggiornamento disponibile";
+      descEl.textContent = MSG_UPDATE_AVAILABLE;
+      const installBtn = banner.querySelector('[data-update-action="install"]');
+      if (installBtn) installBtn.hidden = false;
+      setUpdateDialogVisible(true);
     } catch (error) {
-      // Silenzioso in sviluppo / senza rete / senza latest.json
-      console.debug("Controllo aggiornamenti non disponibile:", error);
+      const msg = error?.message || String(error || "errore sconosciuto");
+      console.warn("Controllo aggiornamenti non riuscito:", msg);
+      if (/404|not found|failed to fetch|error sending request|tls|certificate|forbidden|401|403/i.test(msg)) {
+        if (titleEl) titleEl.textContent = "Aggiornamenti non disponibili";
+        descEl.textContent =
+          "Non riesco a controllare gli aggiornamenti (file latest.json non raggiungibile).";
+        const installBtn = banner.querySelector('[data-update-action="install"]');
+        if (installBtn) installBtn.hidden = true;
+        setUpdateDialogVisible(true);
+      }
     }
   }, 2500);
 }
