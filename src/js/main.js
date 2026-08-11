@@ -45,9 +45,11 @@ import { buildRivestimentiRowsFromStorage, buildIntonacoRusticoRowsFromStorage, 
 import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
 import { syncEsterniMisurazioniNelleVoci } from "./modules/esterniVariSyncVoci.js";
 import { wireAggiornamentiAutomatici } from "./aggiornamenti.js";
+import { wireTitoloConVersione } from "./versione-titolo.js";
 
 window.addEventListener("DOMContentLoaded", () => {
   wireAggiornamentiAutomatici();
+  void wireTitoloConVersione();
   const pianoFormEl = document.querySelector("#piano-form");
   const tipologiaEl = document.querySelector("#tipologia");
   const edificioEl = document.querySelector("#edificio");
