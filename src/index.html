@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Computo Metrico - Piani</title>
+    <title>LP_COMPUTO</title>
     <script type="module" src="/js/main.js" defer></script>
   </head>
 
@@ -13,9 +13,8 @@
     <datalist id="datalist-voci-esterni-vari"></datalist>
     <main class="app">
       <div class="app-layout">
-        <aside class="sidebar sidebar-left" aria-label="Sidebar sinistra">
+        <aside class="sidebar sidebar-left" aria-label="Menu strumenti">
           <div class="sidebar-card">
-            <h2 class="sidebar-title">Sidebar Sinistra</h2>
             <div class="sidebar-actions sidebar-actions--primari" id="sidebar-left-actions-primari">
               <button id="btn-sidebar-esterni-vari" type="button" class="btn-action btn-secondary">
                 ESTERNI VARI
@@ -23,14 +22,13 @@
             </div>
             <hr class="sidebar-divider" aria-hidden="true" />
             <div class="sidebar-actions sidebar-actions--secondari" id="sidebar-left-actions-secondari"></div>
-            <p class="sidebar-text">Area pronta per menu e strumenti.</p>
           </div>
         </aside>
 
         <div class="app-content">
           <section id="vista-piani" class="view">
             <header class="app-header">
-              <h1>Computo Metrico Estimativo</h1>
+              <h1>LP_COMPUTO</h1>
               <p>Gestione tipologia piani dell'edificio</p>
             </header>
 
@@ -794,9 +792,8 @@
           </section>
         </div>
 
-        <aside class="sidebar sidebar-right" aria-label="Sidebar destra">
+        <aside class="sidebar sidebar-right" aria-label="Strumenti computo">
           <div class="sidebar-card">
-            <h2 class="sidebar-title">Sidebar Destra</h2>
             <div class="sidebar-actions">
               <button id="btn-inizia-computo" type="button" class="btn-action btn-inizia-computo">
                 INIZIA COMPUTO
@@ -819,7 +816,6 @@
             <p id="computo-dirty-indicator" class="sidebar-dirty-indicator" hidden>
               Modifiche non esportate
             </p>
-            <p class="sidebar-text">Area pronta per riepiloghi e dettagli.</p>
           </div>
         </aside>
       </div>

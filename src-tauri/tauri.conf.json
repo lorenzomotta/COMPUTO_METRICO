@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
-  "version": "0.2.1",
+  "productName": "LP_COMPUTO",
+  "version": "0.2.2",
   "identifier": "com.utente.tauri-app",
   "build": {
     "frontendDist": "../src"
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "tauri-app",
+        "title": "LP_COMPUTO",
         "width": 1280,
         "height": 800,
         "resizable": true,
