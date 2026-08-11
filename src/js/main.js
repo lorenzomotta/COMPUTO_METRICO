@@ -44,8 +44,10 @@ import { openVistaMisureVarie, closeVistaMisureVarie, wireMisureVarieUi } from "
 import { buildRivestimentiRowsFromStorage, buildIntonacoRusticoRowsFromStorage, buildIntonacoCivileRowsFromStorage, buildZoccoloRowsFromStorage } from "./modules/rivestimentiRiepilogo.js";
 import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
 import { syncEsterniMisurazioniNelleVoci } from "./modules/esterniVariSyncVoci.js";
+import { wireAggiornamentiAutomatici } from "./aggiornamenti.js";
 
 window.addEventListener("DOMContentLoaded", () => {
+  wireAggiornamentiAutomatici();
   const pianoFormEl = document.querySelector("#piano-form");
   const tipologiaEl = document.querySelector("#tipologia");
   const edificioEl = document.querySelector("#edificio");

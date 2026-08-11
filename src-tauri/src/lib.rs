@@ -1,8 +1,19 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(desktop)]
+use tauri_plugin_updater::UpdaterExt;
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateAvailablePayload {
+    version: String,
+    current_version: String,
+    body: Option<String>,
+}
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -33,7 +44,8 @@ fn write_temp_export_file_bytes(file_name: String, bytes: Vec<u8>) -> Result<Str
 
     let mut full_path = PathBuf::from(&dir);
     full_path.push(format!("{}_{}", ts, safe_name));
-    fs::write(&full_path, bytes).map_err(|e| format!("Errore salvataggio file temporaneo: {}", e))?;
+    fs::write(&full_path, bytes)
+        .map_err(|e| format!("Errore salvataggio file temporaneo: {}", e))?;
 
     Ok(full_path.to_string_lossy().to_string())
 }
@@ -78,6 +90,36 @@ fn exit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+async fn check_app_update(app: tauri::AppHandle) -> Result<Option<UpdateAvailablePayload>, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    match updater.check().await.map_err(|e| e.to_string())? {
+        Some(update) => Ok(Some(UpdateAvailablePayload {
+            version: update.version,
+            current_version: update.current_version,
+            body: update.body,
+        })),
+        None => Ok(None),
+    }
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+async fn install_app_update(app: tauri::AppHandle) -> Result<(), String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+        return Err("Nessun aggiornamento disponibile.".into());
+    };
+
+    update
+        .download_and_install(|_chunk_len, _content_len| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+
+    app.restart();
+}
+
 fn sanitize_file_name(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for c in input.chars() {
@@ -93,9 +135,18 @@ fn sanitize_file_name(input: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_opener::init());
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             greet,
             write_export_file,
@@ -103,7 +154,9 @@ pub fn run() {
             write_temp_export_file_bytes,
             open_file_with_system,
             read_file_bytes,
-            exit_app
+            exit_app,
+            check_app_update,
+            install_app_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

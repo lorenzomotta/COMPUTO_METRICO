@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Chiavi firma updater (MAI pubblicare la chiave privata)
+src-tauri/keys/
+*.key
+*.key.pub
+!.gitkeep
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
