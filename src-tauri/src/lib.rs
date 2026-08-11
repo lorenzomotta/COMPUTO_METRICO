@@ -4,6 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::Manager;
 #[cfg(desktop)]
 use tauri_plugin_updater::UpdaterExt;
 
@@ -90,6 +91,15 @@ fn exit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+#[tauri::command]
+fn get_app_version(app: tauri::AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+fn titolo_app_con_versione(app: &tauri::AppHandle) -> String {
+    format!("LP_COMPUTO {}", app.package_info().version)
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 async fn check_app_update(app: tauri::AppHandle) -> Result<Option<UpdateAvailablePayload>, String> {
@@ -147,6 +157,13 @@ pub fn run() {
     }
 
     builder
+        .setup(|app| {
+            let titolo = titolo_app_con_versione(app.handle());
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title(&titolo);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             write_export_file,
@@ -155,6 +172,7 @@ pub fn run() {
             open_file_with_system,
             read_file_bytes,
             exit_app,
+            get_app_version,
             check_app_update,
             install_app_update
         ])

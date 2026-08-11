@@ -6,6 +6,16 @@ const APP_NAME = "LP_COMPUTO";
 
 async function leggiVersioneApp() {
   try {
+    const invoke = window.__TAURI__?.core?.invoke;
+    if (typeof invoke === "function") {
+      const fromRust = await invoke("get_app_version");
+      if (fromRust) return String(fromRust);
+    }
+  } catch (error) {
+    console.warn("get_app_version non disponibile:", error);
+  }
+
+  try {
     const getVersion = window.__TAURI__?.app?.getVersion;
     if (typeof getVersion === "function") {
       return await getVersion();
@@ -28,8 +38,9 @@ async function leggiVersioneApp() {
 
 async function aggiornaTitoloFinestra(titolo) {
   try {
-    const getCurrent = window.__TAURI__?.webviewWindow?.getCurrentWebviewWindow
-      || window.__TAURI__?.window?.getCurrentWindow;
+    const getCurrent =
+      window.__TAURI__?.webviewWindow?.getCurrentWebviewWindow ||
+      window.__TAURI__?.window?.getCurrentWindow;
     if (typeof getCurrent === "function") {
       const win = getCurrent();
       if (win && typeof win.setTitle === "function") {
