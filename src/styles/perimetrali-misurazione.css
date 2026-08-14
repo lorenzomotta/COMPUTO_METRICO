@@ -1,0 +1,156 @@
+/* Schermata fullscreen PERIMETRALI — riusa layout VANI dove possibile */
+
+#vista-perimetrali.vista-perim-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(145deg, #d4e0d8 0%, #e2ebe4 50%, #d8e4dc 100%);
+  color: #10233f;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(16, 35, 63, 0.08);
+}
+
+#vista-perimetrali.vista-perim-overlay[hidden] {
+  display: none;
+}
+
+body.perim-fullscreen-active {
+  overflow: hidden;
+}
+
+#vista-perimetrali .vani-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: min(1920px, 100%);
+  width: 100%;
+  margin: 0 auto;
+  padding: 6px 8px 8px;
+  gap: 4px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#vista-perimetrali .vani-header-title {
+  color: #1a4a32;
+}
+
+#vista-perimetrali .vani-body-layout {
+  flex-direction: row;
+}
+
+#vista-perimetrali .vani-main-column {
+  order: 1;
+  flex: 1;
+  min-width: 0;
+}
+
+#vista-perimetrali .vani-sidebar {
+  order: 2;
+}
+
+#vista-perimetrali .vani-top-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+
+#vista-perimetrali .vani-parete-card {
+  background: #fff;
+  border: 1px solid rgba(16, 35, 63, 0.12);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+#vista-perimetrali .vani-parete-misure,
+#vista-perimetrali .vani-parete-flags,
+#vista-perimetrali .vani-strato-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 6px;
+}
+
+#vista-perimetrali .vani-parete-flag-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+#vista-perimetrali .vani-strato-mq {
+  font-size: 0.8rem;
+  color: #345;
+  align-self: center;
+}
+
+#vista-perimetrali .vani-muted {
+  color: #667;
+  font-size: 0.82rem;
+}
+
+#vista-perimetrali .vani-apertura-check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.8rem;
+  margin: 2px 0;
+  flex: 1;
+  min-width: 0;
+}
+
+#vista-perimetrali .vani-apertura-check.is-disabled {
+  opacity: 0.55;
+}
+
+#vista-perimetrali .perim-apertura-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 2px 0;
+}
+
+#vista-perimetrali .perim-apertura-azioni {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+#vista-perimetrali .vani-parete-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#vista-perimetrali .perim-btn-aggiungi-apertura {
+  background: linear-gradient(135deg, #1a8f4a 0%, #2ec76a 100%);
+  color: #fff;
+}
+
+#vista-perimetrali .vani-help-inline {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(16, 35, 63, 0.12);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+}
+
+#vista-perimetrali .vani-help-inline__p {
+  margin: 0 0 6px;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+#vista-perimetrali .vani-help-inline__p--muted {
+  color: #445566;
+}

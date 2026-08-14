@@ -1,5 +1,6 @@
 /**
- * Gerarchia VANI: Piani → Locali → Pareti → Strati finitura (più per parete) → STRATIAPERTURA (placeholder).
+ * Gerarchia VANI: Piani → Locali → (schede) Pareti | Pavimento | Soffitto.
+ * Pareti: Strati finitura (+ aperture). Pavimento/Soffitto: area L1×L2 + strati (spessore, segno −).
  */
 
 import {
@@ -17,6 +18,20 @@ import {
   aggiornaNoteVociDaSnapshotVanoRegistrato,
   rimuoviRigheMisurazioniPerVanoId,
 } from "./modules/vaniRegistroAggiornaNoteVoci.js";
+import {
+  TIPI_SUPERFICIE_VANO,
+  emptySuperficieLocale,
+  emptyStratoSuperficie,
+  emptyAreaSuperficie,
+  sanificaSuperficieLocale,
+  cloneSuperficiePerSnapshot,
+  rinumeraStratiSuperficie,
+  rinumeraAreeSuperficie,
+  renderSuperficieLocalePanel,
+  syncSuperficieDaBlock,
+  aggiornaCalcoliSuperficieBlock,
+  maxIdStratiSuperficiNeiLocali,
+} from "./modules/vaniSuperficiLocale.js";
 import { altezzaInclusaNelloStratoConElevazione } from "./utils/numberUtils.js";
 
 /** Salvataggio elenco vani registrati (uno per voce). */
@@ -34,6 +49,9 @@ const collapsedPareteIds = new Set();
 const collapsedStratoNettoKeys = new Set();
 /** Dopo `renderGerarchia`, focus sul campo riferimento di questa parete. */
 let vaniFocusPareteIdDopoRender = null;
+
+/** Scheda attiva nel raccoglitore: pareti | pavimento | soffitto. */
+let vaniSchedaAttiva = "pareti";
 
 function pareteStratiCollassati(pareteId) {
   return collapsedPareteIds.has(Number(pareteId));
@@ -100,7 +118,7 @@ const VANI_SVG_FINESTRA =
 const PARETE_FLAG_KEYS = ["zoccolo", "rustico", "civile", "gesso", "rivestimento"];
 
 const PARETE_FLAG_LABELS = {
-  zoccolo: "Zoccolo",
+  zoccolo: "Zoccolino",
   rustico: "Rustico",
   civile: "Civile",
   gesso: "Gesso",
@@ -109,7 +127,7 @@ const PARETE_FLAG_LABELS = {
 
 /** Spunta tipo parete → aggiunge / riempie uno strato con questa `note` (se non già presente). */
 const PARETE_FLAG_AUTO_STRATO_NOTE = {
-  zoccolo: "zoccolo",
+  zoccolo: "zoccolino",
   civile: "civile",
   gesso: "gesso",
   rustico: "rustico",
@@ -162,12 +180,23 @@ function ripristinaContatoriDaPiani() {
           if (st && Number.isFinite(st.id)) maxSf = Math.max(maxSf, st.id);
         }
       }
+      maxSf = Math.max(maxSf, maxIdStratiSuperficiNeiLocali([l]));
     }
   }
   nextPianoId = maxP + 1;
   nextLocaleId = maxL + 1;
   nextPareteId = maxPa + 1;
   nextStratifinituraId = maxSf + 1;
+}
+
+function nextStratoIdFn() {
+  return nextStratifinituraId++;
+}
+
+function assicuraSuperficiSuLocale(locale) {
+  if (!locale || typeof locale !== "object") return;
+  locale.pavimento = sanificaSuperficieLocale(locale.pavimento, nextStratoIdFn);
+  locale.soffitto = sanificaSuperficieLocale(locale.soffitto, nextStratoIdFn);
 }
 
 function sanificaPianiCaricati(lista) {
@@ -215,6 +244,8 @@ function sanificaPianiCaricati(lista) {
           if (typeof pa[k] !== "boolean") pa[k] = false;
         }
       }
+      l.pavimento = sanificaSuperficieLocale(l.pavimento, () => nextStratifinituraId++);
+      l.soffitto = sanificaSuperficieLocale(l.soffitto, () => nextStratifinituraId++);
     }
   }
   return true;
@@ -309,6 +340,7 @@ function assicuraBozzaUnPianoUnLocale() {
     if (!Array.isArray(loc.pareti) || loc.pareti.length === 0) {
       loc.pareti = [emptyParete()];
     }
+    assicuraSuperficiSuLocale(loc);
   }
   ripristinaContatoriDaPiani();
 }
@@ -345,6 +377,8 @@ function creaSnapshotRegistrato(idDaRiprendere) {
   const locali = locs.map((l) => ({
     nomeLocale: typeof l.nomeLocale === "string" ? l.nomeLocale : "",
     pareti: (l.pareti || []).map((pa) => cloneParetePerSnapshot(pa)),
+    pavimento: cloneSuperficiePerSnapshot(l.pavimento),
+    soffitto: cloneSuperficiePerSnapshot(l.soffitto),
   }));
   const l0 = locs[0] || { nomeLocale: "", pareti: [] };
   return {
@@ -353,6 +387,8 @@ function creaSnapshotRegistrato(idDaRiprendere) {
     locali,
     nomeLocale: typeof l0.nomeLocale === "string" ? l0.nomeLocale : "",
     pareti: (l0.pareti || []).map((pa) => cloneParetePerSnapshot(pa)),
+    pavimento: cloneSuperficiePerSnapshot(l0.pavimento),
+    soffitto: cloneSuperficiePerSnapshot(l0.soffitto),
   };
 }
 
@@ -424,6 +460,8 @@ function applicaRecordComeBozza(rec) {
         ),
       });
     }
+    locale.pavimento = sanificaSuperficieLocale(blocco.pavimento, nextStratoIdFn);
+    locale.soffitto = sanificaSuperficieLocale(blocco.soffitto, nextStratoIdFn);
     piano.locali.push(locale);
   }
   piani = [piano];
@@ -440,6 +478,86 @@ function mostraFeedbackRegistra(ok, testo) {
     el.textContent = "";
     el.classList.remove("vani-registra-feedback--err");
   }, 4500);
+}
+
+function getLocaleBozzaPrincipale() {
+  assicuraBozzaUnPianoUnLocale();
+  return piani[0]?.locali?.[0] ?? null;
+}
+
+/** Parete “corrente”: prima quella espansa, altrimenti l’ultima del locale. */
+function getPareteAttivaPerLocale(locale) {
+  if (!locale || !Array.isArray(locale.pareti) || locale.pareti.length === 0) return null;
+  const espansa = locale.pareti.find((p) => !collapsedPareteIds.has(Number(p.id)));
+  if (espansa) return espansa;
+  return locale.pareti[locale.pareti.length - 1];
+}
+
+function aggiornaSidebarAzioniAttive() {
+  const nav = document.getElementById("vani-sidebar-azioni");
+  if (!nav) return;
+  nav.querySelectorAll(".vani-sidebar-azioni-group").forEach((group) => {
+    const scheda = String(group.dataset.schedaGroup ?? "").trim();
+    const attiva = scheda === vaniSchedaAttiva;
+    group.classList.toggle("is-active", attiva);
+    group.querySelectorAll("button.vani-sidebar-azione").forEach((btn) => {
+      if (btn instanceof HTMLButtonElement) {
+        btn.disabled = !attiva;
+        btn.setAttribute("aria-disabled", String(!attiva));
+      }
+    });
+  });
+}
+
+function onSidebarAzioniClick(event) {
+  const btn = event.target.closest("button[data-sidebar-azione]");
+  if (!(btn instanceof HTMLButtonElement) || btn.disabled) return;
+  const azione = String(btn.dataset.sidebarAzione ?? "").trim();
+  if (!azione) return;
+
+  syncStateFromInputs();
+  const locale = getLocaleBozzaPrincipale();
+  if (!locale) return;
+
+  if (azione === "aggiungi-parete") {
+    if (vaniSchedaAttiva !== "pareti") return;
+    addParete(locale.id);
+    return;
+  }
+  if (azione === "aggiungi-apertura") {
+    if (vaniSchedaAttiva !== "pareti") return;
+    const parete = getPareteAttivaPerLocale(locale);
+    if (!parete) return;
+    apriDialogNuovaAperturaParete(parete.id);
+    return;
+  }
+  if (azione === "aggiungi-strato-parete") {
+    if (vaniSchedaAttiva !== "pareti") return;
+    const parete = getPareteAttivaPerLocale(locale);
+    if (!parete) return;
+    collapsedPareteIds.delete(Number(parete.id));
+    addStratifinitura(parete.id);
+    return;
+  }
+  if (azione === "aggiungi-area-pavimento") {
+    if (vaniSchedaAttiva !== "pavimento") return;
+    addAreaSuperficie(locale.id, "pavimento");
+    return;
+  }
+  if (azione === "aggiungi-strato-pavimento") {
+    if (vaniSchedaAttiva !== "pavimento") return;
+    addStratoSuperficie(locale.id, "pavimento");
+    return;
+  }
+  if (azione === "aggiungi-area-soffitto") {
+    if (vaniSchedaAttiva !== "soffitto") return;
+    addAreaSuperficie(locale.id, "soffitto");
+    return;
+  }
+  if (azione === "aggiungi-strato-soffitto") {
+    if (vaniSchedaAttiva !== "soffitto") return;
+    addStratoSuperficie(locale.id, "soffitto");
+  }
 }
 
 function renderSidebarListaVani() {
@@ -628,6 +746,10 @@ function maybeAggiungiStratoPerFlagTipo(parete, flagKey) {
   if (!note) return false;
   if (!Array.isArray(parete.stratifinitura)) parete.stratifinitura = [];
   const want = note.toLowerCase();
+  const voceNome =
+    typeof PARETE_FLAG_LABELS[flagKey] === "string" && PARETE_FLAG_LABELS[flagKey].trim()
+      ? PARETE_FLAG_LABELS[flagKey].trim()
+      : note;
   if (
     parete.stratifinitura.some((st) => String(st.note ?? "").trim().toLowerCase() === want)
   ) {
@@ -636,10 +758,12 @@ function maybeAggiungiStratoPerFlagTipo(parete, flagKey) {
   const riempibile = parete.stratifinitura.find((st) => stratoCompletamenteVuoto(st));
   if (riempibile) {
     riempibile.note = note;
+    riempibile.vocibreve = voceNome;
     return true;
   }
   const nuovo = emptyStratifinitura();
   nuovo.note = note;
+  nuovo.vocibreve = voceNome;
   parete.stratifinitura.push(nuovo);
   return true;
 }
@@ -661,6 +785,8 @@ function emptyLocale() {
     id: nextLocaleId++,
     nomeLocale: "",
     pareti: [emptyParete()],
+    pavimento: emptySuperficieLocale(nextStratoIdFn),
+    soffitto: emptySuperficieLocale(nextStratoIdFn),
   };
 }
 
@@ -864,6 +990,16 @@ function syncStateFromInputs() {
           if (nt instanceof HTMLInputElement) st.note = nt.value;
         });
       }
+    });
+
+    block.querySelectorAll(".vani-sup-block").forEach((supBlock) => {
+      const lid = Number(supBlock.dataset.localeId);
+      const tipo = String(supBlock.dataset.tipoSuperficie ?? "").trim();
+      if (!TIPI_SUPERFICIE_VANO.includes(/** @type {'pavimento'|'soffitto'} */ (tipo))) return;
+      const loc = piano.locali.find((x) => x.id === lid);
+      if (!loc) return;
+      assicuraSuperficiSuLocale(loc);
+      syncSuperficieDaBlock(supBlock, loc[tipo]);
     });
   });
 }
@@ -1285,6 +1421,22 @@ function onVaniFormRefreshStratiNetti(event) {
   const el = event.target;
   if (!(el instanceof HTMLInputElement)) return;
   if (
+    el.classList.contains("vani-sup-area-lato1") ||
+    el.classList.contains("vani-sup-area-lato2") ||
+    el.classList.contains("vani-sup-strato-spessore")
+  ) {
+    const block = el.closest(".vani-sup-block");
+    if (!(block instanceof HTMLElement)) return;
+    const lid = Number(block.dataset.localeId);
+    const tipo = String(block.dataset.tipoSuperficie ?? "").trim();
+    const hit = findLocale(lid);
+    if (!hit || !TIPI_SUPERFICIE_VANO.includes(/** @type {'pavimento'|'soffitto'} */ (tipo))) return;
+    assicuraSuperficiSuLocale(hit.locale);
+    syncSuperficieDaBlock(block, hit.locale[tipo]);
+    aggiornaCalcoliSuperficieBlock(block, hit.locale[tipo]);
+    return;
+  }
+  if (
     !el.classList.contains("vani-stratifinitura-vocibreve") &&
     !el.classList.contains("vani-stratifinitura-elevazione") &&
     !el.classList.contains("vani-stratifinitura-altezza") &&
@@ -1306,15 +1458,7 @@ function renderStratifinituraPanel(parete, nomeLocale) {
   const lbl = document.createElement("span");
   lbl.className = "vani-stratifinitura-label";
   lbl.textContent = "Strati finitura";
-  const addBtn = document.createElement("button");
-  addBtn.type = "button";
-  addBtn.className = "btn-action btn-secondary vani-btn-micro";
-  addBtn.dataset.action = "aggiungi-stratifinitura";
-  addBtn.dataset.pareteId = String(parete.id);
-  addBtn.title = "Aggiungi strato finitura";
-  addBtn.textContent = "+S";
   toolbar.appendChild(lbl);
-  toolbar.appendChild(addBtn);
   wrap.appendChild(toolbar);
 
   const stratList =
@@ -1435,6 +1579,48 @@ function appendStratifinituraRow(tbody, parete, colSpan, nomeLocale) {
   tbody.appendChild(trS);
 }
 
+function renderSchedeTabs() {
+  const nav = document.createElement("div");
+  nav.className = "vani-schede-tabs";
+  nav.setAttribute("role", "tablist");
+  nav.setAttribute("aria-label", "Sezioni del vano");
+  const voci = [
+    { id: "pareti", label: "Pareti" },
+    { id: "pavimento", label: "Pavimento" },
+    { id: "soffitto", label: "Soffitto" },
+  ];
+  for (const v of voci) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "vani-scheda-tab" + (vaniSchedaAttiva === v.id ? " is-active" : "");
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", String(vaniSchedaAttiva === v.id));
+    btn.dataset.action = "seleziona-scheda-vano";
+    btn.dataset.scheda = v.id;
+    btn.id = `vani-scheda-tab-${v.id}`;
+    btn.textContent = v.label;
+    nav.appendChild(btn);
+  }
+  return nav;
+}
+
+function renderSuperficiScheda(piano, tipo) {
+  const host = document.createElement("div");
+  host.className = "vani-sup-scheda-host";
+  host.dataset.scheda = tipo;
+  for (const loc of piano.locali || []) {
+    assicuraSuperficiSuLocale(loc);
+    host.appendChild(
+      renderSuperficieLocalePanel({
+        tipo,
+        locale: loc,
+        escapeHtmlFn: escapeHtml,
+      }),
+    );
+  }
+  return host;
+}
+
 function renderPianoTable(piano, opts = {}) {
   const { soloUnVano = true } = opts;
   const wrap = document.createElement("div");
@@ -1445,10 +1631,17 @@ function renderPianoTable(piano, opts = {}) {
   head.className = "vani-piano-head";
   const btnVoce = `
     <button type="button" class="btn-action btn-secondary vani-btn-mini vani-piano-btn-voce" data-action="apri-dialog-nuova-voce" title="Apri il modulo nuova voce del computo">AGGIUNGI VOCE</button>`;
+  const azioniParetiVisibili = vaniSchedaAttiva === "pareti";
   if (soloUnVano) {
     const loc0 = piano.locali[0];
     const lid = loc0 ? String(loc0.id) : "";
     const lnome = loc0 && typeof loc0.nomeLocale === "string" ? loc0.nomeLocale : "";
+    const azioniPareti = azioniParetiVisibili
+      ? `<div class="vani-locale-actions">
+            <button type="button" class="btn-action btn-secondary vani-btn-micro vani-btn-icon-strati" data-action="toggle-tutte-parete-strati" data-mode="expand" data-locale-id="${escapeHtml(lid)}" title="Espandi strati su tutte le pareti" aria-label="Espandi strati su tutte le pareti">${VANI_SVG_STRATI_ESPANDI}</button>
+            <button type="button" class="btn-action btn-secondary vani-btn-micro vani-btn-icon-strati" data-action="toggle-tutte-parete-strati" data-mode="collapse" data-locale-id="${escapeHtml(lid)}" title="Comprimi strati su tutte le pareti" aria-label="Comprimi strati su tutte le pareti">${VANI_SVG_STRATI_COMPRIMI}</button>
+          </div>`
+      : "";
     head.innerHTML = `
     <div class="vani-piano-head-inner">
       <span class="vani-piano-tag">Piano</span>
@@ -1458,11 +1651,7 @@ function renderPianoTable(piano, opts = {}) {
         <div class="vani-locale-cell-inner vani-locale-cell-inner--inline">
           <input type="text" class="vani-locale-nome" list="vani-archivio-locale-datalist" placeholder="LOCALE" value="${escapeHtml(lnome)}" aria-label="Locale" />
           <button type="button" class="btn-action btn-secondary vani-btn-mini" data-action="aggiungi-locale" data-piano-id="${piano.id}" title="Aggiungi un altro locale nello stesso piano">+ Loc.</button>
-          <div class="vani-locale-actions">
-            <button type="button" class="btn-action btn-secondary vani-btn-mini vani-btn-aggiungi-parete" data-action="aggiungi-parete" data-locale-id="${escapeHtml(lid)}" title="Aggiungi una parete al vano">AGGIUNGI PARETE</button>
-            <button type="button" class="btn-action btn-secondary vani-btn-micro vani-btn-icon-strati" data-action="toggle-tutte-parete-strati" data-mode="expand" data-locale-id="${escapeHtml(lid)}" title="Espandi strati su tutte le pareti" aria-label="Espandi strati su tutte le pareti">${VANI_SVG_STRATI_ESPANDI}</button>
-            <button type="button" class="btn-action btn-secondary vani-btn-micro vani-btn-icon-strati" data-action="toggle-tutte-parete-strati" data-mode="collapse" data-locale-id="${escapeHtml(lid)}" title="Comprimi strati su tutte le pareti" aria-label="Comprimi strati su tutte le pareti">${VANI_SVG_STRATI_COMPRIMI}</button>
-          </div>
+          ${azioniPareti}
         </div>
       </div>
     </div>
@@ -1478,6 +1667,14 @@ function renderPianoTable(piano, opts = {}) {
     </div>
     ${btnVoce}
   `;
+  }
+
+  wrap.appendChild(head);
+  wrap.appendChild(renderSchedeTabs());
+
+  if (vaniSchedaAttiva === "pavimento" || vaniSchedaAttiva === "soffitto") {
+    wrap.appendChild(renderSuperficiScheda(piano, vaniSchedaAttiva));
+    return wrap;
   }
 
   const table = document.createElement("table");
@@ -1520,7 +1717,6 @@ function renderPianoTable(piano, opts = {}) {
           <div class="vani-locale-cell-inner">
             <input type="text" class="vani-locale-nome" list="vani-archivio-locale-datalist" placeholder="LOCALE" value="${escapeHtml(loc.nomeLocale)}" aria-label="Locale" />
             <div class="vani-locale-actions">
-              <button type="button" class="btn-action btn-secondary vani-btn-mini vani-btn-aggiungi-parete" data-action="aggiungi-parete" data-locale-id="${loc.id}" title="Aggiungi una parete al locale">AGGIUNGI PARETE</button>
               <button type="button" class="btn-action btn-secondary vani-btn-micro vani-btn-icon-strati" data-action="toggle-tutte-parete-strati" data-mode="expand" data-locale-id="${loc.id}" title="Espandi strati su tutte le pareti" aria-label="Espandi strati su tutte le pareti">${VANI_SVG_STRATI_ESPANDI}</button>
               <button type="button" class="btn-action btn-secondary vani-btn-micro vani-btn-icon-strati" data-action="toggle-tutte-parete-strati" data-mode="collapse" data-locale-id="${loc.id}" title="Comprimi strati su tutte le pareti" aria-label="Comprimi strati su tutte le pareti">${VANI_SVG_STRATI_COMPRIMI}</button>
               <button type="button" class="btn-action btn-delete vani-btn-micro" data-action="rimuovi-locale" data-locale-id="${loc.id}" ${piano.locali.length <= 1 ? "disabled" : ""} title="Rimuovi locale">✕</button>
@@ -1537,19 +1733,6 @@ function renderPianoTable(piano, opts = {}) {
       tdAct.className = "vani-td-act";
       const actInner = document.createElement("div");
       actInner.className = "vani-td-act-inner";
-
-      const bAp = document.createElement("button");
-      bAp.type = "button";
-      bAp.className = "btn-action btn-secondary vani-btn-micro vani-btn-aggiungi-apertura";
-      bAp.dataset.action = "aggiungi-apertura-parete";
-      bAp.dataset.pareteId = String(parete.id);
-      const localeOk = String(loc.nomeLocale ?? "").trim() !== "";
-      bAp.disabled = !localeOk;
-      bAp.title = localeOk
-        ? "Aggiungi un’apertura all’archivio e collegala a questa parete"
-        : "Inserisci prima il nome del locale";
-      bAp.setAttribute("aria-label", "Aggiungi apertura");
-      bAp.innerHTML = VANI_SVG_FINESTRA;
 
       const bDup = document.createElement("button");
       bDup.type = "button";
@@ -1569,10 +1752,9 @@ function renderPianoTable(piano, opts = {}) {
       b.textContent = "✕";
       b.title =
         loc.pareti.length <= 1
-          ? "Non puoi eliminare l’unica parete: usa «AGGIUNGI PARETE» per aggiungerne un’altra."
+          ? "Non puoi eliminare l’unica parete: usa «Aggiungi parete» nella sidebar."
           : "Rimuovi parete";
 
-      actInner.appendChild(bAp);
       actInner.appendChild(bDup);
       actInner.appendChild(b);
       tdAct.appendChild(actInner);
@@ -1590,7 +1772,6 @@ function renderPianoTable(piano, opts = {}) {
   }
 
   table.appendChild(tbody);
-  wrap.appendChild(head);
   wrap.appendChild(table);
   return wrap;
 }
@@ -1611,6 +1792,7 @@ function renderGerarchia() {
   popolaDatalistArchivioPianiMisura(ARCHIVIO_PIANI_MISURA_STORAGE_KEY, "datalist-piani-misura-archivio");
   popolaDatalistVocibrevi("vani-vocibrevi-datalist");
   renderSidebarListaVani();
+  aggiornaSidebarAzioniAttive();
 
   const fid = vaniFocusPareteIdDopoRender;
   vaniFocusPareteIdDopoRender = null;
@@ -1713,6 +1895,8 @@ function eseguiEliminazioneVaniPendente() {
   if (!p) return;
   if (p.kind === "parete") removeParete(p.pareteId);
   else if (p.kind === "strato") removeStratifinitura(p.pareteId, p.stratifinituraId);
+  else if (p.kind === "stratoSuperficie") removeStratoSuperficie(p.localeId, p.tipo, p.stratoId);
+  else if (p.kind === "areaSuperficie") removeAreaSuperficie(p.localeId, p.tipo, p.areaId);
   else if (p.kind === "locale") removeLocale(p.localeId);
   else if (p.kind === "piano") removePiano(p.pianoId);
   else if (p.kind === "vanoRegistrato") eliminaVanoRegistrato(p.vanoId);
@@ -1792,6 +1976,56 @@ function removeStratifinitura(pareteId, stratId) {
   const sid = Number(stratId);
   setStratoNettoCollassato(pareteId, sid, false);
   hit.parete.stratifinitura = hit.parete.stratifinitura.filter((x) => x.id !== sid);
+  renderGerarchia();
+}
+
+function addStratoSuperficie(localeId, tipo) {
+  if (!TIPI_SUPERFICIE_VANO.includes(/** @type {'pavimento'|'soffitto'} */ (tipo))) return;
+  const hit = findLocale(localeId);
+  if (!hit) return;
+  assicuraSuperficiSuLocale(hit.locale);
+  const superficie = hit.locale[tipo];
+  if (!Array.isArray(superficie.strati)) superficie.strati = [];
+  superficie.strati.push(emptyStratoSuperficie(nextStratoIdFn, superficie.strati.length + 1));
+  rinumeraStratiSuperficie(superficie);
+  renderGerarchia();
+}
+
+function removeStratoSuperficie(localeId, tipo, stratoId) {
+  if (!TIPI_SUPERFICIE_VANO.includes(/** @type {'pavimento'|'soffitto'} */ (tipo))) return;
+  const hit = findLocale(localeId);
+  if (!hit) return;
+  assicuraSuperficiSuLocale(hit.locale);
+  const superficie = hit.locale[tipo];
+  if (!Array.isArray(superficie.strati) || superficie.strati.length <= 1) return;
+  const sid = Number(stratoId);
+  superficie.strati = superficie.strati.filter((x) => x.id !== sid);
+  rinumeraStratiSuperficie(superficie);
+  renderGerarchia();
+}
+
+function addAreaSuperficie(localeId, tipo) {
+  if (!TIPI_SUPERFICIE_VANO.includes(/** @type {'pavimento'|'soffitto'} */ (tipo))) return;
+  const hit = findLocale(localeId);
+  if (!hit) return;
+  assicuraSuperficiSuLocale(hit.locale);
+  const superficie = hit.locale[tipo];
+  if (!Array.isArray(superficie.aree)) superficie.aree = [];
+  superficie.aree.push(emptyAreaSuperficie(nextStratoIdFn, superficie.aree.length + 1));
+  rinumeraAreeSuperficie(superficie);
+  renderGerarchia();
+}
+
+function removeAreaSuperficie(localeId, tipo, areaId) {
+  if (!TIPI_SUPERFICIE_VANO.includes(/** @type {'pavimento'|'soffitto'} */ (tipo))) return;
+  const hit = findLocale(localeId);
+  if (!hit) return;
+  assicuraSuperficiSuLocale(hit.locale);
+  const superficie = hit.locale[tipo];
+  if (!Array.isArray(superficie.aree) || superficie.aree.length <= 1) return;
+  const aid = Number(areaId);
+  superficie.aree = superficie.aree.filter((x) => x.id !== aid);
+  rinumeraAreeSuperficie(superficie);
   renderGerarchia();
 }
 
@@ -1880,6 +2114,48 @@ function onHostClick(event) {
   if (!btn) return;
   syncStateFromInputs();
   const action = btn.dataset.action;
+  if (action === "seleziona-scheda-vano") {
+    const scheda = String(btn.dataset.scheda ?? "").trim();
+    if (scheda !== "pareti" && scheda !== "pavimento" && scheda !== "soffitto") return;
+    vaniSchedaAttiva = scheda;
+    renderGerarchia();
+    queueMicrotask(() => {
+      document.getElementById(`vani-scheda-tab-${scheda}`)?.focus();
+    });
+    return;
+  }
+  if (action === "aggiungi-strato-superficie") {
+    addStratoSuperficie(Number(btn.dataset.localeId), String(btn.dataset.tipoSuperficie ?? ""));
+    return;
+  }
+  if (action === "rimuovi-strato-superficie") {
+    const tipo = String(btn.dataset.tipoSuperficie ?? "");
+    const lid = Number(btn.dataset.localeId);
+    const sid = Number(btn.dataset.stratoId);
+    apriModaleConfermaEliminaVani("Vuoi eliminare questo strato?", {
+      kind: "stratoSuperficie",
+      localeId: lid,
+      tipo,
+      stratoId: sid,
+    });
+    return;
+  }
+  if (action === "aggiungi-area-superficie") {
+    addAreaSuperficie(Number(btn.dataset.localeId), String(btn.dataset.tipoSuperficie ?? ""));
+    return;
+  }
+  if (action === "rimuovi-area-superficie") {
+    const tipo = String(btn.dataset.tipoSuperficie ?? "");
+    const lid = Number(btn.dataset.localeId);
+    const aid = Number(btn.dataset.areaId);
+    apriModaleConfermaEliminaVani("Vuoi eliminare quest’area?", {
+      kind: "areaSuperficie",
+      localeId: lid,
+      tipo,
+      areaId: aid,
+    });
+    return;
+  }
   if (action === "apri-dialog-nuova-voce") {
     document.dispatchEvent(new CustomEvent("computo-apri-dialog-nuova-voce"));
     return;
@@ -1979,7 +2255,7 @@ function onHostClick(event) {
     if (hit.locale.pareti.length <= 1) {
       apriModaleInfoVaniConferma(
         "Eliminazione non possibile",
-        "Non puoi eliminare l’unica parete di questo locale. Usa «AGGIUNGI PARETE» per aggiungerne un’altra sullo stesso vano; dopo potrai rimuovere quella che non ti serve.",
+        "Non puoi eliminare l’unica parete di questo locale. Usa «Aggiungi parete» nella sidebar a sinistra; dopo potrai rimuovere quella che non ti serve.",
       );
       return;
     }
@@ -1995,6 +2271,20 @@ function onHostClick(event) {
 }
 
 function onHostChange(event) {
+  const cbSegno = event.target.closest("input[type='checkbox'].vani-sup-area-segno");
+  if (cbSegno instanceof HTMLInputElement) {
+    const block = cbSegno.closest(".vani-sup-block");
+    if (!(block instanceof HTMLElement)) return;
+    const lid = Number(block.dataset.localeId);
+    const tipo = String(block.dataset.tipoSuperficie ?? "").trim();
+    const hit = findLocale(lid);
+    if (!hit || !TIPI_SUPERFICIE_VANO.includes(/** @type {'pavimento'|'soffitto'} */ (tipo))) return;
+    assicuraSuperficiSuLocale(hit.locale);
+    syncSuperficieDaBlock(block, hit.locale[tipo]);
+    aggiornaCalcoliSuperficieBlock(block, hit.locale[tipo]);
+    return;
+  }
+
   const cbAp = event.target.closest("input[type='checkbox'][data-id-apertura-master]");
   if (cbAp instanceof HTMLInputElement) {
     syncStateFromInputs();
@@ -2077,7 +2367,13 @@ function onVaniFormFocusOutArchivioPiano(event) {
 
 function onVaniFormFocusInVocibreve(event) {
   const el = event.target;
-  if (!(el instanceof HTMLInputElement) || !el.classList.contains("vani-stratifinitura-vocibreve")) return;
+  if (!(el instanceof HTMLInputElement)) return;
+  if (
+    !el.classList.contains("vani-stratifinitura-vocibreve") &&
+    !el.classList.contains("vani-sup-strato-voce")
+  ) {
+    return;
+  }
   popolaDatalistVocibrevi("vani-vocibrevi-datalist");
 }
 
@@ -2094,6 +2390,7 @@ export function initVaniParetiUi() {
   host?.addEventListener("change", onHostChange);
   host?.addEventListener("input", onHostInput);
   document.getElementById("vani-sidebar-list")?.addEventListener("click", onSidebarListaClick);
+  document.getElementById("vani-sidebar-azioni")?.addEventListener("click", onSidebarAzioniClick);
   document.getElementById("btn-vani-registra")?.addEventListener("click", onRegistraVanoClick);
 
   document.getElementById("vani-nap-annulla")?.addEventListener("click", () => {

@@ -14,6 +14,7 @@ dist-ssr
 
 # Chiavi firma updater (MAI pubblicare la chiave privata)
 src-tauri/keys/
+src-tauri/UPDATER_SECRETS.txt
 *.key
 *.key.pub
 !.gitkeep

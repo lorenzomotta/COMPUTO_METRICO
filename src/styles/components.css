@@ -260,6 +260,21 @@
   border-radius: 6px;
 }
 
+.table-voci .actions-cell .btn-voce-mm-add {
+  width: 25px;
+  height: 23px;
+  min-width: 25px;
+  min-height: 23px;
+  font-size: 1.05rem;
+  align-self: center;
+}
+
+.table-voci .actions-cell .btn-voce-mm-add:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+}
+
 /* + verde compatto: submit form (ESTERNI VARI / CAMMINAMENTI) */
 .btn-form-add-plus {
   align-self: end;

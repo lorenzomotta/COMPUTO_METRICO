@@ -35,12 +35,53 @@ import {
   risolviBlurCampoPianoArchivioStorage,
 } from "./modules/archivioPianiMisura.js";
 import {
+  ARCHIVIO_CAPITOLI_STORAGE_KEY,
+  CAPITOLO_SENZA_KEY,
+  applicaSequenzaConScambio,
+  buildVociGroupsByCapitolo,
+  createCapitoloId,
+  formatVoceNumeroCapitolo,
+  getCapitoloById,
+  loadCapitoli,
+  saveCapitoli,
+  sortCapitoli,
+} from "./modules/archivioCapitoli.js";
+import {
+  buildCapitoliTemplatePayload,
+  deleteCapitoliTemplateFile,
+  listCapitoliTemplates,
+  loadCapitoliTemplateFile,
+  openCapitoliTemplatesFolder,
+  saveCapitoliTemplate,
+} from "./modules/capitoliTemplate.js";
+import {
   dismissCamminamentiIfOpen,
   openVistaCamminamenti,
   wireCamminamentiUi,
 } from "./camminamenti-misurazione.js";
 import { dismissVaniIfOpen, openVistaVani, wireVaniUi } from "./vani-misurazione.js";
-import { openVistaMisureVarie, closeVistaMisureVarie, wireMisureVarieUi } from "./misure-varie.js";
+import {
+  dismissPerimetraliIfOpen,
+  openVistaPerimetrali,
+  wirePerimetraliUi,
+} from "./perimetrali-misurazione.js";
+import {
+  dismissElevazioneIfOpen,
+  openVistaElevazione,
+  wireElevazioneUi,
+} from "./elevazione-misurazione.js";
+import {
+  dismissSolaiInterniIfOpen,
+  openVistaSolaiInterni,
+  wireSolaiInterniUi,
+} from "./solai-interni-misurazione.js";
+import {
+  dismissSolaiInclinatiIfOpen,
+  openVistaSolaiInclinati,
+  wireSolaiInclinatiUi,
+} from "./solai-inclinati-misurazione.js";
+import { openVistaMisureVarie, wireMisureVarieUi } from "./misure-varie.js";
+import { openVistaScavo, wireScavoUi, dismissScavoIfOpen } from "./scavo.js";
 import { buildRivestimentiRowsFromStorage, buildIntonacoRusticoRowsFromStorage, buildIntonacoCivileRowsFromStorage, buildZoccoloRowsFromStorage } from "./modules/rivestimentiRiepilogo.js";
 import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
 import { syncEsterniMisurazioniNelleVoci } from "./modules/esterniVariSyncVoci.js";
@@ -97,6 +138,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const sidebarLeftActionsSecondariEl = document.querySelector("#sidebar-left-actions-secondari");
   const apertureMasterSidebarButtonEl = document.createElement("button");
   const pianiMisuraArchivioSidebarButtonEl = document.createElement("button");
+  const capitoliArchivioSidebarButtonEl = document.createElement("button");
   const grondeSidebarButtonEl = document.createElement("button");
   const davanzaliSidebarButtonEl = document.createElement("button");
   const soglieSidebarButtonEl = document.createElement("button");
@@ -128,6 +170,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const ifcRiepilogoCloseButtonEl = document.createElement("button");
   const apertureMasterDialogEl = document.createElement("dialog");
   const pianiMisuraArchivioDialogEl = document.createElement("dialog");
+  const capitoliArchivioDialogEl = document.createElement("dialog");
   const useAperturaDialogEl = document.createElement("dialog");
   const confirmDeleteAperturaMasterDialogEl = document.createElement("dialog");
   const confirmEditVoceMmAperturaDialogEl = document.createElement("dialog");
@@ -142,6 +185,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const compilazioneInterratoPanelEl = document.querySelector("#compilazione-interrato");
   const compilazioneEsterniPanelEl = document.querySelector("#compilazione-esterni-vari");
   const compilazioneMisureVariePanelEl = document.querySelector("#compilazione-misure-varie");
+  const compilazioneScavoPanelEl = document.querySelector("#compilazione-scavo");
 
   const interratoSottotitoloEl = document.querySelector("#compilazione-interrato-sottotitolo");
   const esterniSottotitoloEl = document.querySelector("#compilazione-esterni-sottotitolo");
@@ -181,6 +225,22 @@ window.addEventListener("DOMContentLoaded", () => {
   // CAMMINAMENTI non è più in ESTERNI VARI (modulo dedicato in sidebar).
   const sumAreaCorselliEl = document.querySelector("#sum-area-corselli");
   const sumVolumeCorselliEl = document.querySelector("#sum-volume-corselli");
+  const scivoloFormEl = document.querySelector("#scivolo-form");
+  const idPlScivEl = document.querySelector("#idplsciv");
+  const scivoloPianoEl = document.querySelector("#scivolo-piano");
+  const scivoloRiferimentoEl = document.querySelector("#scivolo-riferimento");
+  const scivoloSottraiEl = document.querySelector("#scivolo-sottrai");
+  const scivoloMisura1El = document.querySelector("#scivolo-misura1");
+  const scivoloMisura2El = document.querySelector("#scivolo-misura2");
+  const scivoloFormulaEl = document.querySelector("#scivolo-formula");
+  const apriFormulaScivoloButtonEl = document.querySelector("#btn-apri-formula-scivolo");
+  const scivoloAltezzaEl = document.querySelector("#scivolo-altezza");
+  const scivoloIdVoceEl = document.querySelector("#scivolo-idvoce");
+  const scivoloBodyEl = document.querySelector("#scivolo-body");
+  const scivoloSubmitButtonEl = scivoloFormEl.querySelector("button[type='submit']");
+  const countScivoliEl = document.querySelector("#count-scivoli");
+  const sumAreaScivoliEl = document.querySelector("#sum-area-scivoli");
+  const sumVolumeScivoliEl = document.querySelector("#sum-volume-scivoli");
   const misurazioniFormEl = document.querySelector("#misurazioni-form");
   const idMisurazioneEl = document.querySelector("#idmisurazione");
   const misurazioniIdVoceEl = document.querySelector("#misurazioni-idvoce");
@@ -212,9 +272,28 @@ window.addEventListener("DOMContentLoaded", () => {
   const chiusuraAppDialogEl = document.querySelector("#chiusura-app-dialog");
   const chiusuraAppDialogMsgEl = document.querySelector("#chiusura-app-dialog-msg");
   const iniziaComputoDialogEl = document.querySelector("#inizia-computo-dialog");
+  const capitoliSalvaTemplateDialogEl = document.querySelector("#capitoli-salva-template-dialog");
+  const capitoliSalvaTemplateNomeEl = document.querySelector("#capitoli-salva-template-nome");
+  const capitoliSalvaTemplateMsgEl = document.querySelector("#capitoli-salva-template-msg");
+  const capitoliSalvaTemplateNomeWrapEl = document.querySelector("#capitoli-salva-template-nome-wrap");
+  const capitoliSalvaTemplateActionsMainEl = document.querySelector("#capitoli-salva-template-actions-main");
+  const capitoliSalvaTemplateActionsOverwriteEl = document.querySelector(
+    "#capitoli-salva-template-actions-overwrite",
+  );
+  const btnCapitoliSalvaTemplateOkEl = document.querySelector("#btn-capitoli-salva-template-ok");
+  const btnCapitoliSalvaTemplateAnnullaEl = document.querySelector(
+    "#btn-capitoli-salva-template-annulla",
+  );
+  const btnCapitoliSalvaTemplateOverwriteEl = document.querySelector(
+    "#btn-capitoli-salva-template-overwrite",
+  );
+  const btnCapitoliSalvaTemplateAnnullaOwEl = document.querySelector(
+    "#btn-capitoli-salva-template-annulla-ow",
+  );
   const computoDirtyIndicatorEl = document.querySelector("#computo-dirty-indicator");
   const voceIdEl = document.querySelector("#voce-id");
   const vocePosizioneEl = document.querySelector("#voce-posizione");
+  const voceCapitoloEl = document.querySelector("#voce-capitolo");
   const voceAbbreviataEl = document.querySelector("#voce-abbreviata");
   const voceUnitaMisuraEl = document.querySelector("#voce-unita-misura");
   const vocePrezzoEl = document.querySelector("#voce-prezzo");
@@ -264,6 +343,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const vociTotaleComputoEl = document.querySelector("#voci-totale-computo");
   const btnApriTutteVociEl = document.querySelector("#btn-apri-tutte-voci");
   const btnChiudiTutteVociEl = document.querySelector("#btn-chiudi-tutte-voci");
+  const btnChiudiCapitoliVociEl = document.querySelector("#btn-chiudi-capitoli-voci");
+  const btnApriCapitoliVociEl = document.querySelector("#btn-apri-capitoli-voci");
   const vociCercaAbbrevInputEl = document.querySelector("#voci-cerca-abbrev");
 
   const STORAGE_PIANI = "computo_metrico_piani";
@@ -272,10 +353,12 @@ window.addEventListener("DOMContentLoaded", () => {
   const STORAGE_APERTURE_ELEV = "computo_metrico_aperture_elevazione";
   const STORAGE_SCAVI_ESTERNI = "computo_metrico_esterni_vari_scavi";
   const STORAGE_CORSELLI_ESTERNI = "computo_metrico_esterni_vari_corselli";
+  const STORAGE_SCIVOLI_ESTERNI = "computo_metrico_esterni_vari_scivoli";
   const STORAGE_CAMMINAMENTI_ESTERNI = "computo_metrico_esterni_vari_camminamenti";
   const STORAGE_MISURAZIONI_VARIE = "computo_metrico_misurazioni_varie";
   const STORAGE_VOCI = "computo_metrico_voci";
   const STORAGE_VOCI_UNITA_OPTIONS = "computo_metrico_voci_unita_options";
+  const STORAGE_ARCHIVIO_CAPITOLI = ARCHIVIO_CAPITOLI_STORAGE_KEY;
   const STORAGE_IFC_DATA = "computo_metrico_ifc_data";
   const STORAGE_APERTURE_MASTER = "computo_metrico_aperture_master";
   const STORAGE_ARCHIVIO_PIANI_MISURA = ARCHIVIO_PIANI_MISURA_STORAGE_KEY;
@@ -294,6 +377,7 @@ window.addEventListener("DOMContentLoaded", () => {
     STORAGE_APERTURE_ELEV,
     STORAGE_SCAVI_ESTERNI,
     STORAGE_CORSELLI_ESTERNI,
+    STORAGE_SCIVOLI_ESTERNI,
     STORAGE_CAMMINAMENTI_ESTERNI,
     STORAGE_MISURAZIONI_VARIE,
   };
@@ -308,18 +392,22 @@ window.addEventListener("DOMContentLoaded", () => {
   let scaviEsterni = [];
   /** @type {{ idPlCors: number, piano: string, riferimento: string, sottrai: boolean, misura1: number|null, misura2: number|null, formula: string, formulaValue: number|null, area: number, altezza: number|null, volume: number, idVoce: string }[]} */
   let corselliEsterni = [];
+  /** @type {{ idPlSciv: number, piano: string, riferimento: string, sottrai: boolean, misura1: number|null, misura2: number|null, formula: string, formulaValue: number|null, area: number, altezza: number|null, volume: number, idVoce: string }[]} */
+  let scivoliEsterni = [];
   /** @type {{ idPlCamm: number, piano: string, riferimento: string, sottrai: boolean, misura1: number|null, misura2: number|null, formula: string, formulaValue: number|null, area: number, altezza: number|null, volume: number, idVoce: string }[]} */
   let camminamentiEsterni = [];
   /** @type {{ idMisurazione: number, idVoce: string, piano: string, riferimento: string, formula: string, formulaValue: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[]} */
   let misurazioniVarie = [];
   /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, canaleGronda?: boolean, grondaCanaleValore?: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[] }[]} */
   let voci = [];
-  /** @type {{ idAperturaMaster: string, piano: string, locale: string, largh: number, alt: number, hDav: number, ante: number, tipologia: string, falso: string, scuro: string, inferiata: string, zanzariera: string }[]} */
+  /** @type {{ idAperturaMaster: string, piano: string, zona?: string, locale: string, largh: number, alt: number, hDav: number, ante: number, tipologia: string, falso: string, scuro: string, inferiata: string, zanzariera: string }[]} */
   let apertureMaster = [];
   /** @type {string[]} */
   let vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
   /** voci manuali collassate nella tabella VOCI */
   const vociMmCollapsed = new Set();
+  /** Capitoli chiusi in elenco VOCI (chiave = capitolo.id oppure CAPITOLO_SENZA_KEY). */
+  const capitoliCollapsed = new Set();
   /** id voce in modalità focus fullscreen nella vista VOCI */
   let voceFocusId = null;
   /** draft editor aperture collegata per riga misurazione manuale (chiave: "idVoce:mmIndex") */
@@ -331,12 +419,16 @@ window.addEventListener("DOMContentLoaded", () => {
 
   /** Nomi piano usati in MISURAZIONI VARIE, esterni vari e righe manuali voce (lista univoca, ordinata). */
   let archivioPianiMisura = [];
+  /** @type {{ id: string, sequenza: number, nome: string }[]} */
+  let archivioCapitoli = [];
+  let editingCapitoloId = null;
 
   let pianoIdCounter = 1;
   let stratoMurIdCounter = 1;
   let aperturaElevIdCounter = 1;
   let scavoIdCounter = 1;
   let corselloIdCounter = 1;
+  let scivoloIdCounter = 1;
   let camminamentiIdCounter = 1;
   let misurazioniIdCounter = 1;
   let voceIdCounter = 1;
@@ -349,13 +441,15 @@ window.addEventListener("DOMContentLoaded", () => {
   let editingScavoId = null;
   /** modifica riga corsello */
   let editingCorselloId = null;
+  /** modifica riga scivolo */
+  let editingScivoloId = null;
   /** modifica riga camminamenti */
   let editingCamminamentiId = null;
   /** modifica riga misurazioni varie */
   let editingMisurazioneId = null;
   /** modifica riga voce */
   let editingVoceId = null;
-  /** Dialog voce: solo unità di misura (voci collegate a VANI). */
+  /** Dialog voce: modalità limitata (auto/semiauto): unità, prezzo e testo VOCE. */
   let editingVoceSoloUnitaMisura = false;
   /** contesto popup riga misurazione manuale: index null = nuova riga */
   let voceMmDialogContext = { idVoce: /** @type {number | null} */ (null), index: /** @type {number | null} */ (null) };
@@ -1284,6 +1378,7 @@ window.addEventListener("DOMContentLoaded", () => {
       "#aperture-elev-form",
       "#scavo-form",
       "#corsello-form",
+      "#scivolo-form",
       "#misurazioni-form",
       "#voce-dialog-form",
       "#voce-mm-riga-dialog-form",
@@ -1303,6 +1398,7 @@ window.addEventListener("DOMContentLoaded", () => {
       apertureElevazione,
       scaviEsterni,
       corselliEsterni,
+      scivoliEsterni,
       camminamentiEsterni,
       misurazioniVarie,
     );
@@ -1322,6 +1418,7 @@ window.addEventListener("DOMContentLoaded", () => {
     apertureElevazione = loaded.apertureElevazione;
     scaviEsterni = loaded.scaviEsterni;
     corselliEsterni = loaded.corselliEsterni;
+    scivoliEsterni = Array.isArray(loaded.scivoliEsterni) ? loaded.scivoliEsterni : [];
     // Vecchio archivio «camminamenti in ESTERNI VARI» dismesso: non caricare (doppio con modulo CAMMINAMENTI).
     camminamentiEsterni = [];
     try {
@@ -1339,6 +1436,8 @@ window.addEventListener("DOMContentLoaded", () => {
     aperturaElevIdCounter = loaded.aperturaElevIdCounter;
     scavoIdCounter = loaded.scavoIdCounter;
     corselloIdCounter = loaded.corselloIdCounter;
+    scivoloIdCounter =
+      typeof loaded.scivoloIdCounter === "number" ? loaded.scivoloIdCounter : 1;
     camminamentiIdCounter = loaded.camminamentiIdCounter;
     misurazioniIdCounter =
       typeof loaded.misurazioniIdCounter === "number" ? loaded.misurazioniIdCounter : 1;
@@ -1378,9 +1477,345 @@ window.addEventListener("DOMContentLoaded", () => {
     if (ev.detail?.added) segnaComputoModificatoPerExportJson();
   });
 
+  function loadArchivioCapitoliFromStorage() {
+    archivioCapitoli = loadCapitoli(STORAGE_ARCHIVIO_CAPITOLI);
+  }
+
+  function saveArchivioCapitoliToStorage() {
+    archivioCapitoli = sortCapitoli(archivioCapitoli);
+    saveCapitoli(STORAGE_ARCHIVIO_CAPITOLI, archivioCapitoli);
+    segnaComputoModificatoPerExportJson();
+  }
+
+  function normalizeCapitoloIdOnVoce(raw) {
+    const sid = typeof raw === "string" ? raw.trim() : "";
+    if (!sid) return "";
+    return getCapitoloById(archivioCapitoli, sid) ? sid : "";
+  }
+
+  function calcolaImportoVoceEuro(item) {
+    const mm = normalizzaMisurazioniManualiVoce(item?.misurazioniManuali, item?.unitaMisura);
+    const totaleQuantitaVoce = mm.reduce((sum, m) => sum + Number(m.risultato || 0), 0);
+    const detrazioneAperture = calcolaDetrazioneApertureVoce(item, mm);
+    const hasSemiautomatica = mm.some(
+      (row) => normalizzaTipoMisurazioneVoce(row?.tipo) === VOCE_MM_TIPO_SEMIAUTOMATICA,
+    );
+    const senzaSottrazioneUi = voceSenzaSottrazioneApertureUi(item);
+    const quantitaFinale =
+      hasSemiautomatica && !senzaSottrazioneUi
+        ? totaleQuantitaVoce - detrazioneAperture
+        : totaleQuantitaVoce;
+    const prezzoVoce = parseNonNegativeDecimal2(item?.prezzo) ?? 0;
+    return quantitaFinale * prezzoVoce;
+  }
+
+  function popolaSelectCapitoliVoce(selectedId = "") {
+    if (!voceCapitoloEl) return;
+    const current = String(selectedId ?? "").trim();
+    voceCapitoloEl.replaceChildren();
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "— Senza capitolo —";
+    voceCapitoloEl.appendChild(opt0);
+    for (const c of sortCapitoli(archivioCapitoli)) {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = `${c.sequenza} · ${c.nome}`;
+      voceCapitoloEl.appendChild(opt);
+    }
+    voceCapitoloEl.value = current && getCapitoloById(archivioCapitoli, current) ? current : "";
+  }
+
+  function countVociPerCapitolo(capitoloId) {
+    const sid = String(capitoloId ?? "").trim();
+    if (!sid) return 0;
+    return voci.filter((v) => String(v?.capitoloId ?? "").trim() === sid).length;
+  }
+
+  /** @type {"load" | "delete" | null} */
+  let capitoliTemplatePickerMode = null;
+
+  function openArchivioCapitoliDialog() {
+    capitoliTemplatePickerMode = null;
+    const rows =
+      archivioCapitoli.length === 0
+        ? `<tr><td colspan="4" class="empty-cell">Nessun capitolo. Aggiungine uno con sequenza e nome.</td></tr>`
+        : sortCapitoli(archivioCapitoli)
+            .map((c) => {
+              const uses = countVociPerCapitolo(c.id);
+              return `<tr>
+              <td>${c.sequenza}</td>
+              <td>${escapeHtml(c.nome)}</td>
+              <td>${uses}</td>
+              <td class="actions-cell">
+                <button type="button" class="btn-action btn-edit" data-action="edit-capitolo" data-id="${escapeHtml(c.id)}" title="Modifica">✎</button>
+                <button type="button" class="btn-action btn-delete" data-action="delete-capitolo" data-id="${escapeHtml(c.id)}" title="${uses > 0 ? "In uso: le voci passeranno a Senza capitolo" : "Elimina"}">🗑</button>
+              </td>
+            </tr>`;
+            })
+            .join("");
+    const editing = editingCapitoloId ? getCapitoloById(archivioCapitoli, editingCapitoloId) : null;
+    const nextSeq =
+      archivioCapitoli.reduce((max, c) => Math.max(max, Number(c.sequenza) || 0), 0) + 1;
+    capitoliArchivioDialogEl.innerHTML = `
+      <div class="ifc-riepilogo-dialog-header"><h3>Archivio CAPITOLI</h3></div>
+      <p class="bim-riepilogo-note">La <strong>sequenza</strong> ordina i capitoli in elenco e in stampa (voci 1.1, 1.2, 2.1…). Se in modifica assegni un numero già usato, i due capitoli si scambiano (es. 2→1 e l’ex 1 diventa 2). Le voci senza capitolo restano in fondo.</p>
+      <div class="capitoli-form-row">
+        <div class="field capitoli-field-seq">
+          <label for="archivio-capitolo-seq">Sequenza</label>
+          <input id="archivio-capitolo-seq" type="number" min="1" step="1" value="${editing ? editing.sequenza : nextSeq}" />
+        </div>
+        <div class="field capitoli-field-nome">
+          <label for="archivio-capitolo-nome">Nome capitolo</label>
+          <input id="archivio-capitolo-nome" type="text" placeholder="Es: SCAVI E MOVIMENTI TERRA" value="${editing ? escapeHtml(editing.nome) : ""}" autocomplete="off" />
+        </div>
+        <button type="button" class="btn-action btn-secondary" data-action="save-capitolo">${editing ? "Salva modifica" : "Aggiungi"}</button>
+        ${editing ? `<button type="button" class="btn-action btn-delete" data-action="cancel-edit-capitolo">Annulla</button>` : ""}
+      </div>
+      <div class="capitoli-template-bar">
+        <button type="button" class="btn-action btn-secondary" data-action="salva-template-capitoli" title="Salva solo i capitoli (non il computo) come template su PC">Salva come template</button>
+        <button type="button" class="btn-action btn-secondary" data-action="carica-template-capitoli" title="Carica un template di capitoli salvato">Carica da template</button>
+        <button type="button" class="btn-action btn-secondary" data-action="elimina-template-capitoli" title="Elimina un template salvato">Elimina template</button>
+        <button type="button" class="btn-action btn-secondary" data-action="apri-cartella-template-capitoli" title="Apri la cartella dei template sul PC">Apri cartella</button>
+      </div>
+      <div id="capitoli-template-picker" class="capitoli-template-picker" hidden>
+        <label for="capitoli-template-select">Scegli template</label>
+        <select id="capitoli-template-select"></select>
+        <div class="capitoli-template-picker-actions">
+          <button type="button" class="btn-action btn-secondary" data-action="conferma-template-capitoli">Conferma</button>
+          <button type="button" class="btn-action btn-delete" data-action="annulla-template-capitoli">Annulla</button>
+        </div>
+      </div>
+      <div class="ifc-riepilogo-table-host">
+        <table class="table-voce-mm-inline capitoli-archivio-table">
+          <thead><tr><th>SEQ.</th><th>NOME</th><th>Voci</th><th>AZIONI</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="padding-top:12px;display:flex;justify-content:flex-end;">
+        <button type="button" class="btn-action btn-secondary" data-action="close-archivio-capitoli">Chiudi</button>
+      </div>
+    `;
+    capitoliArchivioDialogEl.showModal();
+    window.requestAnimationFrame(() => {
+      capitoliArchivioDialogEl.querySelector("#archivio-capitolo-nome")?.focus();
+    });
+  }
+
+  function nascondiPickerTemplateCapitoli() {
+    capitoliTemplatePickerMode = null;
+    const box = capitoliArchivioDialogEl.querySelector("#capitoli-template-picker");
+    if (box) box.hidden = true;
+  }
+
+  async function mostraPickerTemplateCapitoli(mode) {
+    const list = await listCapitoliTemplates();
+    if (!list.length) {
+      window.alert("Nessun template trovato. Usa prima «Salva come template».");
+      return;
+    }
+    capitoliTemplatePickerMode = mode;
+    const box = capitoliArchivioDialogEl.querySelector("#capitoli-template-picker");
+    const select = capitoliArchivioDialogEl.querySelector("#capitoli-template-select");
+    if (!(box instanceof HTMLElement) || !(select instanceof HTMLSelectElement)) return;
+    select.replaceChildren();
+    for (const item of list) {
+      const opt = document.createElement("option");
+      opt.value = String(item.fileName || "");
+      opt.textContent = String(item.nome || item.fileName || "Template");
+      select.appendChild(opt);
+    }
+    box.hidden = false;
+    select.focus();
+  }
+
+  async function salvaTemplateCapitoliCorrente() {
+    if (!archivioCapitoli.length) {
+      window.alert("Non ci sono capitoli da salvare nel template.");
+      return;
+    }
+    if (!(capitoliSalvaTemplateDialogEl instanceof HTMLDialogElement)) {
+      window.alert("Modale salva template non trovato.");
+      return;
+    }
+
+    const resetUi = () => {
+      if (capitoliSalvaTemplateMsgEl) {
+        capitoliSalvaTemplateMsgEl.hidden = true;
+        capitoliSalvaTemplateMsgEl.textContent = "";
+        capitoliSalvaTemplateMsgEl.classList.remove("is-error", "is-ok");
+      }
+      if (capitoliSalvaTemplateNomeWrapEl) capitoliSalvaTemplateNomeWrapEl.hidden = false;
+      if (capitoliSalvaTemplateActionsMainEl) capitoliSalvaTemplateActionsMainEl.hidden = false;
+      if (capitoliSalvaTemplateActionsOverwriteEl) {
+        capitoliSalvaTemplateActionsOverwriteEl.hidden = true;
+      }
+      if (capitoliSalvaTemplateNomeEl instanceof HTMLInputElement) {
+        capitoliSalvaTemplateNomeEl.value = "";
+        capitoliSalvaTemplateNomeEl.disabled = false;
+      }
+    };
+
+    const showMsg = (text, kind = "") => {
+      if (!capitoliSalvaTemplateMsgEl) return;
+      capitoliSalvaTemplateMsgEl.hidden = false;
+      capitoliSalvaTemplateMsgEl.textContent = text;
+      capitoliSalvaTemplateMsgEl.classList.remove("is-error", "is-ok");
+      if (kind) capitoliSalvaTemplateMsgEl.classList.add(kind);
+    };
+
+    const eseguiSalvataggio = async (nomeTrim, overwrite) => {
+      const payload = buildCapitoliTemplatePayload(archivioCapitoli, nomeTrim);
+      const fileName = await saveCapitoliTemplate(nomeTrim, payload, overwrite);
+      showMsg(
+        overwrite ? `Template aggiornato: ${fileName}` : `Template salvato: ${fileName}`,
+        "is-ok",
+      );
+      if (capitoliSalvaTemplateNomeWrapEl) capitoliSalvaTemplateNomeWrapEl.hidden = true;
+      if (capitoliSalvaTemplateActionsMainEl) capitoliSalvaTemplateActionsMainEl.hidden = true;
+      if (capitoliSalvaTemplateActionsOverwriteEl) {
+        capitoliSalvaTemplateActionsOverwriteEl.hidden = true;
+      }
+      window.setTimeout(() => {
+        if (capitoliSalvaTemplateDialogEl.open) capitoliSalvaTemplateDialogEl.close();
+      }, 900);
+    };
+
+    const onSalvaClick = async () => {
+      const nomeTrim =
+        capitoliSalvaTemplateNomeEl instanceof HTMLInputElement
+          ? capitoliSalvaTemplateNomeEl.value.trim()
+          : "";
+      if (!nomeTrim) {
+        showMsg("Inserisci un nome per il template.", "is-error");
+        capitoliSalvaTemplateNomeEl?.focus();
+        return;
+      }
+      try {
+        await eseguiSalvataggio(nomeTrim, false);
+      } catch (err) {
+        const msg = String(err?.message || err || "");
+        if (msg.includes("EXISTS:")) {
+          showMsg(
+            `Esiste già un template con questo nome. Vuoi sovrascriverlo?`,
+            "is-error",
+          );
+          if (capitoliSalvaTemplateNomeEl instanceof HTMLInputElement) {
+            capitoliSalvaTemplateNomeEl.disabled = true;
+          }
+          if (capitoliSalvaTemplateActionsMainEl) capitoliSalvaTemplateActionsMainEl.hidden = true;
+          if (capitoliSalvaTemplateActionsOverwriteEl) {
+            capitoliSalvaTemplateActionsOverwriteEl.hidden = false;
+          }
+          return;
+        }
+        console.error(err);
+        showMsg(`Salvataggio non riuscito. ${msg}`, "is-error");
+      }
+    };
+
+    const onOverwriteClick = async () => {
+      const nomeTrim =
+        capitoliSalvaTemplateNomeEl instanceof HTMLInputElement
+          ? capitoliSalvaTemplateNomeEl.value.trim()
+          : "";
+      if (!nomeTrim) return;
+      try {
+        await eseguiSalvataggio(nomeTrim, true);
+      } catch (error) {
+        console.error(error);
+        showMsg(`Salvataggio non riuscito. ${String(error?.message || error || "")}`, "is-error");
+      }
+    };
+
+    const onAnnullaOverwrite = () => {
+      if (capitoliSalvaTemplateNomeEl instanceof HTMLInputElement) {
+        capitoliSalvaTemplateNomeEl.disabled = false;
+      }
+      if (capitoliSalvaTemplateMsgEl) {
+        capitoliSalvaTemplateMsgEl.hidden = true;
+        capitoliSalvaTemplateMsgEl.classList.remove("is-error", "is-ok");
+      }
+      if (capitoliSalvaTemplateActionsOverwriteEl) {
+        capitoliSalvaTemplateActionsOverwriteEl.hidden = true;
+      }
+      if (capitoliSalvaTemplateActionsMainEl) capitoliSalvaTemplateActionsMainEl.hidden = false;
+      capitoliSalvaTemplateNomeEl?.focus();
+    };
+
+    const onAnnulla = () => {
+      if (capitoliSalvaTemplateDialogEl.open) capitoliSalvaTemplateDialogEl.close();
+    };
+
+    const onFormSubmit = (event) => {
+      event.preventDefault();
+      if (!capitoliSalvaTemplateActionsOverwriteEl?.hidden) return;
+      onSalvaClick();
+    };
+
+    const onKeyDown = (event) => {
+      if (event.key === "Enter" && !capitoliSalvaTemplateActionsOverwriteEl?.hidden) {
+        event.preventDefault();
+      }
+    };
+
+    const formEl = document.querySelector("#capitoli-salva-template-form");
+
+    const cleanup = () => {
+      btnCapitoliSalvaTemplateOkEl?.removeEventListener("click", onSalvaClick);
+      btnCapitoliSalvaTemplateAnnullaEl?.removeEventListener("click", onAnnulla);
+      btnCapitoliSalvaTemplateOverwriteEl?.removeEventListener("click", onOverwriteClick);
+      btnCapitoliSalvaTemplateAnnullaOwEl?.removeEventListener("click", onAnnullaOverwrite);
+      formEl?.removeEventListener("submit", onFormSubmit);
+      capitoliSalvaTemplateDialogEl.removeEventListener("keydown", onKeyDown);
+      capitoliSalvaTemplateDialogEl.removeEventListener("close", cleanup);
+    };
+
+    resetUi();
+    btnCapitoliSalvaTemplateOkEl?.addEventListener("click", onSalvaClick);
+    btnCapitoliSalvaTemplateAnnullaEl?.addEventListener("click", onAnnulla);
+    btnCapitoliSalvaTemplateOverwriteEl?.addEventListener("click", onOverwriteClick);
+    btnCapitoliSalvaTemplateAnnullaOwEl?.addEventListener("click", onAnnullaOverwrite);
+    formEl?.addEventListener("submit", onFormSubmit);
+    capitoliSalvaTemplateDialogEl.addEventListener("keydown", onKeyDown);
+    capitoliSalvaTemplateDialogEl.addEventListener("close", cleanup);
+
+    capitoliSalvaTemplateDialogEl.showModal();
+    window.requestAnimationFrame(() => {
+      if (capitoliSalvaTemplateNomeEl instanceof HTMLInputElement) {
+        capitoliSalvaTemplateNomeEl.focus();
+      }
+    });
+  }
+
+  async function applicaTemplateCapitoliScelto(fileName) {
+    const parsed = await loadCapitoliTemplateFile(fileName);
+    if (!parsed.capitoli.length) {
+      window.alert("Il template non contiene capitoli validi.");
+      return;
+    }
+    const ok = window.confirm(
+      `Caricare il template «${parsed.nome}» (${parsed.capitoli.length} capitoli)?\nI capitoli attuali verranno sostituiti.\nLe voci resteranno, ma andranno riassegnate ai nuovi capitoli.`,
+    );
+    if (!ok) return;
+    archivioCapitoli = parsed.capitoli;
+    editingCapitoloId = null;
+    capitoliCollapsed.clear();
+    // Gli id capitolo cambiano: le voci tornano «senza capitolo» finché non le riassegni.
+    voci = voci.map((v) => ({ ...v, capitoloId: "" }));
+    saveVoci();
+    saveArchivioCapitoliToStorage();
+    popolaSelectCapitoliVoce("");
+    nascondiPickerTemplateCapitoli();
+    openArchivioCapitoliDialog();
+    renderVoci();
+  }
+
   document.addEventListener("computo-voci-storage-externally-updated", () => {
     loadVoci();
-    syncVoceCanali();
+    // Stesse voci speciali che si aggiornano dopo VANI / aperture:
+    // DAVANZALI, SOGLIE, CANALI, FALSI TELAI + voci per tipologia apertura.
+    syncVociDerivateDaApertureMaster();
     renderVoci();
     segnaComputoModificatoPerExportJson();
   });
@@ -1407,24 +1842,74 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
     const piano = typeof d.piano === "string" ? d.piano.trim() : "";
-    const id = creaAperturaMasterDaDati({ ...parsed, piano });
+    const zona = typeof d.zona === "string" ? d.zona.trim() : "";
+    const id = creaAperturaMasterDaDati({ ...parsed, piano, zona });
     if (!id) {
       window.alert("Impossibile creare l’apertura.");
       return;
     }
     saveApertureMaster();
     syncVaniApertureLocalesForPicker(apertureElevazione, apertureMaster);
-    syncVoceDavanzali();
-    syncVoceSoglie();
-    syncVoceCanali();
-    syncVoceFalsiTelaiLegno();
-    syncVoceFalsiTelaiAlluminio();
+    syncVociDerivateDaApertureMaster();
     renderVoci();
     document.dispatchEvent(
       new CustomEvent("computo-vani-apertura-creata", {
         detail: { idAperturaMaster: id, pareteId: d.pareteId },
       }),
     );
+  });
+
+  document.addEventListener("computo-richiedi-modifica-apertura", (event) => {
+    const d = event.detail && typeof event.detail === "object" ? event.detail : null;
+    if (!d) return;
+    const id = typeof d.idAperturaMaster === "string" ? d.idAperturaMaster.trim() : "";
+    if (!id) return;
+    const parsed = parseVoceMmAperturaDraft({
+      locale: d.locale,
+      largh: d.largh,
+      alt: d.alt,
+      hDav: d.hDav,
+      ante: d.ante,
+      tipologia: d.tipologia,
+      falso: d.falso,
+      scuro: d.scuro,
+      inferiata: d.inferiata,
+      zanzariera: d.zanzariera,
+    });
+    if (!parsed) {
+      window.alert(
+        "Dati apertura non validi. Controlla locale, larghezza, altezza, H davanzale e ante.",
+      );
+      return;
+    }
+    const piano = typeof d.piano === "string" ? d.piano.trim() : "";
+    const zona = typeof d.zona === "string" ? d.zona.trim() : "";
+    const idx = apertureMaster.findIndex((ap) => ap.idAperturaMaster === id);
+    if (idx < 0) {
+      window.alert("Apertura non trovata nell’archivio.");
+      return;
+    }
+    const updated = { ...apertureMaster[idx], ...parsed, piano };
+    if (zona) updated.zona = zona;
+    else delete updated.zona;
+    apertureMaster[idx] = updated;
+    saveApertureMaster();
+    syncVaniApertureLocalesForPicker(apertureElevazione, apertureMaster);
+    syncVociDerivateDaApertureMaster();
+    renderVoci();
+    document.dispatchEvent(
+      new CustomEvent("computo-apertura-aggiornata", {
+        detail: { idAperturaMaster: id, pareteId: d.pareteId },
+      }),
+    );
+  });
+
+  document.addEventListener("computo-richiedi-elimina-apertura", (event) => {
+    const d = event.detail && typeof event.detail === "object" ? event.detail : null;
+    if (!d) return;
+    const id = typeof d.idAperturaMaster === "string" ? d.idAperturaMaster.trim() : "";
+    if (!id) return;
+    eliminaAperturaMaster(id, { reopenDialog: false });
   });
 
   function refreshArchivioPianiMisuraDatalist() {
@@ -1443,6 +1928,7 @@ window.addEventListener("DOMContentLoaded", () => {
       misurazioniVarie,
       scaviEsterni,
       corselliEsterni,
+      scivoliEsterni,
       camminamentiEsterni,
       voci,
     });
@@ -1469,6 +1955,11 @@ window.addEventListener("DOMContentLoaded", () => {
       return { ...m, piano: np };
     });
     corselliEsterni = corselliEsterni.map((m) => {
+      const np = canon(m.piano);
+      if (np !== m.piano) dirtyMur = true;
+      return { ...m, piano: np };
+    });
+    scivoliEsterni = scivoliEsterni.map((m) => {
       const np = canon(m.piano);
       if (np !== m.piano) dirtyMur = true;
       return { ...m, piano: np };
@@ -1525,6 +2016,9 @@ window.addEventListener("DOMContentLoaded", () => {
     for (const m of corselliEsterni) {
       if (pianoMisuraDedupKey(m.piano) === k) n += 1;
     }
+    for (const m of scivoliEsterni) {
+      if (pianoMisuraDedupKey(m.piano) === k) n += 1;
+    }
     for (const m of camminamentiEsterni) {
       if (pianoMisuraDedupKey(m.piano) === k) n += 1;
     }
@@ -1579,6 +2073,10 @@ window.addEventListener("DOMContentLoaded", () => {
     for (const m of corselliEsterni) {
       if (pianoMisuraDedupKey(m.piano) !== k) continue;
       addDaRefVoce(m.idVoce, "Corselli esterni (voce non indicata)");
+    }
+    for (const m of scivoliEsterni) {
+      if (pianoMisuraDedupKey(m.piano) !== k) continue;
+      addDaRefVoce(m.idVoce, "Scivoli esterni (voce non indicata)");
     }
     for (const m of camminamentiEsterni) {
       if (pianoMisuraDedupKey(m.piano) !== k) continue;
@@ -1649,6 +2147,7 @@ window.addEventListener("DOMContentLoaded", () => {
       misurazioniPianoEl,
       scavoPianoEl,
       corselloPianoEl,
+      scivoloPianoEl,
       voceMmRigaPianoEl,
     ].filter(Boolean);
     for (const el of list) {
@@ -1925,12 +2424,42 @@ window.addEventListener("DOMContentLoaded", () => {
     unitaNorm,
     vaniVanoId,
     camminamentiSchedaId,
+    perimetraliSchedaId,
+    elevazioneSchedaId,
+    solaiInterniSchedaId,
+    solaiInclinatiSchedaId,
     stratoAltezza,
+    tipoOggetto,
   }) {
     if (!Number.isInteger(numero) || numero < 0) return 0;
+    const tipoOg = String(tipoOggetto ?? "")
+      .trim()
+      .toUpperCase();
+    // Pavimento/soffitto/solaio: spessore (o altezza trave) compilato → volume; vuoto → area.
+    if (
+      tipoOg === "PAVIMENTO" ||
+      tipoOg === "SOFFITTO" ||
+      tipoOg === "SOLAIO_INTERNO" ||
+      tipoOg === "SOLAIO_TRAVE" ||
+      tipoOg === "SOLAIO_INCLINATO" ||
+      tipoOg === "SOLAIO_INCLINATO_TRAVE" ||
+      tipoOg === "ELEVAZIONE_FONDAZIONE"
+    ) {
+      const m1 = mmFactorOrOne(misura1);
+      const m2 = mmFactorOrOne(misura2);
+      const hasSpessore = typeof misura3 === "number" && Number.isFinite(misura3);
+      const raw = hasSpessore
+        ? Number((m1 * m2 * misura3 * numero).toFixed(3))
+        : Number((m1 * m2 * numero).toFixed(3));
+      return segno ? -Math.abs(raw) : raw;
+    }
     const daModuloSpeciale =
       (typeof vaniVanoId === "string" && vaniVanoId.trim() !== "") ||
-      (typeof camminamentiSchedaId === "string" && camminamentiSchedaId.trim() !== "");
+      (typeof camminamentiSchedaId === "string" && camminamentiSchedaId.trim() !== "") ||
+      (typeof perimetraliSchedaId === "string" && perimetraliSchedaId.trim() !== "") ||
+      (typeof elevazioneSchedaId === "string" && elevazioneSchedaId.trim() !== "") ||
+      (typeof solaiInterniSchedaId === "string" && solaiInterniSchedaId.trim() !== "") ||
+      (typeof solaiInclinatiSchedaId === "string" && solaiInclinatiSchedaId.trim() !== "");
     if (!daModuloSpeciale) {
       const calc = calcolaMisurazioneVoceSemiautomatica(misura1, misura2, misura3, numero, segno);
       return calc.ok ? Number(calc.risultato || 0) : 0;
@@ -1954,13 +2483,31 @@ window.addEventListener("DOMContentLoaded", () => {
       const daVani = typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "";
       const daCamm =
         typeof m?.camminamentiSchedaId === "string" && m.camminamentiSchedaId.trim() !== "";
+      const daPerim =
+        typeof m?.perimetraliSchedaId === "string" && m.perimetraliSchedaId.trim() !== "";
+      const daElev =
+        typeof m?.elevazioneSchedaId === "string" && m.elevazioneSchedaId.trim() !== "";
+      const daSolai =
+        typeof m?.solaiInterniSchedaId === "string" && m.solaiInterniSchedaId.trim() !== "";
+      const daSolaiIncl =
+        typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "";
       const daEsterni = typeof m?.esterniKey === "string" && m.esterniKey.trim() !== "";
-      return daVani || daCamm || daEsterni;
+      return daVani || daCamm || daPerim || daElev || daSolai || daSolaiIncl || daEsterni;
     });
   }
 
+  /** Voci auto da aperture (tipologia, scuro, inferiata, zanzariera, cassonetto). */
+  function voceDerivataDaApertureAccessori(item) {
+    const mm = normalizzaMisurazioniManualiVoce(item?.misurazioniManuali, item?.unitaMisura);
+    return mm.some((m) => isTipoOggettoAccessorioApertura(m?.tipoOggetto));
+  }
+
   function voceBloccataInVoci(item) {
-    return voceDerivataDaVani(item) || isVoceSpecialeNoTotaleRiferimento(item);
+    return (
+      voceDerivataDaVani(item) ||
+      isVoceSpecialeNoTotaleRiferimento(item) ||
+      voceDerivataDaApertureAccessori(item)
+    );
   }
 
   function voceIdBloccataInVoci(idVoce) {
@@ -2037,6 +2584,14 @@ window.addEventListener("DOMContentLoaded", () => {
         const vaniVanoId = typeof m?.vaniVanoId === "string" ? m.vaniVanoId : "";
         const camminamentiSchedaId =
           typeof m?.camminamentiSchedaId === "string" ? m.camminamentiSchedaId : "";
+        const perimetraliSchedaId =
+          typeof m?.perimetraliSchedaId === "string" ? m.perimetraliSchedaId : "";
+        const elevazioneSchedaId =
+          typeof m?.elevazioneSchedaId === "string" ? m.elevazioneSchedaId : "";
+        const solaiInterniSchedaId =
+          typeof m?.solaiInterniSchedaId === "string" ? m.solaiInterniSchedaId : "";
+        const solaiInclinatiSchedaId =
+          typeof m?.solaiInclinatiSchedaId === "string" ? m.solaiInclinatiSchedaId : "";
         const esterniKey = typeof m?.esterniKey === "string" ? m.esterniKey.trim() : "";
         const stratoAltezza =
           typeof m?.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
@@ -2055,7 +2610,12 @@ window.addEventListener("DOMContentLoaded", () => {
                   unitaNorm,
                   vaniVanoId,
                   camminamentiSchedaId,
+                  perimetraliSchedaId,
+                  elevazioneSchedaId,
+                  solaiInterniSchedaId,
+                  solaiInclinatiSchedaId,
                   stratoAltezza,
+                  tipoOggetto: typeof m?.tipoOggetto === "string" ? m.tipoOggetto : "",
                 })
               : Number(m.risultato || 0);
         return {
@@ -2080,6 +2640,10 @@ window.addEventListener("DOMContentLoaded", () => {
         apertureCollegate: normalizzaApertureCollegateRefs(m.apertureCollegate),
         vaniVanoId,
         camminamentiSchedaId,
+        perimetraliSchedaId,
+        elevazioneSchedaId,
+        solaiInterniSchedaId,
+        solaiInclinatiSchedaId,
         esterniKey,
         stratoAltezza,
         stratoElevazione:
@@ -2092,10 +2656,44 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function calcolaMetricheAperturaMisurazione(apertura, m2AltVal, m3Val, stratoElevazioneVal = null) {
-    const m2 = typeof m2AltVal === "number" && Number.isFinite(m2AltVal) ? m2AltVal : null;
+  function isTipoOggettoAccessorioApertura(tipoOggetto) {
+    const t = String(tipoOggetto ?? "")
+      .trim()
+      .toUpperCase();
+    return (
+      t === "SCURO" ||
+      t === "CASSONETTO" ||
+      t === "INFERIATA" ||
+      t === "ZANZARIERA" ||
+      t === "APERTURA"
+    );
+  }
+
+  function voceSenzaSottrazioneApertureUi(item) {
+    const mm = normalizzaMisurazioniManualiVoce(item?.misurazioniManuali, item?.unitaMisura);
+    if (mm.length === 0) return false;
+    return mm.every((m) => isTipoOggettoAccessorioApertura(m?.tipoOggetto));
+  }
+
+  function calcolaMetricheAperturaMisurazione(
+    apertura,
+    m2AltVal,
+    m3Val,
+    stratoElevazioneVal = null,
+    opts = {},
+  ) {
     const m3 = typeof m3Val === "number" && Number.isFinite(m3Val) ? m3Val : 0;
     const largh = Number(apertura?.largh || 0);
+    // Accessori (zanzariera, scuro, …): quantità = L×H intera dell’apertura, senza H inclusa nello strato.
+    if (opts.usaAltezzaPienaApertura === true) {
+      const alt = Number(apertura?.alt || 0);
+      const hInclusa = Number((Number.isFinite(alt) ? alt : 0).toFixed(2));
+      const ml = Number((largh || 0).toFixed(2));
+      const mq = Number((largh * hInclusa).toFixed(2));
+      const mc = Number((mq * m3).toFixed(2));
+      return { hInclusa, ml, mq, mc };
+    }
+    const m2 = typeof m2AltVal === "number" && Number.isFinite(m2AltVal) ? m2AltVal : null;
     const hInclusaRaw =
       m2 === null
         ? null
@@ -2123,6 +2721,11 @@ window.addEventListener("DOMContentLoaded", () => {
   function calcolaDetrazioneApertureMisurazione(misurazione, unitaNorm) {
     const mmTipo = normalizzaTipoMisurazioneVoce(misurazione?.tipo);
     if (mmTipo !== VOCE_MM_TIPO_SEMIAUTOMATICA) return 0;
+    // Voci accessori apertura (scuro, inferiata, zanzariera, cassonetto, tipologia):
+    // la quantità È quella dell’apertura → non va detratta di nuovo.
+    if (isTipoOggettoAccessorioApertura(misurazione?.tipoOggetto)) {
+      return 0;
+    }
     const misura2Val =
       typeof misurazione?.stratoAltezza === "number" && Number.isFinite(misurazione.stratoAltezza)
         ? Number(misurazione.stratoAltezza)
@@ -2204,6 +2807,7 @@ window.addEventListener("DOMContentLoaded", () => {
       ).map((item) => ({
         idVoce: item.idVoce,
         posizione: item.posizione,
+        capitoloId: normalizeCapitoloIdOnVoce(item?.capitoloId),
         voceAbbreviata: typeof item?.voceAbbreviata === "string" ? item.voceAbbreviata : "",
         unitaMisura:
           typeof item?.unitaMisura === "string" && item.unitaMisura.trim() !== ""
@@ -2385,7 +2989,8 @@ window.addEventListener("DOMContentLoaded", () => {
     return { ...parsed, piano: getValue("piano") };
   }
 
-  function eliminaAperturaMaster(id) {
+  function eliminaAperturaMaster(id, opts = {}) {
+    const reopenDialog = opts.reopenDialog !== false;
     apertureMaster = apertureMaster.filter((ap) => ap.idAperturaMaster !== id);
     voci = voci.map((voce) => ({
       ...voce,
@@ -2399,13 +3004,12 @@ window.addEventListener("DOMContentLoaded", () => {
     apertureMasterPendingDeleteId = null;
     saveApertureMaster();
     saveVoci();
-    syncVoceDavanzali();
-    syncVoceSoglie();
-    syncVoceCanali();
-    syncVoceFalsiTelaiLegno();
-    syncVoceFalsiTelaiAlluminio();
+    syncVociDerivateDaApertureMaster();
     renderVoci();
-    openApertureMasterDialog();
+    document.dispatchEvent(
+      new CustomEvent("computo-apertura-eliminata", { detail: { idAperturaMaster: id } }),
+    );
+    if (reopenDialog) openApertureMasterDialog();
   }
 
   function collegaAperturaMasterARigaVoce(idVoce, idx, idAperturaMaster) {
@@ -2759,10 +3363,10 @@ window.addEventListener("DOMContentLoaded", () => {
     openRiepilogoParetiFlagDialog({
       dialogEl: zoccoloDialogEl,
       rows: buildZoccoloRowsFromStorage(),
-      titolo: "ZOCCOLO",
+      titolo: "ZOCCOLINO",
       descrizione:
-        "Pareti con flag Zoccolo attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
-      emptyMessage: "Nessuna parete con zoccolo nei vani registrati.",
+        "Pareti con flag Zoccolino attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
+      emptyMessage: "Nessuna parete con zoccolino nei vani registrati.",
       closeAction: "close-zoccolo-dialog",
     });
   }
@@ -2849,6 +3453,328 @@ window.addEventListener("DOMContentLoaded", () => {
       0,
     );
     return maxId + 1;
+  }
+
+  function tipologyVoceKey(raw) {
+    return String(raw ?? "")
+      .trim()
+      .toLocaleUpperCase("it-IT");
+  }
+
+  function creaMisurazioneDaAperturaMaster(ap, idMisurazione, opts = {}) {
+    const tipoOggetto =
+      typeof opts.tipoOggetto === "string" && opts.tipoOggetto.trim()
+        ? opts.tipoOggetto.trim().toUpperCase()
+        : "APERTURA";
+    const modo = opts.modo === "ml" ? "ml" : "mq";
+    const piano = typeof ap?.piano === "string" ? ap.piano.trim() : "";
+    const locale = typeof ap?.locale === "string" ? ap.locale.trim() : "";
+    const zona = typeof ap?.zona === "string" ? ap.zona.trim() : "";
+    const idM = typeof ap?.idAperturaMaster === "string" ? ap.idAperturaMaster.trim() : "";
+    const largh =
+      typeof ap?.largh === "number" && Number.isFinite(ap.largh) ? Number(ap.largh.toFixed(3)) : null;
+    const alt =
+      typeof ap?.alt === "number" && Number.isFinite(ap.alt) ? Number(ap.alt.toFixed(3)) : null;
+    const numero = 1;
+    const segno = false;
+    const risultato =
+      modo === "ml"
+        ? Number(((largh != null ? largh : 0) * numero).toFixed(3))
+        : Number(((largh != null ? largh : 0) * (alt != null ? alt : 0) * numero).toFixed(3));
+    const specifica = [zona, locale].filter(Boolean).join(" · ") || idM || "-";
+    return {
+      idMisurazione,
+      tipo: VOCE_MM_TIPO_SEMIAUTOMATICA,
+      piano: piano || "-",
+      riferimento: locale || idM || "-",
+      tipoOggetto,
+      specifica,
+      formula: "",
+      formulaValue: null,
+      misura1: largh,
+      misura2: modo === "ml" ? null : alt,
+      misura3: null,
+      canaleGronda: false,
+      grondaCanaleValore: null,
+      numero,
+      segno,
+      risultato,
+      apertureCollegate: idM ? [{ idAperturaMaster: idM }] : [],
+    };
+  }
+
+  function isRigaMisurazioneTipoOggetto(row, tipoOggetto) {
+    return (
+      String(row?.tipoOggetto ?? "")
+        .trim()
+        .toUpperCase() === String(tipoOggetto ?? "").trim().toUpperCase()
+    );
+  }
+
+  function isRigaMisurazioneAperturaTipologia(row) {
+    return isRigaMisurazioneTipoOggetto(row, "APERTURA");
+  }
+
+  /**
+   * Allinea una voce (per abbreviazione) alle aperture date, sostituendo le sole
+   * misurazioni con `tipoOggetto` indicato (le altre restano).
+   * @returns {boolean} true se ha modificato qualcosa
+   */
+  function syncVoceApertureGruppo({
+    label,
+    apertures,
+    tipoOggetto,
+    unitaMisura = "mq.",
+    modo = "mq",
+  }) {
+    const key = tipologyVoceKey(label);
+    if (!key) return { changed: false, voceId: null };
+    let voce = voci.find(
+      (item) =>
+        tipologyVoceKey(item?.voceAbbreviata) === key || tipologyVoceKey(item?.voce) === key,
+    );
+    let changed = false;
+    if (!voce && apertures.length > 0) {
+      const newId = voceIdCounter++;
+      voci.push({
+        idVoce: newId,
+        posizione: getPrimaPosizioneVoceDisponibile(),
+        voceAbbreviata: label,
+        unitaMisura,
+        prezzo: 0,
+        tipoMisura: TIPOMISURA_VOCE_MANUALE,
+        voce: label,
+        note: "",
+        misurazioniManuali: [],
+      });
+      normalizzaPosizioniVoci();
+      voce = voci.find((item) => item.idVoce === newId) || null;
+      changed = true;
+    }
+    if (!voce) return { changed: false, voceId: null };
+
+    const mmEsistenti = normalizzaMisurazioniManualiVoce(
+      voce.misurazioniManuali,
+      voce.unitaMisura,
+    );
+    const mmAltre = mmEsistenti.filter((row) => !isRigaMisurazioneTipoOggetto(row, tipoOggetto));
+    let nextMmId = nextVoceMmIdForRows(mmEsistenti);
+    const apertureOrdinate = [...apertures].sort((a, b) =>
+      String(a.idAperturaMaster || "").localeCompare(String(b.idAperturaMaster || ""), "it"),
+    );
+    const mmAuto = apertureOrdinate.map((ap) =>
+      creaMisurazioneDaAperturaMaster(ap, nextMmId++, { tipoOggetto, modo }),
+    );
+    const mmNuove = [...mmAltre, ...mmAuto];
+    if (JSON.stringify(mmNuove) !== JSON.stringify(mmEsistenti) || voce.unitaMisura !== unitaMisura) {
+      changed = true;
+      voci = voci.map((item) =>
+        item.idVoce === voce.idVoce
+          ? {
+              ...item,
+              // Conserva voce/prezzo associati dall'utente; aggiorna solo misure e U.M. di sync
+              unitaMisura,
+              misurazioniManuali: mmNuove,
+            }
+          : item,
+      );
+    }
+    return { changed, voceId: voce.idVoce };
+  }
+
+  function pulisciMisurazioniTipoOggettoDaVociNonGestite(handledVoceIds, tipiOggetto) {
+    const tipi = new Set(
+      (Array.isArray(tipiOggetto) ? tipiOggetto : [tipiOggetto]).map((t) =>
+        String(t).trim().toUpperCase(),
+      ),
+    );
+    let changed = false;
+    voci = voci.map((item) => {
+      if (handledVoceIds.has(item.idVoce)) return item;
+      const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
+      if (!mm.some((row) => tipi.has(String(row?.tipoOggetto ?? "").trim().toUpperCase()))) {
+        return item;
+      }
+      const filtrati = mm.filter(
+        (row) => !tipi.has(String(row?.tipoOggetto ?? "").trim().toUpperCase()),
+      );
+      if (filtrati.length === mm.length) return item;
+      changed = true;
+      return { ...item, misurazioniManuali: filtrati };
+    });
+    return changed;
+  }
+
+  /**
+   * Crea/aggiorna le VOCI per tipologia apertura (FINESTRA, PORTA, …):
+   * una voce per tipologia; ogni apertura master diventa una misurazione accodata.
+   */
+  function syncVociAperturePerTipologia() {
+    /** @type {Map<string, { label: string, apertures: object[] }>} */
+    const byTipo = new Map();
+    for (const ap of apertureMaster) {
+      if (!ap || typeof ap !== "object") continue;
+      const label = typeof ap.tipologia === "string" ? ap.tipologia.trim() : "";
+      if (!label) continue;
+      const key = tipologyVoceKey(label);
+      if (!byTipo.has(key)) byTipo.set(key, { label, apertures: [] });
+      byTipo.get(key).apertures.push(ap);
+    }
+
+    const handledVoceIds = new Set();
+    let changed = false;
+
+    for (const [, group] of byTipo) {
+      const res = syncVoceApertureGruppo({
+        label: group.label,
+        apertures: group.apertures,
+        tipoOggetto: "APERTURA",
+        unitaMisura: "mq.",
+        modo: "mq",
+      });
+      if (res.voceId != null) handledVoceIds.add(res.voceId);
+      if (res.changed) changed = true;
+    }
+
+    if (pulisciMisurazioniTipoOggettoDaVociNonGestite(handledVoceIds, ["APERTURA"])) {
+      changed = true;
+    }
+
+    if (!changed) return;
+    saveVoci();
+    renderVoci();
+  }
+
+  /**
+   * Da campo SCURO delle aperture:
+   * - PERSIANA → voce PERSIANA
+   * - TAPPARELLA → voce TAPPARELLA + voce CASSONETTO (collegata all’apertura)
+   */
+  function syncVociApertureScuroECassonetto() {
+    /** @type {object[]} */
+    const persiane = [];
+    /** @type {object[]} */
+    const tapparelle = [];
+    for (const ap of apertureMaster) {
+      if (!ap || typeof ap !== "object") continue;
+      const scuro = String(ap.scuro || "")
+        .trim()
+        .toUpperCase();
+      if (scuro === "PERSIANA") persiane.push(ap);
+      else if (scuro === "TAPPARELLA") tapparelle.push(ap);
+    }
+
+    const handledVoceIds = new Set();
+    let changed = false;
+
+    const rPers = syncVoceApertureGruppo({
+      label: "PERSIANA",
+      apertures: persiane,
+      tipoOggetto: "SCURO",
+      unitaMisura: "mq.",
+      modo: "mq",
+    });
+    if (rPers.voceId != null) handledVoceIds.add(rPers.voceId);
+    if (rPers.changed) changed = true;
+
+    const rTapp = syncVoceApertureGruppo({
+      label: "TAPPARELLA",
+      apertures: tapparelle,
+      tipoOggetto: "SCURO",
+      unitaMisura: "mq.",
+      modo: "mq",
+    });
+    if (rTapp.voceId != null) handledVoceIds.add(rTapp.voceId);
+    if (rTapp.changed) changed = true;
+
+    const rCass = syncVoceApertureGruppo({
+      label: "CASSONETTO",
+      apertures: tapparelle,
+      tipoOggetto: "CASSONETTO",
+      unitaMisura: "ml.",
+      modo: "ml",
+    });
+    if (rCass.voceId != null) handledVoceIds.add(rCass.voceId);
+    if (rCass.changed) changed = true;
+
+    if (pulisciMisurazioniTipoOggettoDaVociNonGestite(handledVoceIds, ["SCURO", "CASSONETTO"])) {
+      changed = true;
+    }
+
+    if (!changed) return;
+    saveVoci();
+    renderVoci();
+  }
+
+  /**
+   * Da campi SI/NO delle aperture:
+   * - Inferiata = SI → voce INFERIATA
+   * - Zanzariera = SI → voce ZANZARIERA
+   */
+  function syncVociApertureInferiataZanzariera() {
+    /** @type {object[]} */
+    const conInferiata = [];
+    /** @type {object[]} */
+    const conZanzariera = [];
+    for (const ap of apertureMaster) {
+      if (!ap || typeof ap !== "object") continue;
+      if (
+        String(ap.inferiata || "")
+          .trim()
+          .toUpperCase() === "SI"
+      ) {
+        conInferiata.push(ap);
+      }
+      if (
+        String(ap.zanzariera || "")
+          .trim()
+          .toUpperCase() === "SI"
+      ) {
+        conZanzariera.push(ap);
+      }
+    }
+
+    const handledVoceIds = new Set();
+    let changed = false;
+
+    const rInf = syncVoceApertureGruppo({
+      label: "INFERIATA",
+      apertures: conInferiata,
+      tipoOggetto: "INFERIATA",
+      unitaMisura: "mq.",
+      modo: "mq",
+    });
+    if (rInf.voceId != null) handledVoceIds.add(rInf.voceId);
+    if (rInf.changed) changed = true;
+
+    const rZan = syncVoceApertureGruppo({
+      label: "ZANZARIERA",
+      apertures: conZanzariera,
+      tipoOggetto: "ZANZARIERA",
+      unitaMisura: "mq.",
+      modo: "mq",
+    });
+    if (rZan.voceId != null) handledVoceIds.add(rZan.voceId);
+    if (rZan.changed) changed = true;
+
+    if (pulisciMisurazioniTipoOggettoDaVociNonGestite(handledVoceIds, ["INFERIATA", "ZANZARIERA"])) {
+      changed = true;
+    }
+
+    if (!changed) return;
+    saveVoci();
+    renderVoci();
+  }
+
+  function syncVociDerivateDaApertureMaster() {
+    syncVoceDavanzali();
+    syncVoceSoglie();
+    syncVoceCanali();
+    syncVoceFalsiTelaiLegno();
+    syncVoceFalsiTelaiAlluminio();
+    syncVociAperturePerTipologia();
+    syncVociApertureScuroECassonetto();
+    syncVociApertureInferiataZanzariera();
   }
 
   function isVoceSpecialeNoTotaleRiferimento(voceItem) {
@@ -2949,8 +3875,6 @@ window.addEventListener("DOMContentLoaded", () => {
       item.idVoce === voceDavanzali.idVoce
         ? {
             ...item,
-            voceAbbreviata: "DAVANZALI",
-            voce: "DAVANZALI",
             tipoMisura: TIPOMISURA_VOCE_MANUALE,
             misurazioniManuali: nuoveMisurazioni,
           }
@@ -3048,8 +3972,6 @@ window.addEventListener("DOMContentLoaded", () => {
       item.idVoce === voceSoglie.idVoce
         ? {
             ...item,
-            voceAbbreviata: "SOGLIE",
-            voce: "SOGLIE",
             tipoMisura: TIPOMISURA_VOCE_MANUALE,
             misurazioniManuali: nuoveMisurazioni,
           }
@@ -3130,8 +4052,6 @@ window.addEventListener("DOMContentLoaded", () => {
       item.idVoce === voceCanali.idVoce
         ? {
             ...item,
-            voceAbbreviata: "CANALI",
-            voce: "CANALI",
             tipoMisura: TIPOMISURA_VOCE_MANUALE,
             misurazioniManuali: nuoveMisurazioni,
           }
@@ -3231,8 +4151,6 @@ window.addEventListener("DOMContentLoaded", () => {
       item.idVoce === voceFalsi.idVoce
         ? {
             ...item,
-            voceAbbreviata: "FALSI TELAI LEGNO",
-            voce: "FALSI TELAI LEGNO",
             tipoMisura: TIPOMISURA_VOCE_MANUALE,
             misurazioniManuali: nuoveMisurazioni,
           }
@@ -3332,8 +4250,6 @@ window.addEventListener("DOMContentLoaded", () => {
       item.idVoce === voceFalsi.idVoce
         ? {
             ...item,
-            voceAbbreviata: "FALSI TELAI ALLUMINIO",
-            voce: "FALSI TELAI ALLUMINIO",
             tipoMisura: TIPOMISURA_VOCE_MANUALE,
             misurazioniManuali: nuoveMisurazioni,
           }
@@ -3479,6 +4395,9 @@ window.addEventListener("DOMContentLoaded", () => {
     if (compilazioneMisureVariePanelEl) {
       compilazioneMisureVariePanelEl.hidden = tipo !== "misure-varie";
     }
+    if (compilazioneScavoPanelEl) {
+      compilazioneScavoPanelEl.hidden = tipo !== "scavo";
+    }
     altreTipologiePanelEl.hidden = tipo !== "altre";
   }
 
@@ -3491,11 +4410,38 @@ window.addEventListener("DOMContentLoaded", () => {
   function openCompilazioneMisureVarie() {
     compilazionePianoId = null;
     dismissVaniIfOpen();
+    dismissPerimetraliIfOpen();
+    dismissElevazioneIfOpen();
+    dismissSolaiInterniIfOpen();
+    dismissSolaiInclinatiIfOpen();
     dismissCamminamentiIfOpen();
+    dismissScavoIfOpen();
     openVistaMisureVarie({
       onPrepare: () => {
         mostraPannelloCompilazione("misure-varie");
         preparaVistaMisureVarie();
+      },
+    });
+  }
+
+  function preparaVistaScavo() {
+    popolaDatalistVocibrevi("datalist-voci-esterni-vari");
+    resetScavoForm();
+    renderScavi();
+  }
+
+  function openCompilazioneScavo() {
+    compilazionePianoId = null;
+    dismissVaniIfOpen();
+    dismissPerimetraliIfOpen();
+    dismissElevazioneIfOpen();
+    dismissSolaiInterniIfOpen();
+    dismissSolaiInclinatiIfOpen();
+    dismissCamminamentiIfOpen();
+    openVistaScavo({
+      onPrepare: () => {
+        mostraPannelloCompilazione("scavo");
+        preparaVistaScavo();
       },
     });
   }
@@ -3526,6 +4472,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function openCompilazioneEsterniVari() {
     compilazionePianoId = null;
+    dismissScavoIfOpen();
     mostraPannelloCompilazione("esterni");
     showVistaCompilazione(vistaPianiEl, vistaCompilazioneEl, altreTipologiePanelEl);
     vistaVociEl.hidden = true;
@@ -3535,10 +4482,10 @@ window.addEventListener("DOMContentLoaded", () => {
       .forEach((section) => (section.open = false));
     esterniSottotitoloEl.innerHTML = "Vista indipendente ESTERNI VARI.";
     popolaDatalistVocibrevi("datalist-voci-esterni-vari");
-    resetScavoForm();
     resetCorselloForm();
-    renderScavi();
+    resetScivoloForm();
     renderCorselli();
+    renderScivoli();
     tornaPianiEsterniButtonEl.focus();
     window.scrollTo({ top: 0, behavior: "auto" });
   }
@@ -3547,6 +4494,7 @@ window.addEventListener("DOMContentLoaded", () => {
     syncEsterniMisurazioniNelleVoci({
       scaviEsterni,
       corselliEsterni,
+      scivoliEsterni,
       camminamentiEsterni: [],
       misurazioniVarie,
     });
@@ -3569,7 +4517,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function apriVistaVoci() {
     dismissVaniIfOpen();
+    dismissPerimetraliIfOpen();
+    dismissElevazioneIfOpen();
+    dismissSolaiInterniIfOpen();
+    dismissSolaiInclinatiIfOpen();
     dismissCamminamentiIfOpen();
+    dismissScavoIfOpen();
     vistaPianiEl.hidden = true;
     vistaCompilazioneEl.hidden = true;
     vistaVociEl.hidden = false;
@@ -3580,7 +4533,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function apriVistaBim() {
     dismissVaniIfOpen();
+    dismissPerimetraliIfOpen();
+    dismissElevazioneIfOpen();
+    dismissSolaiInterniIfOpen();
+    dismissSolaiInclinatiIfOpen();
     dismissCamminamentiIfOpen();
+    dismissScavoIfOpen();
     vistaPianiEl.hidden = true;
     vistaCompilazioneEl.hidden = true;
     vistaVociEl.hidden = true;
@@ -3727,6 +4685,28 @@ window.addEventListener("DOMContentLoaded", () => {
     setCorselloFormMode();
     updateFormulaButtonState(corselloFormulaEl, apriFormulaCorselloButtonEl);
     corselloPianoEl.focus();
+  }
+
+  function setScivoloFormMode() {
+    const isEdit = editingScivoloId !== null;
+    scivoloSubmitButtonEl.textContent = "+";
+    scivoloSubmitButtonEl.title = isEdit ? "Salva modifica scivolo" : "Aggiungi scivolo";
+    scivoloSubmitButtonEl.setAttribute(
+      "aria-label",
+      isEdit ? "Salva modifica scivolo" : "Aggiungi scivolo",
+    );
+    scivoloSubmitButtonEl.classList.toggle("btn-form-add-plus--edit", isEdit);
+    if (!isEdit) {
+      idPlScivEl.value = String(scivoloIdCounter);
+    }
+  }
+
+  function resetScivoloForm() {
+    scivoloFormEl.reset();
+    editingScivoloId = null;
+    setScivoloFormMode();
+    updateFormulaButtonState(scivoloFormulaEl, apriFormulaScivoloButtonEl);
+    scivoloPianoEl.focus();
   }
 
   function setCamminamentiFormMode() {
@@ -3885,7 +4865,10 @@ window.addEventListener("DOMContentLoaded", () => {
         ? item.idAperturaMaster.trim()
         : fallbackId;
     const piano = typeof item?.piano === "string" ? item.piano.trim() : "";
-    return { idAperturaMaster, ...base, piano };
+    const zona = typeof item?.zona === "string" ? item.zona.trim() : "";
+    const out = { idAperturaMaster, ...base, piano };
+    if (zona) out.zona = zona;
+    return out;
   }
 
   function normalizzaApertureMaster(raw) {
@@ -4263,7 +5246,13 @@ window.addEventListener("DOMContentLoaded", () => {
               segno: row.segno === true,
               unitaNorm: normalizzaUnitaVoceDetrazione(v.unitaMisura),
               vaniVanoId: row.vaniVanoId,
+              camminamentiSchedaId: row.camminamentiSchedaId,
+              perimetraliSchedaId: row.perimetraliSchedaId,
+              elevazioneSchedaId: row.elevazioneSchedaId,
+              solaiInterniSchedaId: row.solaiInterniSchedaId,
+              solaiInclinatiSchedaId: row.solaiInclinatiSchedaId,
               stratoAltezza: row.stratoAltezza,
+              tipoOggetto: row.tipoOggetto,
             }),
           }
         : calcolaMisurazioneVaria(row.formula, row.numero, row.segno);
@@ -4291,6 +5280,14 @@ window.addEventListener("DOMContentLoaded", () => {
       segno: row.segno === true,
       risultato: calc.risultato,
       apertureCollegate: normalizzaApertureCollegateRefs(row.apertureCollegate),
+      vaniVanoId: row.vaniVanoId || "",
+      camminamentiSchedaId: row.camminamentiSchedaId || "",
+      perimetraliSchedaId: row.perimetraliSchedaId || "",
+      elevazioneSchedaId: row.elevazioneSchedaId || "",
+      solaiInterniSchedaId: row.solaiInterniSchedaId || "",
+      solaiInclinatiSchedaId: row.solaiInclinatiSchedaId || "",
+      stratoAltezza: row.stratoAltezza ?? null,
+      stratoElevazione: row.stratoElevazione ?? null,
     };
     voci = voci.map((vv) => {
       if (vv.idVoce !== idVoce) return vv;
@@ -4362,34 +5359,37 @@ window.addEventListener("DOMContentLoaded", () => {
     renderVoci();
   }
 
-  const VOCE_DIALOG_CAMPI_NON_UM = [
+  /** Campi strutturali bloccati in modalità limitata (misure restano automatiche). */
+  const VOCE_DIALOG_CAMPI_BLOCCATI_LIMITATA = [
     vocePosizioneEl,
     voceAbbreviataEl,
-    vocePrezzoEl,
     voceTipoMisuraEl,
-    voceTestoEl,
     voceNoteEl,
-    voceBtnCercaEl,
   ];
 
   function setVoceDialogModalitaSoloUnitaMisura(attiva) {
     editingVoceSoloUnitaMisura = attiva;
     voceDialogEl?.classList.toggle("voce-dialog--solo-unita", attiva);
     if (voceDialogSoloUnitaHintEl) voceDialogSoloUnitaHintEl.hidden = !attiva;
-    if (voceDialogSaveEl) voceDialogSaveEl.textContent = attiva ? "Salva unità" : "Salva voce";
+    if (voceDialogSaveEl) voceDialogSaveEl.textContent = attiva ? "Salva associazione" : "Salva voce";
     if (voceDialogTitleEl) {
-      if (attiva) voceDialogTitleEl.textContent = "MODIFICA UNITÀ DI MISURA";
+      if (attiva) voceDialogTitleEl.textContent = "ASSOCIA VOCE E PREZZO";
       else if (editingVoceId !== null) voceDialogTitleEl.textContent = "MODIFICA VOCE";
       else voceDialogTitleEl.textContent = "NUOVA VOCE";
     }
-    VOCE_DIALOG_CAMPI_NON_UM.forEach((el) => {
+    VOCE_DIALOG_CAMPI_BLOCCATI_LIMITATA.forEach((el) => {
       if (el) el.disabled = attiva;
     });
+    if (vocePrezzoEl) vocePrezzoEl.disabled = false;
+    if (voceTestoEl) voceTestoEl.disabled = false;
+    if (voceBtnCercaEl) voceBtnCercaEl.disabled = false;
+    if (voceUnitaMisuraEl) voceUnitaMisuraEl.disabled = false;
   }
 
   function resetVoceForm() {
     voceIdEl.value = String(voceIdCounter);
-    vocePosizioneEl.value = String(getPrimaPosizioneVoceDisponibile());
+    vocePosizioneEl.value = String(getPrimaPosizioneVoceDisponibile(""));
+    popolaSelectCapitoliVoce("");
     voceAbbreviataEl.value = "";
     renderVociUnitaOptions();
     if (vocePrezzoEl) vocePrezzoEl.value = fmt2(0);
@@ -4401,9 +5401,11 @@ window.addEventListener("DOMContentLoaded", () => {
     setVoceDialogModalitaSoloUnitaMisura(false);
   }
 
-  function getPrimaPosizioneVoceDisponibile() {
+  function getPrimaPosizioneVoceDisponibile(capitoloId = "") {
+    const cid = normalizeCapitoloIdOnVoce(capitoloId);
     const usate = new Set(
       voci
+        .filter((item) => normalizeCapitoloIdOnVoce(item.capitoloId) === cid)
         .map((item) => Number(item.posizione))
         .filter((n) => Number.isInteger(n) && n > 0),
     );
@@ -4413,27 +5415,37 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function normalizzaPosizioniVoci() {
-    const ordinate = [...voci].sort(
-      (a, b) => a.posizione - b.posizione || a.idVoce - b.idVoce,
-    );
-    ordinate.forEach((item, index) => {
-      item.posizione = index + 1;
-    });
+    const groups = buildVociGroupsByCapitolo(voci, archivioCapitoli);
+    const ordinate = [];
+    for (const g of groups) {
+      const sorted = [...g.voci].sort(
+        (a, b) => a.posizione - b.posizione || a.idVoce - b.idVoce,
+      );
+      sorted.forEach((item, index) => {
+        item.posizione = index + 1;
+        item.capitoloId = g.capitolo ? g.capitolo.id : "";
+      });
+      ordinate.push(...sorted);
+    }
+    // include orphan empty? already all voci are in groups
     voci = ordinate;
   }
 
   function spostaVoceAPosizione(idVoce, nuovaPosizione) {
     normalizzaPosizioniVoci();
-    const corrente = [...voci];
-    const idx = corrente.findIndex((item) => item.idVoce === idVoce);
+    const voce = voci.find((item) => item.idVoce === idVoce);
+    if (!voce) return;
+    const cid = normalizeCapitoloIdOnVoce(voce.capitoloId);
+    const siblings = voci.filter((item) => normalizeCapitoloIdOnVoce(item.capitoloId) === cid);
+    const idx = siblings.findIndex((item) => item.idVoce === idVoce);
     if (idx < 0) return;
-    const [voce] = corrente.splice(idx, 1);
-    const posClamped = Math.max(1, Math.min(nuovaPosizione, corrente.length + 1));
-    corrente.splice(posClamped - 1, 0, voce);
-    corrente.forEach((item, index) => {
+    const [moved] = siblings.splice(idx, 1);
+    const posClamped = Math.max(1, Math.min(nuovaPosizione, siblings.length + 1));
+    siblings.splice(posClamped - 1, 0, moved);
+    siblings.forEach((item, index) => {
       item.posizione = index + 1;
     });
-    voci = corrente;
+    normalizzaPosizioniVoci();
   }
 
   function exitVoceFocusMode() {
@@ -4532,19 +5544,59 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    vociDaRenderizzare.forEach((item, index) => {
+    const groupsRender = buildVociGroupsByCapitolo(vociDaRenderizzare, archivioCapitoli).filter(
+      (g) => g.voci.length > 0,
+    );
+    /** @type {{ kind: string, group: any, item?: any, indexInGroup?: number, collapsed?: boolean }[]} */
+    const flatRender = [];
+    for (const g of groupsRender) {
+      const collapsed = capitoliCollapsed.has(g.key);
+      flatRender.push({ kind: "cap", group: g, collapsed });
+      if (!collapsed) {
+        g.voci.forEach((voceItem, indexInGroup) => {
+          flatRender.push({ kind: "voce", group: g, item: voceItem, indexInGroup });
+        });
+      }
+    }
+
+    flatRender.forEach((entry) => {
+      if (entry.kind === "cap") {
+        const g = entry.group;
+        const importoCap = g.voci.reduce((acc, v) => acc + calcolaImportoVoceEuro(v), 0);
+        const trCap = document.createElement("tr");
+        trCap.className = "voci-row-capitolo";
+        trCap.dataset.action = "toggle-capitolo";
+        trCap.dataset.capitoloKey = g.key;
+        const tdCap = document.createElement("td");
+        tdCap.colSpan = 8;
+        const toggle = entry.collapsed ? "▶" : "▼";
+        const titolo =
+          g.capitolo != null
+            ? `${g.capitolo.sequenza} · ${g.capitolo.nome}`
+            : "Senza capitolo";
+        tdCap.innerHTML = `<span class="voci-capitolo-toggle">${toggle}</span>${escapeHtml(titolo)}<span class="voci-capitolo-totale">${formatEuro2(importoCap)}</span>`;
+        trCap.appendChild(tdCap);
+        trCap.title = entry.collapsed ? "Clic per aprire le voci" : "Clic per chiudere le voci";
+        vociBodyEl.appendChild(trCap);
+        return;
+      }
+      const item = entry.item;
+      const index = entry.indexInGroup;
       const derivataDaVani = voceDerivataDaVani(item);
+      const daApertureAccessori = voceDerivataDaApertureAccessori(item);
       const bloccataInVoci = voceBloccataInVoci(item);
       const row = document.createElement("tr");
       row.className = "voci-row-principale";
       row.dataset.idVoce = String(item.idVoce);
       row.title = "Doppio clic per aprire in fullscreen";
       row.appendChild(createCell(String(item.idVoce)));
-      row.appendChild(createCell(String(item.posizione)));
+      row.appendChild(createCell(formatVoceNumeroCapitolo(entry.group, entry.indexInGroup)));
       const cellVoceAbbrev = createCell(item.voceAbbreviata || "-");
       cellVoceAbbrev.title = item.voce;
       cellVoceAbbrev.classList.add("voci-cell-open-focus");
-      if (derivataDaVani) cellVoceAbbrev.classList.add("voci-cell-from-vani");
+      if (derivataDaVani || daApertureAccessori) {
+        cellVoceAbbrev.classList.add("voci-cell-from-vani");
+      }
       if (isVoceSpecialeNoTotaleRiferimento(item)) {
         cellVoceAbbrev.classList.add("voci-cell-special-voce");
       }
@@ -4553,7 +5605,16 @@ window.addEventListener("DOMContentLoaded", () => {
       row.appendChild(cellVoceAbbrev);
       row.appendChild(createCell(item.unitaMisura || "-"));
       row.appendChild(createCell(formatEuro2(item.prezzo ?? 0)));
-      row.appendChild(createCell(item.tipoMisura || TIPOMISURA_VOCE_AUTOMATICA));
+      {
+        const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
+        const totaleQuantitaVoce = mm.reduce((sum, m) => sum + Number(m.risultato || 0), 0);
+        const detrazioneAperture = calcolaDetrazioneApertureVoce(item, mm);
+        const totaleQuantitaVoceNetto = totaleQuantitaVoce - detrazioneAperture;
+        const cellQta = createCell(formatTotaleMisurazioniManualiIt(totaleQuantitaVoceNetto));
+        cellQta.classList.add("voci-cell-qta-netta");
+        cellQta.title = "Quantità totale netta (misurazioni − aperture)";
+        row.appendChild(cellQta);
+      }
       row.appendChild(createCell(item.note || "-"));
 
       const actionsCell = document.createElement("td");
@@ -4590,7 +5651,7 @@ window.addEventListener("DOMContentLoaded", () => {
         ? "Svuota il campo Cerca per usare Sposta sotto"
         : "Sposta sotto";
       downButton.setAttribute("aria-label", "Sposta sotto");
-      downButton.disabled = ricercaAttiva || index === vociDaRenderizzare.length - 1;
+      downButton.disabled = ricercaAttiva || index === entry.group.voci.length - 1;
 
       const deleteButton = document.createElement("button");
       deleteButton.type = "button";
@@ -4611,23 +5672,17 @@ window.addEventListener("DOMContentLoaded", () => {
       copyButton.setAttribute("aria-label", "Copia voce");
 
       if (bloccataInVoci) {
-        const roTitle = isVoceSpecialeNoTotaleRiferimento(item)
-          ? "Voce automatica: modifica solo dai relativi strumenti (qui sola lettura)"
-          : "Voce da VANI/CAMMINAMENTI: modifica unità di misura con ✎ (qui sola lettura)";
-        if (derivataDaVani && !isVoceSpecialeNoTotaleRiferimento(item)) {
-          editButton.disabled = false;
-          editButton.title =
-            "Modifica unità di misura (i totali delle misurazioni da VANI si aggiornano al salvataggio)";
-          copyButton.disabled = true;
-          copyButton.title = "Voce da VANI: copia non disponibile";
-        } else {
-          [copyButton, editButton].forEach((btn) => {
-            btn.disabled = true;
-            btn.title = roTitle;
-          });
-        }
+        editButton.disabled = false;
+        editButton.title =
+          "Associa testo VOCE, prezzo e unità di misura (le misurazioni restano automatiche)";
+        copyButton.disabled = true;
+        copyButton.title = isVoceSpecialeNoTotaleRiferimento(item)
+          ? "Voce automatica: copia non disponibile"
+          : daApertureAccessori
+            ? "Voce automatica da aperture: copia non disponibile"
+            : "Voce da VANI/CAMMINAMENTI: copia non disponibile";
         upButton.disabled = ricercaAttiva || index === 0;
-        downButton.disabled = ricercaAttiva || index === vociDaRenderizzare.length - 1;
+        downButton.disabled = ricercaAttiva || index === entry.group.voci.length - 1;
         deleteButton.disabled = false;
         deleteButton.title = "Elimina voce";
       }
@@ -4653,6 +5708,21 @@ window.addEventListener("DOMContentLoaded", () => {
           isCollapsed ? "Espandi misurazioni manuali" : "Collassa misurazioni manuali",
         );
         actionsCell.appendChild(collapseMmButton);
+
+        const addMmRowButton = document.createElement("button");
+        addMmRowButton.type = "button";
+        addMmRowButton.className = "btn-action btn-form-add-plus btn-voce-mm-add";
+        addMmRowButton.dataset.action = "add-voce-mm";
+        addMmRowButton.dataset.idVoce = String(item.idVoce);
+        addMmRowButton.textContent = "+";
+        addMmRowButton.title = "Aggiungi misurazione";
+        addMmRowButton.setAttribute("aria-label", "Aggiungi misurazione");
+        if (bloccataInVoci) {
+          addMmRowButton.disabled = true;
+          addMmRowButton.title =
+            "Questa voce è automatica: le misurazioni non si aggiungono qui";
+        }
+        actionsCell.appendChild(addMmRowButton);
       }
       row.appendChild(actionsCell);
       vociBodyEl.appendChild(row);
@@ -4826,11 +5896,23 @@ window.addEventListener("DOMContentLoaded", () => {
                 del.dataset.mmIndex = String(idx);
                 del.textContent = "✕";
                 del.title = "Elimina riga";
+                if (bloccataInVoci) {
+                  const tip =
+                    "Misurazione automatica: non modificabile da VOCI";
+                  dup.disabled = true;
+                  del.disabled = true;
+                  dup.title = tip;
+                  del.title = tip;
+                }
                 ac.append(dup, del);
                 trMm.appendChild(ac);
                 tbody.appendChild(trMm);
 
-                if (!isVoceSpecialeNoTotaleRiferimento(item)) {
+                // Accessori (zanzariera, scuro, inferiata, …): non mostrare il blocco «aperture associate».
+                if (
+                  !isVoceSpecialeNoTotaleRiferimento(item) &&
+                  !isTipoOggettoAccessorioApertura(m?.tipoOggetto)
+                ) {
                   const apertureCollegate = risolviApertureCollegateRefs(m.apertureCollegate);
                   const trAp = document.createElement("tr");
                   trAp.className = "voce-mm-aperture-row";
@@ -4838,7 +5920,11 @@ window.addEventListener("DOMContentLoaded", () => {
                   tdAp.colSpan = mmTotalColumns;
                   tdAp.className = "empty-cell voce-mm-aperture-cell";
                   const isMisurazioneDaVani =
-                    typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "";
+                    (typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "") ||
+                    (typeof m?.perimetraliSchedaId === "string" && m.perimetraliSchedaId.trim() !== "") ||
+                    (typeof m?.elevazioneSchedaId === "string" && m.elevazioneSchedaId.trim() !== "") ||
+                    (typeof m?.solaiInterniSchedaId === "string" && m.solaiInterniSchedaId.trim() !== "") ||
+                    (typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "");
                   if (isMisurazioneDaVani) {
                     const misura2Val =
                       typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
@@ -4884,6 +5970,9 @@ window.addEventListener("DOMContentLoaded", () => {
                           mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
                           mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
                           mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.stratoElevazione ?? null) : null,
+                          {
+                            usaAltezzaPienaApertura: isTipoOggettoAccessorioApertura(m?.tipoOggetto),
+                          },
                         );
                         pushTextCell(fmt2(metric.ml), "voce-mm-ap-metric-cell");
                         pushTextCell(fmt2(metric.hInclusa), "voce-mm-ap-metric-cell");
@@ -5007,6 +6096,9 @@ window.addEventListener("DOMContentLoaded", () => {
                         mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
                         mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
                         mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.stratoElevazione ?? null) : null,
+                        {
+                          usaAltezzaPienaApertura: isTipoOggettoAccessorioApertura(m?.tipoOggetto),
+                        },
                       );
                       const roCell = (text, extraClass = "") => {
                         const c = document.createElement("div");
@@ -5068,6 +6160,9 @@ window.addEventListener("DOMContentLoaded", () => {
                       mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
                       mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
                       mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.stratoElevazione ?? null) : null,
+                      {
+                        usaAltezzaPienaApertura: isTipoOggettoAccessorioApertura(m?.tipoOggetto),
+                      },
                     );
                     pushTextCell(fmt2(metric.hInclusa), "voce-mm-ap-metric-cell");
                     pushTextCell(fmt2(metric.mq), "voce-mm-ap-metric-cell");
@@ -5221,6 +6316,9 @@ window.addEventListener("DOMContentLoaded", () => {
                     mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
                     mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura3Val : null,
                     mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.stratoElevazione ?? null) : null,
+                    {
+                      usaAltezzaPienaApertura: isTipoOggettoAccessorioApertura(m?.tipoOggetto),
+                    },
                   );
                   const makeReadonly = (text, extraClass = "") => {
                     const d = document.createElement("div");
@@ -5285,20 +6383,18 @@ window.addEventListener("DOMContentLoaded", () => {
 
               const sumRifNetto = sumRif - sumRifAperture;
               if (!isVoceSpecialeNoTotaleRiferimento(item)) {
-                appendSubtotalRow(
-                  `Totale RIFERIMENTO: ${rifKey} (Lordo ${fmt2(sumRif)} - Aperture ${fmt2(sumRifAperture)})`,
-                  sumRifNetto,
-                  "voce-mm-subtotal-rif",
-                );
+                const labelRif = voceSenzaSottrazioneApertureUi(item)
+                  ? `Totale RIFERIMENTO: ${rifKey}`
+                  : `Totale RIFERIMENTO: ${rifKey} (Lordo ${fmt2(sumRif)} - Aperture ${fmt2(sumRifAperture)})`;
+                appendSubtotalRow(labelRif, sumRifNetto, "voce-mm-subtotal-rif");
               }
             });
 
             const sumPianoNetto = sumPiano - sumPianoAperture;
-            appendSubtotalRow(
-              `Totale PIANO: ${pianoKey} (Lordo ${fmt2(sumPiano)} - Aperture ${fmt2(sumPianoAperture)})`,
-              sumPianoNetto,
-              "voce-mm-subtotal-piano",
-            );
+            const labelPiano = voceSenzaSottrazioneApertureUi(item)
+              ? `Totale PIANO: ${pianoKey}`
+              : `Totale PIANO: ${pianoKey} (Lordo ${fmt2(sumPiano)} - Aperture ${fmt2(sumPianoAperture)})`;
+            appendSubtotalRow(labelPiano, sumPianoNetto, "voce-mm-subtotal-piano");
           });
         }
         table.appendChild(tbody);
@@ -5311,7 +6407,8 @@ window.addEventListener("DOMContentLoaded", () => {
         const hasSemiautomatica = mm.some(
           (row) => normalizzaTipoMisurazioneVoce(row?.tipo) === VOCE_MM_TIPO_SEMIAUTOMATICA,
         );
-        const quantitaFinaleVoce = hasSemiautomatica ? sumMmNetto : sumMm;
+        const senzaSottrazioneUi = voceSenzaSottrazioneApertureUi(item);
+        const quantitaFinaleVoce = hasSemiautomatica && !senzaSottrazioneUi ? sumMmNetto : sumMm;
         const strong = document.createElement("strong");
         strong.textContent = formatTotaleMisurazioniManualiIt(quantitaFinaleVoce);
         const prezzoVoce = parseNonNegativeDecimal2(item.prezzo) ?? 0;
@@ -5326,10 +6423,12 @@ window.addEventListener("DOMContentLoaded", () => {
         totP.append(
           `TOTALE ${unitaVoce}: `,
           strong,
-          hasSemiautomatica ? dettaglioNetto : "",
+          hasSemiautomatica && !senzaSottrazioneUi ? dettaglioNetto : "",
           " | Prezzo voce: ",
           strongPrezzo,
-          hasSemiautomatica ? " | Totale (Netto x Prezzo): " : " | Totale (Risultato x Prezzo): ",
+          hasSemiautomatica && !senzaSottrazioneUi
+            ? " | Totale (Netto x Prezzo): "
+            : " | Totale (Risultato x Prezzo): ",
           strongImporto,
         );
 
@@ -5783,13 +6882,25 @@ window.addEventListener("DOMContentLoaded", () => {
         maximumFractionDigits: 3,
       });
 
-    const voices = [...voci].sort((a, b) => a.posizione - b.posizione || a.idVoce - b.idVoce);
+    const voicesGroups = buildVociGroupsByCapitolo(voci, archivioCapitoli).filter(
+      (g) => g.voci.length > 0,
+    );
     let totaleComplessivoComputo = 0;
     drawPageHeader();
-    if (voices.length === 0) {
+    if (voicesGroups.length === 0) {
       drawText(marginLeft, y + 6, "Nessuna voce disponibile.", true, voceFontSize);
     } else {
-      voices.forEach((item) => {
+      voicesGroups.forEach((group) => {
+        const capTitle =
+          group.capitolo != null
+            ? `${group.capitolo.sequenza}  ${group.capitolo.nome}`
+            : "Senza capitolo";
+        ensureSpace(voceLineH + 2);
+        drawText(marginLeft, y + 4, capTitle, true, voceFontSize + 0.5);
+        y += voceLineH + 1;
+
+        let totaleCapitolo = 0;
+        group.voci.forEach((item, indexInGroup) => {
         const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
         const unitaNormDetrazione = normalizzaUnitaVoceDetrazione(item.unitaMisura);
         const usaMcPerAperturePdf = unitaNormDetrazione.includes("mc");
@@ -5806,7 +6917,13 @@ window.addEventListener("DOMContentLoaded", () => {
         });
 
         ensureSpace(voceLineH);
-        drawText(marginLeft, y + 4, `${item.posizione})`, false, voceFontSize);
+        drawText(
+          marginLeft,
+          y + 4,
+          `${formatVoceNumeroCapitolo(group, indexInGroup)})`,
+          false,
+          voceFontSize,
+        );
         drawJustifiedParagraph(item.voce || "-", leftTextX, y + 4, voceColW, voceFontSize, voceLineH);
         y += gapAfterVoce;
 
@@ -5838,7 +6955,11 @@ window.addEventListener("DOMContentLoaded", () => {
               const misurazioneDaCamminamenti =
                 typeof m?.camminamentiSchedaId === "string" && m.camminamentiSchedaId.trim() !== "";
               const misurazioneDaVani =
-                typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "";
+                (typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "") ||
+                (typeof m?.perimetraliSchedaId === "string" && m.perimetraliSchedaId.trim() !== "") ||
+                (typeof m?.elevazioneSchedaId === "string" && m.elevazioneSchedaId.trim() !== "") ||
+                (typeof m?.solaiInterniSchedaId === "string" && m.solaiInterniSchedaId.trim() !== "") ||
+                    (typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "");
               const detailLine =
                 mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA
                   ? misurazioneDaCamminamenti
@@ -5876,6 +6997,9 @@ window.addEventListener("DOMContentLoaded", () => {
                     misura2Val,
                     misura3Val,
                     m.stratoElevazione ?? null,
+                    {
+                      usaAltezzaPienaApertura: isTipoOggettoAccessorioApertura(m?.tipoOggetto),
+                    },
                   );
                   const valoreMetrica = usaMcPerAperturePdf
                     ? metriche.mc
@@ -5884,7 +7008,10 @@ window.addEventListener("DOMContentLoaded", () => {
                       : metriche.mq;
                   const valoreNum = Number(valoreMetrica || 0);
                   if (valoreNum <= 0.0001) return;
-                  detrazioneRigaAperture += valoreNum;
+                  // Accessori: non contabilizzare come detrazione (solo eventuale riga informativa).
+                  if (!isTipoOggettoAccessorioApertura(m?.tipoOggetto)) {
+                    detrazioneRigaAperture += valoreNum;
+                  }
                   apertureDaStampare.push({
                     locale: apertura.locale || "-",
                     largh: apertura.largh,
@@ -5984,6 +7111,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const sumMmNetto = sumMm - detrazioneAperture;
         const prezzo = parseNonNegativeDecimal2(item.prezzo) ?? 0;
         totaleComplessivoComputo += sumMmNetto * prezzo;
+        totaleCapitolo += sumMmNetto * prezzo;
         ensureSpace(detailLineH + 4.5);
         drawText(
           leftTextX,
@@ -6007,6 +7135,24 @@ window.addEventListener("DOMContentLoaded", () => {
           drawTextRight(totaleRightX, y + 4.2, "__________", true, totalFontSize);
         }
         y += detailLineH + 4.5;
+        });
+
+        if (showPrices) {
+          ensureSpace(detailLineH + 5);
+          const labelCap =
+            group.capitolo != null
+              ? `TOTALE CAPITOLO ${group.capitolo.sequenza}`
+              : "TOTALE SENZA CAPITOLO";
+          drawText(leftTextX, y + 4.2, labelCap, true, totalFontSize);
+          drawTextRight(
+            totaleRightX,
+            y + 4.2,
+            `€. ${fmtEuroAmount(totaleCapitolo)}`,
+            true,
+            totalFontSize,
+          );
+          y += detailLineH + 5;
+        }
       });
 
       if (showPrices) {
@@ -6139,6 +7285,23 @@ window.addEventListener("DOMContentLoaded", () => {
       ]),
     ];
 
+    const scivoloRows = [
+      ["IDPLSCIV", "PIANO", "RIFERIMENTO", "SOTTRAI", "MISURA1", "MISURA2", "FORMULA", "AREA", "SPESSORE", "VOLUME", "IDVOCE"],
+      ...scivoliEsterni.map((item) => [
+        item.idPlSciv,
+        item.piano,
+        item.riferimento,
+        item.sottrai ? "SI" : "NO",
+        item.misura1 ?? "",
+        item.misura2 ?? "",
+        item.formula || "",
+        item.area,
+        item.altezza ?? "",
+        item.volume,
+        item.idVoce || "",
+      ]),
+    ];
+
     const camminamentiRows = [
       ["IDPLCAMM", "PIANO", "RIFERIMENTO", "SOTTRAI", "MISURA1", "MISURA2", "FORMULA", "AREA", "SPESSORE", "VOLUME", "IDVOCE"],
       ...camminamentiEsterni.map((item) => [
@@ -6256,6 +7419,9 @@ window.addEventListener("DOMContentLoaded", () => {
                     misura2Val,
                     misura3Val,
                     m.stratoElevazione ?? null,
+                    {
+                      usaAltezzaPienaApertura: isTipoOggettoAccessorioApertura(m?.tipoOggetto),
+                    },
                   );
                   const valoreMetrica = usaMcPerApertureXls
                     ? metriche.mc
@@ -6335,6 +7501,7 @@ window.addEventListener("DOMContentLoaded", () => {
       apertureRows,
       scavoRows,
       corselloRows,
+      scivoloRows,
       camminamentiRows,
       misurazioniRows,
       vociRows,
@@ -6387,11 +7554,13 @@ window.addEventListener("DOMContentLoaded", () => {
       apertureElevazione,
       scaviEsterni,
       corselliEsterni,
+      scivoliEsterni,
       camminamentiEsterni,
       misurazioniVarie,
       voci,
       apertureMaster,
       archivioPianiMisura: [...archivioPianiMisura],
+      archivioCapitoli: [...archivioCapitoli],
       vociUnitaMisuraOptions,
       ifcLink,
     };
@@ -6442,6 +7611,10 @@ window.addEventListener("DOMContentLoaded", () => {
       "computo_metrico_vani_registrati",
       "computo_metrico_vani_misurazione",
       "computo_metrico_camminamenti_registrati",
+      "computo_metrico_perimetrali_registrati",
+      "computo_metrico_elevazione_registrati",
+      "computo_metrico_solai_interni_registrati",
+      "computo_metrico_solai_inclinati_registrati",
     ];
     for (const key of keys) {
       try {
@@ -6455,6 +7628,10 @@ window.addEventListener("DOMContentLoaded", () => {
   /** Chiude il computo corrente e riparte da zero (dopo conferma utente). */
   function iniziaNuovoComputoVuoto() {
     dismissVaniIfOpen();
+    dismissPerimetraliIfOpen();
+    dismissElevazioneIfOpen();
+    dismissSolaiInterniIfOpen();
+    dismissSolaiInclinatiIfOpen();
     dismissCamminamentiIfOpen();
     if (voceFocusId !== null) exitVoceFocusMode();
 
@@ -6463,11 +7640,15 @@ window.addEventListener("DOMContentLoaded", () => {
     apertureElevazione = [];
     scaviEsterni = [];
     corselliEsterni = [];
+    scivoliEsterni = [];
     camminamentiEsterni = [];
     misurazioniVarie = [];
     voci = [];
     apertureMaster = [];
     archivioPianiMisura = [];
+    archivioCapitoli = [];
+    editingCapitoloId = null;
+    capitoliCollapsed.clear();
     vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
     davanzaliSbordiByKey = {};
     soglieSbordiByKey = {};
@@ -6484,6 +7665,7 @@ window.addEventListener("DOMContentLoaded", () => {
     aperturaElevIdCounter = 1;
     scavoIdCounter = 1;
     corselloIdCounter = 1;
+    scivoloIdCounter = 1;
     camminamentiIdCounter = 1;
     misurazioniIdCounter = 1;
     voceIdCounter = 1;
@@ -6494,6 +7676,7 @@ window.addEventListener("DOMContentLoaded", () => {
     editingAperturaElevId = null;
     editingScavoId = null;
     editingCorselloId = null;
+    editingScivoloId = null;
     editingCamminamentiId = null;
     editingMisurazioneId = null;
     editingVoceId = null;
@@ -6512,6 +7695,7 @@ window.addEventListener("DOMContentLoaded", () => {
     savePiani();
     saveMurDati();
     saveArchivioPianiMisuraToStorage();
+    saveArchivioCapitoliToStorage();
     saveApertureMaster();
     saveVoci();
     saveVociUnitaOptions();
@@ -6526,6 +7710,7 @@ window.addEventListener("DOMContentLoaded", () => {
     setAperturaFormMode();
     setScavoFormMode();
     setCorselloFormMode();
+    setScivoloFormMode();
     setCamminamentiFormMode();
     setMisurazioniFormMode();
     resetVoceForm();
@@ -6536,6 +7721,7 @@ window.addEventListener("DOMContentLoaded", () => {
     renderAperture();
     renderScavi();
     renderCorselli();
+    renderScivoli();
     renderCamminamenti();
     renderMisurazioniVarie();
     renderVoci();
@@ -7411,6 +8597,7 @@ window.addEventListener("DOMContentLoaded", () => {
   <Worksheet ss:Name="APERTURE">${jsonRowsToWorksheetXml(data.apertureRows)}</Worksheet>
   <Worksheet ss:Name="SCAVO">${jsonRowsToWorksheetXml(data.scavoRows)}</Worksheet>
   <Worksheet ss:Name="CORSELLO">${jsonRowsToWorksheetXml(data.corselloRows)}</Worksheet>
+  <Worksheet ss:Name="SCIVOLO">${jsonRowsToWorksheetXml(data.scivoloRows)}</Worksheet>
   <Worksheet ss:Name="CAMMINAMENTI">${jsonRowsToWorksheetXml(data.camminamentiRows)}</Worksheet>
   <Worksheet ss:Name="MISURAZIONI_VARIE">${jsonRowsToWorksheetXml(data.misurazioniRows)}</Worksheet>
   <Worksheet ss:Name="VOCI">${jsonRowsToWorksheetXml(data.vociRows)}</Worksheet>
@@ -7586,6 +8773,26 @@ window.addEventListener("DOMContentLoaded", () => {
           .map((item) => ({ ...item, sottrai: item.sottrai === true }))
       : [];
 
+    const importedScivoli = Array.isArray(payload.scivoliEsterni)
+      ? payload.scivoliEsterni
+          .filter(
+            (item) =>
+              typeof item?.idPlSciv === "number" &&
+              typeof item?.piano === "string" &&
+              typeof item?.riferimento === "string" &&
+              (typeof item?.sottrai === "boolean" || typeof item?.sottrai === "undefined") &&
+              (typeof item?.misura1 === "number" || item?.misura1 === null) &&
+              (typeof item?.misura2 === "number" || item?.misura2 === null) &&
+              typeof item?.formula === "string" &&
+              (typeof item?.formulaValue === "number" || item?.formulaValue === null) &&
+              (typeof item?.altezza === "number" || item?.altezza === null) &&
+              typeof item?.area === "number" &&
+              typeof item?.volume === "number" &&
+              typeof item?.idVoce === "string",
+          )
+          .map((item) => ({ ...item, sottrai: item.sottrai === true }))
+      : [];
+
     const importedCamminamenti = Array.isArray(payload.camminamentiEsterni)
       ? payload.camminamentiEsterni
           .filter(
@@ -7667,6 +8874,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const importedVoci = importedVociRaw.map((item) => ({
       idVoce: item.idVoce,
       posizione: item.posizione,
+      capitoloId: typeof item?.capitoloId === "string" ? item.capitoloId.trim() : "",
       voceAbbreviata: typeof item?.voceAbbreviata === "string" ? item.voceAbbreviata : "",
       unitaMisura:
         typeof item?.unitaMisura === "string" && item.unitaMisura.trim() !== ""
@@ -7709,6 +8917,7 @@ window.addEventListener("DOMContentLoaded", () => {
     apertureElevazione = importedAperture;
     scaviEsterni = importedScavi;
     corselliEsterni = importedCorselli;
+    scivoliEsterni = importedScivoli;
     camminamentiEsterni = [];
     misurazioniVarie = importedMisurazioni;
     voci = importedVoci;
@@ -7725,6 +8934,37 @@ window.addEventListener("DOMContentLoaded", () => {
     }
     syncArchivioPianiMisuraCompleto();
 
+    if (Array.isArray(payload.archivioCapitoli)) {
+      const seen = new Set();
+      archivioCapitoli = [];
+      for (const item of payload.archivioCapitoli) {
+        const n =
+          item && typeof item === "object"
+            ? {
+                id: typeof item.id === "string" ? item.id.trim() : createCapitoloId(),
+                sequenza: Number(item.sequenza),
+                nome: typeof item.nome === "string" ? item.nome.trim() : "",
+              }
+            : null;
+        if (!n || !n.id || !n.nome || !Number.isFinite(n.sequenza) || n.sequenza < 1) continue;
+        if (seen.has(n.id)) continue;
+        seen.add(n.id);
+        archivioCapitoli.push({
+          id: n.id,
+          sequenza: Math.floor(n.sequenza),
+          nome: n.nome,
+        });
+      }
+      archivioCapitoli = sortCapitoli(archivioCapitoli);
+    } else {
+      archivioCapitoli = [];
+    }
+    saveArchivioCapitoliToStorage();
+    voci = voci.map((v) => ({
+      ...v,
+      capitoloId: normalizeCapitoloIdOnVoce(v.capitoloId),
+    }));
+
     const uniqueUnita = [];
     [...UNITA_MISURA_DEFAULT_OPTIONS, ...importedUnita, ...voci.map((v) => v.unitaMisura)].forEach(
       (item) => {
@@ -7740,6 +8980,7 @@ window.addEventListener("DOMContentLoaded", () => {
       apertureElevazione.reduce((max, item) => Math.max(max, item.idAperturaElev), 0) + 1;
     scavoIdCounter = scaviEsterni.reduce((max, item) => Math.max(max, item.idPlScavo), 0) + 1;
     corselloIdCounter = corselliEsterni.reduce((max, item) => Math.max(max, item.idPlCors), 0) + 1;
+    scivoloIdCounter = scivoliEsterni.reduce((max, item) => Math.max(max, item.idPlSciv), 0) + 1;
     camminamentiIdCounter =
       camminamentiEsterni.reduce((max, item) => Math.max(max, item.idPlCamm), 0) + 1;
     misurazioniIdCounter =
@@ -7757,6 +8998,7 @@ window.addEventListener("DOMContentLoaded", () => {
     editingAperturaElevId = null;
     editingScavoId = null;
     editingCorselloId = null;
+    editingScivoloId = null;
     editingCamminamentiId = null;
     editingMisurazioneId = null;
     editingVoceId = null;
@@ -7778,6 +9020,7 @@ window.addEventListener("DOMContentLoaded", () => {
     setAperturaFormMode();
     setScavoFormMode();
     setCorselloFormMode();
+    setScivoloFormMode();
     setCamminamentiFormMode();
     setMisurazioniFormMode();
     resetVoceForm();
@@ -7788,6 +9031,7 @@ window.addEventListener("DOMContentLoaded", () => {
     renderAperture();
     renderScavi();
     renderCorselli();
+    renderScivoli();
     renderCamminamenti();
     renderMisurazioniVarie();
     renderVoci();
@@ -8199,6 +9443,63 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function renderScivoli() {
+    scivoloBodyEl.innerHTML = "";
+    const visibili = scivoliEsterni;
+    countScivoliEl.textContent = `(${visibili.length})`;
+    const sumArea = visibili.reduce((sum, item) => sum + Number(item.area || 0), 0);
+    const sumVolume = visibili.reduce((sum, item) => sum + Number(item.volume || 0), 0);
+    sumAreaScivoliEl.textContent = `Mq. ${fmt2(sumArea)}`;
+    sumVolumeScivoliEl.textContent = `Mc. ${fmt2(sumVolume)}`;
+
+    if (visibili.length === 0) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 11;
+      cell.className = "empty-cell";
+      cell.textContent = "Nessuna riga SCIVOLO.";
+      row.appendChild(cell);
+      scivoloBodyEl.appendChild(row);
+      return;
+    }
+
+    visibili.forEach((item) => {
+      const row = document.createElement("tr");
+      if (item.sottrai) row.classList.add("row-sottrai");
+      row.appendChild(createCell(String(item.idPlSciv)));
+      row.appendChild(createCell(item.piano));
+      row.appendChild(createCell(item.riferimento));
+      row.appendChild(createCell(item.misura1 === null ? "-" : fmt2(item.misura1)));
+      row.appendChild(createCell(item.misura2 === null ? "-" : fmt2(item.misura2)));
+      row.appendChild(createCell(item.formula || "-"));
+      row.appendChild(createCell(fmt2(item.area)));
+      row.appendChild(createCell(item.altezza === null ? "-" : fmt2(item.altezza)));
+      row.appendChild(createCell(fmt2(item.volume)));
+      row.appendChild(createCell(item.idVoce || "-"));
+
+      const actionsCell = document.createElement("td");
+      actionsCell.className = "actions-cell";
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "btn-action btn-edit";
+      editButton.dataset.action = "edit-scivolo";
+      editButton.dataset.id = String(item.idPlSciv);
+      editButton.textContent = "Modifica";
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "btn-action btn-delete";
+      deleteButton.dataset.action = "delete-scivolo";
+      deleteButton.dataset.id = String(item.idPlSciv);
+      deleteButton.textContent = "Elimina";
+
+      actionsCell.append(editButton, deleteButton);
+      row.appendChild(actionsCell);
+      scivoloBodyEl.appendChild(row);
+    });
+  }
+
   function renderMisurazioniVarie() {
     if (!misurazioniBodyEl || !countMisurazioniEl) return;
     misurazioniBodyEl.innerHTML = "";
@@ -8584,6 +9885,78 @@ window.addEventListener("DOMContentLoaded", () => {
     updateFormulaButtonState(corselloFormulaEl, apriFormulaCorselloButtonEl);
   });
 
+  scivoloFormEl.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const piano = ensurePianoMisuraInArchivio(scivoloPianoEl.value);
+    scivoloPianoEl.value = piano;
+    const riferimento = scivoloRiferimentoEl.value.trim();
+    const sottrai = scivoloSottraiEl.checked;
+    const misura1 =
+      scivoloMisura1El.value.trim() === "" ? null : parseNonNegativeDecimal2(scivoloMisura1El.value);
+    const misura2 =
+      scivoloMisura2El.value.trim() === "" ? null : parseNonNegativeDecimal2(scivoloMisura2El.value);
+    const formula = scivoloFormulaEl.value.trim();
+    const formulaValue = evalFormulaValue(formula);
+    const altezza =
+      scivoloAltezzaEl.value.trim() === "" ? null : parseNonNegativeDecimal2(scivoloAltezzaEl.value);
+    const idVoce = scivoloIdVoceEl.value.trim();
+
+    if (!piano || !riferimento) return;
+    if (misura1 === null && scivoloMisura1El.value.trim() !== "") return;
+    if (misura2 === null && scivoloMisura2El.value.trim() !== "") return;
+    if (formula && formulaValue === null) {
+      window.alert("FORMULA non valida. Usa solo numeri, operatori (+ - * /) e parentesi.");
+      return;
+    }
+
+    const areaBase = calcolaAreaScavo(misura1, misura2, formulaValue);
+    const area = applySegno(areaBase, sottrai);
+    const volume = applySegno(calcolaVolume(areaBase, altezza), sottrai);
+
+    if (editingScivoloId === null) {
+      scivoliEsterni.push({
+        idPlSciv: scivoloIdCounter++,
+        piano,
+        riferimento,
+        sottrai,
+        misura1,
+        misura2,
+        formula,
+        formulaValue,
+        area,
+        altezza,
+        volume,
+        idVoce,
+      });
+    } else {
+      scivoliEsterni = scivoliEsterni.map((item) =>
+        item.idPlSciv === editingScivoloId
+          ? {
+              ...item,
+              piano,
+              riferimento,
+              sottrai,
+              misura1,
+              misura2,
+              formula,
+              formulaValue,
+              area,
+              altezza,
+              volume,
+              idVoce,
+            }
+          : item,
+      );
+    }
+
+    saveMurDati();
+    renderScivoli();
+    syncEsterniVersoVoci();
+    resetScivoloForm();
+    updateFormulaButtonState(scivoloFormulaEl, apriFormulaScivoloButtonEl);
+  });
+
   if (misurazioniFormEl) {
     misurazioniFormEl.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -8648,6 +10021,10 @@ window.addEventListener("DOMContentLoaded", () => {
     openFormulaDialog(corselloFormulaEl);
   });
 
+  apriFormulaScivoloButtonEl.addEventListener("click", () => {
+    openFormulaDialog(scivoloFormulaEl);
+  });
+
   apriFormulaMisurazioniButtonEl?.addEventListener("click", () => {
     openFormulaDialog(misurazioniFormulaEl);
   });
@@ -8665,6 +10042,9 @@ window.addEventListener("DOMContentLoaded", () => {
     } else if (targetId === corselloFormulaEl.id) {
       corselloFormulaEl.value = formulaDialogTextEl.value.trim();
       updateFormulaButtonState(corselloFormulaEl, apriFormulaCorselloButtonEl);
+    } else if (targetId === scivoloFormulaEl.id) {
+      scivoloFormulaEl.value = formulaDialogTextEl.value.trim();
+      updateFormulaButtonState(scivoloFormulaEl, apriFormulaScivoloButtonEl);
     } else if (targetId === misurazioniFormulaEl?.id) {
       misurazioniFormulaEl.value = formulaDialogTextEl.value.trim();
       updateFormulaButtonState(misurazioniFormulaEl, apriFormulaMisurazioniButtonEl);
@@ -8803,9 +10183,9 @@ window.addEventListener("DOMContentLoaded", () => {
     if (Number.isNaN(idVoce) || Number.isNaN(idx)) return;
     if (voceIdBloccataInVoci(idVoce)) {
       const voce = voci.find((item) => item.idVoce === idVoce);
-      const msg = voce && isVoceSpecialeNoTotaleRiferimento(voce)
-        ? "Questa voce automatica è in sola lettura in VOCI. Modifica dai relativi strumenti."
-        : "Questa voce deriva da VANI o CAMMINAMENTI: in VOCI puoi modificare solo l'unità di misura (✎).";
+      const msg = voce
+        ? "Questa voce è automatica o semiautomatica: le misurazioni non si modificano qui. Usa ✎ per associare VOCE e PREZZO."
+        : "Misurazioni non modificabili su questa voce.";
       window.alert(msg);
       return;
     }
@@ -8832,6 +10212,7 @@ window.addEventListener("DOMContentLoaded", () => {
         "voceDialogDraft",
         JSON.stringify({
           editingVoceId,
+          editingVoceCampiLimitati: editingVoceSoloUnitaMisura,
           idVoce: voceIdEl.value,
           posizione: vocePosizioneEl.value,
           abbreviata: voceAbbreviataEl.value,
@@ -8840,6 +10221,7 @@ window.addEventListener("DOMContentLoaded", () => {
           tipoMisura: voceTipoMisuraEl ? voceTipoMisuraEl.value : "",
           testo: voceTestoEl.value,
           note: voceNoteEl.value,
+          focusVoceTesto: true,
         }),
       );
     } catch (_) {
@@ -8906,7 +10288,9 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
       const unitaMisura = voceUnitaMisuraEl.value.trim();
-      if (!unitaMisura) return;
+      const prezzo = parseNonNegativeDecimal2(vocePrezzoEl?.value ?? "");
+      const voce = voceTestoEl.value.trim();
+      if (!unitaMisura || !voce || prezzo === null) return;
       if (
         unitaMisura &&
         !vociUnitaMisuraOptions.some((u) => u.toLowerCase() === unitaMisura.toLowerCase())
@@ -8920,6 +10304,9 @@ window.addEventListener("DOMContentLoaded", () => {
           ? {
               ...item,
               unitaMisura,
+              prezzo,
+              voce,
+              capitoloId: normalizeCapitoloIdOnVoce(voceCapitoloEl?.value),
               misurazioniManuali: normalizzaMisurazioniManualiVoce(
                 item.misurazioniManuali,
                 unitaMisura,
@@ -8935,6 +10322,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
     const posizione = Number.parseInt(vocePosizioneEl.value, 10);
+    const capitoloId = normalizeCapitoloIdOnVoce(voceCapitoloEl?.value);
     const voceAbbreviata = voceAbbreviataEl.value.trim();
     const unitaMisura = voceUnitaMisuraEl.value.trim();
     const prezzo = parseNonNegativeDecimal2(vocePrezzoEl?.value ?? "");
@@ -8951,7 +10339,8 @@ window.addEventListener("DOMContentLoaded", () => {
       const newId = voceIdCounter++;
       voci.push({
         idVoce: newId,
-        posizione: getPrimaPosizioneVoceDisponibile(),
+        posizione: getPrimaPosizioneVoceDisponibile(capitoloId),
+        capitoloId,
         voceAbbreviata,
         unitaMisura,
         prezzo,
@@ -8966,6 +10355,7 @@ window.addEventListener("DOMContentLoaded", () => {
         item.idVoce === editingVoceId
           ? {
               ...item,
+              capitoloId,
               voceAbbreviata,
               unitaMisura,
               prezzo,
@@ -8986,6 +10376,16 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   vociBodyEl.addEventListener("click", (event) => {
+    const capitoloRow = event.target.closest("tr.voci-row-capitolo[data-capitolo-key]");
+    if (capitoloRow && !event.target.closest("button")) {
+      const key = String(capitoloRow.dataset.capitoloKey || "");
+      if (!key) return;
+      if (capitoliCollapsed.has(key)) capitoliCollapsed.delete(key);
+      else capitoliCollapsed.add(key);
+      renderVoci();
+      return;
+    }
+
     const openFocusCell = event.target.closest("td.voci-cell-open-focus[data-id-voce]");
     if (openFocusCell && !event.target.closest("button")) {
       const idVoce = Number(openFocusCell.dataset.idVoce);
@@ -8998,6 +10398,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const azione = String(button.dataset.action || "").trim();
     const idVoceLock = Number(button.dataset.idVoce ?? button.dataset.id ?? NaN);
     const azioniBloccateDaVani = new Set([
+      "add-voce-mm",
       "duplicate-voce-mm-row",
       "open-voce-mm-apertura-editor",
       "use-voce-mm-apertura",
@@ -9009,21 +10410,10 @@ window.addEventListener("DOMContentLoaded", () => {
       "delete-voce-mm-row",
       "copy-voce",
     ]);
-    if (azione === "edit-voce" && !Number.isNaN(idVoceLock)) {
-      const voceEdit = voci.find((item) => item.idVoce === idVoceLock);
-      if (voceEdit && isVoceSpecialeNoTotaleRiferimento(voceEdit)) {
-        window.alert(
-          "Questa voce automatica è in sola lettura in VOCI. Modifica dai relativi strumenti.",
-        );
-        return;
-      }
-    }
     if (azioniBloccateDaVani.has(azione) && !Number.isNaN(idVoceLock) && voceIdBloccataInVoci(idVoceLock)) {
-      const voce = voci.find((item) => item.idVoce === idVoceLock);
-      const msg = voce && isVoceSpecialeNoTotaleRiferimento(voce)
-        ? "Questa voce automatica è in sola lettura in VOCI. Modifica dai relativi strumenti."
-        : "Questa voce deriva da VANI o CAMMINAMENTI: in VOCI puoi modificare solo l'unità di misura (✎).";
-      window.alert(msg);
+      window.alert(
+        "Questa voce è automatica o semiautomatica: le misurazioni non si modificano qui. Usa ✎ per associare VOCE e PREZZO.",
+      );
       return;
     }
 
@@ -9033,6 +10423,20 @@ window.addEventListener("DOMContentLoaded", () => {
       if (vociMmCollapsed.has(idVoce)) vociMmCollapsed.delete(idVoce);
       else vociMmCollapsed.add(idVoce);
       renderVoci();
+      return;
+    }
+
+    if (button.dataset.action === "add-voce-mm") {
+      const idVoce = Number(button.dataset.idVoce);
+      if (Number.isNaN(idVoce)) return;
+      const voce = voci.find((item) => item.idVoce === idVoce);
+      if (!voce || normalizzaTipoMisuraVoce(voce.tipoMisura) !== TIPOMISURA_VOCE_MANUALE) {
+        window.alert("Puoi aggiungere misurazioni solo alle voci di tipo MANUALE.");
+        return;
+      }
+      // Espandi le misurazioni così dopo il salvataggio la nuova riga è visibile.
+      vociMmCollapsed.delete(idVoce);
+      openVoceMmRigaDialog(idVoce, null);
       return;
     }
 
@@ -9121,11 +10525,7 @@ window.addEventListener("DOMContentLoaded", () => {
       voceMmAperturaDraftByKey.delete(key);
       saveApertureMaster();
       saveVoci();
-      syncVoceDavanzali();
-      syncVoceSoglie();
-      syncVoceCanali();
-      syncVoceFalsiTelaiLegno();
-      syncVoceFalsiTelaiAlluminio();
+      syncVociDerivateDaApertureMaster();
       renderVoci();
       return;
     }
@@ -9206,17 +10606,12 @@ window.addEventListener("DOMContentLoaded", () => {
     if (button.dataset.action === "edit-voce") {
       const row = voci.find((item) => item.idVoce === id);
       if (!row) return;
-      if (isVoceSpecialeNoTotaleRiferimento(row)) {
-        window.alert(
-          "Questa voce automatica è in sola lettura in VOCI. Modifica dai relativi strumenti.",
-        );
-        return;
-      }
       editingVoceId = id;
-      const soloUnita = voceDerivataDaVani(row);
-      setVoceDialogModalitaSoloUnitaMisura(soloUnita);
+      const campiLimitati = voceBloccataInVoci(row);
+      setVoceDialogModalitaSoloUnitaMisura(campiLimitati);
       voceIdEl.value = String(row.idVoce);
       vocePosizioneEl.value = String(row.posizione);
+      popolaSelectCapitoliVoce(row.capitoloId || "");
       voceAbbreviataEl.value = row.voceAbbreviata || "";
       renderVociUnitaOptions(row.unitaMisura || "");
       if (vocePrezzoEl) vocePrezzoEl.value = fmt2(row.prezzo ?? 0);
@@ -9225,7 +10620,7 @@ window.addEventListener("DOMContentLoaded", () => {
       voceTestoEl.value = row.voce;
       voceNoteEl.value = row.note;
       voceDialogEl.showModal();
-      setTimeout(() => (soloUnita ? voceUnitaMisuraEl : vocePosizioneEl)?.focus(), 0);
+      setTimeout(() => (campiLimitati ? voceTestoEl : vocePosizioneEl)?.focus(), 0);
       return;
     }
 
@@ -9278,6 +10673,16 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   btnApriTutteVociEl?.addEventListener("click", () => {
     apriTutteLeVociManuali();
+  });
+  btnChiudiCapitoliVociEl?.addEventListener("click", () => {
+    for (const g of buildVociGroupsByCapitolo(voci, archivioCapitoli)) {
+      if (g.voci.length > 0) capitoliCollapsed.add(g.key);
+    }
+    renderVoci();
+  });
+  btnApriCapitoliVociEl?.addEventListener("click", () => {
+    capitoliCollapsed.clear();
+    renderVoci();
   });
 
   vociCercaAbbrevInputEl?.addEventListener("input", () => {
@@ -9551,6 +10956,41 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  scivoloBodyEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const id = Number(button.dataset.id);
+    if (Number.isNaN(id)) return;
+
+    if (button.dataset.action === "edit-scivolo") {
+      const row = scivoliEsterni.find((item) => item.idPlSciv === id);
+      if (!row) return;
+      editingScivoloId = id;
+      idPlScivEl.value = String(row.idPlSciv);
+      scivoloPianoEl.value = row.piano;
+      scivoloRiferimentoEl.value = row.riferimento;
+      scivoloSottraiEl.checked = row.sottrai === true;
+      scivoloMisura1El.value = row.misura1 === null ? "" : fmt2(row.misura1);
+      scivoloMisura2El.value = row.misura2 === null ? "" : fmt2(row.misura2);
+      scivoloFormulaEl.value = row.formula;
+      scivoloAltezzaEl.value = fmt2(row.altezza);
+      scivoloIdVoceEl.value = row.idVoce;
+      setScivoloFormMode();
+      updateFormulaButtonState(scivoloFormulaEl, apriFormulaScivoloButtonEl);
+      scivoloPianoEl.focus();
+      return;
+    }
+
+    if (button.dataset.action === "delete-scivolo") {
+      if (!window.confirm("Eliminare questa riga SCIVOLO?")) return;
+      scivoliEsterni = scivoliEsterni.filter((item) => item.idPlSciv !== id);
+      if (editingScivoloId === id) resetScivoloForm();
+      saveMurDati();
+      renderScivoli();
+      syncEsterniVersoVoci();
+    }
+  });
+
   misurazioniBodyEl?.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button) return;
@@ -9676,6 +11116,7 @@ window.addEventListener("DOMContentLoaded", () => {
       renderAperture();
       renderScavi();
       renderCorselli();
+      renderScivoli();
       renderCamminamenti();
       renderMisurazioniVarie();
     }
@@ -9689,10 +11130,9 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   tornaPianiEsterniButtonEl.addEventListener("click", () => {
-    vistaVociEl.hidden = true;
-    if (vistaBimEl) vistaBimEl.hidden = true;
-    showVistaPiani(vistaPianiEl, vistaCompilazioneEl, altreTipologiePanelEl);
-    renderPiani();
+    syncEsterniVersoVoci();
+    renderVoci();
+    apriVistaVoci();
   });
 
   sidebarEsterniVariButtonEl.addEventListener("click", () => {
@@ -9709,8 +11149,11 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   wireMisureVarieUi({
     onBack: () => {
-      closeVistaMisureVarie();
-      renderPiani();
+      syncEsterniVersoVoci();
+      renderVoci();
+      const misure = document.getElementById("compilazione-misure-varie");
+      if (misure) misure.hidden = true;
+      apriVistaVoci();
     },
   });
 
@@ -9856,11 +11299,7 @@ window.addEventListener("DOMContentLoaded", () => {
       apertureMasterEditingId = null;
       apertureMasterPendingDeleteId = null;
       saveApertureMaster();
-      syncVoceDavanzali();
-      syncVoceSoglie();
-      syncVoceCanali();
-      syncVoceFalsiTelaiLegno();
-      syncVoceFalsiTelaiAlluminio();
+      syncVociDerivateDaApertureMaster();
       renderVoci();
       openApertureMasterDialog();
       return;
@@ -9875,11 +11314,7 @@ window.addEventListener("DOMContentLoaded", () => {
       apertureMasterEditingId = null;
       apertureMasterPendingDeleteId = null;
       saveApertureMaster();
-      syncVoceDavanzali();
-      syncVoceSoglie();
-      syncVoceCanali();
-      syncVoceFalsiTelaiLegno();
-      syncVoceFalsiTelaiAlluminio();
+      syncVociDerivateDaApertureMaster();
       renderVoci();
       openApertureMasterDialog();
       return;
@@ -9934,6 +11369,158 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   document.body.appendChild(pianiMisuraArchivioDialogEl);
 
+  capitoliArchivioDialogEl.id = "capitoli-archivio-dialog";
+  capitoliArchivioDialogEl.className = "ifc-riepilogo-dialog";
+  capitoliArchivioDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const action = button.dataset.action;
+    if (action === "close-archivio-capitoli") {
+      editingCapitoloId = null;
+      capitoliArchivioDialogEl.close();
+      return;
+    }
+    if (action === "cancel-edit-capitolo") {
+      editingCapitoloId = null;
+      openArchivioCapitoliDialog();
+      return;
+    }
+    if (action === "edit-capitolo") {
+      editingCapitoloId = String(button.dataset.id || "");
+      openArchivioCapitoliDialog();
+      return;
+    }
+    if (action === "save-capitolo") {
+      const seqEl = capitoliArchivioDialogEl.querySelector("#archivio-capitolo-seq");
+      const nomeEl = capitoliArchivioDialogEl.querySelector("#archivio-capitolo-nome");
+      const sequenza = Number.parseInt(seqEl instanceof HTMLInputElement ? seqEl.value : "", 10);
+      const nome = nomeEl instanceof HTMLInputElement ? nomeEl.value.trim() : "";
+      if (!Number.isInteger(sequenza) || sequenza < 1) {
+        window.alert("Inserisci una sequenza valida (numero intero ≥ 1).");
+        return;
+      }
+      if (!nome) {
+        window.alert("Inserisci il nome del capitolo.");
+        return;
+      }
+      if (editingCapitoloId) {
+        archivioCapitoli = applicaSequenzaConScambio(
+          archivioCapitoli,
+          editingCapitoloId,
+          sequenza,
+        ).map((c) => (c.id === editingCapitoloId ? { ...c, nome } : c));
+        editingCapitoloId = null;
+      } else {
+        const seqOccupata = archivioCapitoli.some((c) => c.sequenza === sequenza);
+        if (seqOccupata) {
+          window.alert(
+            `La sequenza ${sequenza} è già usata. Scegli un altro numero, oppure modifica quel capitolo e cambia tu la sequenza (così i due si scambiano).`,
+          );
+          return;
+        }
+        archivioCapitoli.push({
+          id: createCapitoloId(),
+          sequenza,
+          nome,
+        });
+      }
+      saveArchivioCapitoliToStorage();
+      popolaSelectCapitoliVoce(voceCapitoloEl?.value || "");
+      openArchivioCapitoliDialog();
+      renderVoci();
+      return;
+    }
+    if (action === "delete-capitolo") {
+      const id = String(button.dataset.id || "");
+      if (!id) return;
+      const uses = countVociPerCapitolo(id);
+      if (uses > 0) {
+        const ok = window.confirm(
+          `Il capitolo è usato da ${uses} voc${uses === 1 ? "e" : "i"}. Eliminandolo, quelle voci passeranno a «Senza capitolo». Continuare?`,
+        );
+        if (!ok) return;
+        voci = voci.map((v) =>
+          String(v.capitoloId || "").trim() === id ? { ...v, capitoloId: "" } : v,
+        );
+        saveVoci();
+      }
+      archivioCapitoli = archivioCapitoli.filter((c) => c.id !== id);
+      if (editingCapitoloId === id) editingCapitoloId = null;
+      capitoliCollapsed.delete(id);
+      saveArchivioCapitoliToStorage();
+      popolaSelectCapitoliVoce("");
+      openArchivioCapitoliDialog();
+      renderVoci();
+      return;
+    }
+    if (action === "salva-template-capitoli") {
+      salvaTemplateCapitoliCorrente().catch((err) => {
+        console.error(err);
+        window.alert(`Salvataggio template non riuscito.\n${String(err?.message || err || "")}`);
+      });
+      return;
+    }
+    if (action === "carica-template-capitoli") {
+      mostraPickerTemplateCapitoli("load").catch((err) => {
+        console.error(err);
+        window.alert(`Lettura template non riuscita.\n${String(err?.message || err || "")}`);
+      });
+      return;
+    }
+    if (action === "elimina-template-capitoli") {
+      mostraPickerTemplateCapitoli("delete").catch((err) => {
+        console.error(err);
+        window.alert(`Lettura template non riuscita.\n${String(err?.message || err || "")}`);
+      });
+      return;
+    }
+    if (action === "apri-cartella-template-capitoli") {
+      openCapitoliTemplatesFolder().catch((err) => {
+        console.error(err);
+        window.alert(`Apertura cartella non riuscita.\n${String(err?.message || err || "")}`);
+      });
+      return;
+    }
+    if (action === "annulla-template-capitoli") {
+      nascondiPickerTemplateCapitoli();
+      return;
+    }
+    if (action === "conferma-template-capitoli") {
+      const select = capitoliArchivioDialogEl.querySelector("#capitoli-template-select");
+      const fileName =
+        select instanceof HTMLSelectElement ? String(select.value || "").trim() : "";
+      if (!fileName) {
+        window.alert("Seleziona un template.");
+        return;
+      }
+      if (capitoliTemplatePickerMode === "load") {
+        applicaTemplateCapitoliScelto(fileName).catch((err) => {
+          console.error(err);
+          window.alert(`Caricamento template non riuscito.\n${String(err?.message || err || "")}`);
+        });
+        return;
+      }
+      if (capitoliTemplatePickerMode === "delete") {
+        const label =
+          select instanceof HTMLSelectElement
+            ? select.options[select.selectedIndex]?.textContent || fileName
+            : fileName;
+        const ok = window.confirm(`Eliminare il template «${label}»?`);
+        if (!ok) return;
+        deleteCapitoliTemplateFile(fileName)
+          .then(() => {
+            window.alert("Template eliminato.");
+            nascondiPickerTemplateCapitoli();
+          })
+          .catch((err) => {
+            console.error(err);
+            window.alert(`Eliminazione non riuscita.\n${String(err?.message || err || "")}`);
+          });
+      }
+    }
+  });
+  document.body.appendChild(capitoliArchivioDialogEl);
+
   pianiMisuraArchivioSidebarButtonEl.id = "btn-apri-archivio-piani-misura";
   pianiMisuraArchivioSidebarButtonEl.type = "button";
   pianiMisuraArchivioSidebarButtonEl.className = "btn-action btn-secondary";
@@ -9943,6 +11530,84 @@ window.addEventListener("DOMContentLoaded", () => {
     openArchivioPianiMisuraDialog();
   });
   sidebarLeftActionsPrimariEl?.appendChild(pianiMisuraArchivioSidebarButtonEl);
+
+  capitoliArchivioSidebarButtonEl.id = "btn-apri-archivio-capitoli";
+  capitoliArchivioSidebarButtonEl.type = "button";
+  capitoliArchivioSidebarButtonEl.className = "btn-action btn-secondary";
+  capitoliArchivioSidebarButtonEl.title = "Archivio capitoli per raggruppare le voci";
+  capitoliArchivioSidebarButtonEl.textContent = "CAPITOLI";
+  capitoliArchivioSidebarButtonEl.addEventListener("click", () => {
+    editingCapitoloId = null;
+    openArchivioCapitoliDialog();
+  });
+  sidebarLeftActionsPrimariEl?.appendChild(capitoliArchivioSidebarButtonEl);
+
+  const scavoSidebarButtonEl = document.createElement("button");
+  scavoSidebarButtonEl.id = "btn-sidebar-scavo";
+  scavoSidebarButtonEl.type = "button";
+  scavoSidebarButtonEl.className = "btn-action btn-secondary";
+  scavoSidebarButtonEl.textContent = "SCAVO";
+  scavoSidebarButtonEl.title = "Scavi e volumi di terreno";
+  scavoSidebarButtonEl.addEventListener("click", () => {
+    openCompilazioneScavo();
+  });
+  sidebarLeftActionsPrimariEl?.appendChild(scavoSidebarButtonEl);
+  wireScavoUi({
+    onBack: () => {
+      syncEsterniVersoVoci();
+      renderVoci();
+      dismissScavoIfOpen();
+      apriVistaVoci();
+    },
+  });
+
+  const elevazioneSidebarButtonEl = document.createElement("button");
+  elevazioneSidebarButtonEl.id = "btn-elev-open";
+  elevazioneSidebarButtonEl.type = "button";
+  elevazioneSidebarButtonEl.className = "btn-action btn-secondary";
+  elevazioneSidebarButtonEl.textContent = "ELEVAZIONE";
+  elevazioneSidebarButtonEl.title = "Pareti in elevazione, fondazione e aperture";
+  elevazioneSidebarButtonEl.addEventListener("click", () => {
+    openVistaElevazione();
+  });
+  sidebarLeftActionsPrimariEl?.appendChild(elevazioneSidebarButtonEl);
+  wireElevazioneUi();
+
+  const perimetraliSidebarButtonEl = document.createElement("button");
+  perimetraliSidebarButtonEl.id = "btn-perim-open";
+  perimetraliSidebarButtonEl.type = "button";
+  perimetraliSidebarButtonEl.className = "btn-action btn-secondary";
+  perimetraliSidebarButtonEl.textContent = "PERIMETRALI";
+  perimetraliSidebarButtonEl.title = "Pareti perimetrali, strati e aperture";
+  perimetraliSidebarButtonEl.addEventListener("click", () => {
+    openVistaPerimetrali();
+  });
+  sidebarLeftActionsPrimariEl?.appendChild(perimetraliSidebarButtonEl);
+  wirePerimetraliUi();
+
+  const solaiInterniSidebarButtonEl = document.createElement("button");
+  solaiInterniSidebarButtonEl.id = "btn-solai-open";
+  solaiInterniSidebarButtonEl.type = "button";
+  solaiInterniSidebarButtonEl.className = "btn-action btn-secondary";
+  solaiInterniSidebarButtonEl.textContent = "SOLAI INTERNI";
+  solaiInterniSidebarButtonEl.title = "Aree solaio, sottrazioni e travi";
+  solaiInterniSidebarButtonEl.addEventListener("click", () => {
+    openVistaSolaiInterni();
+  });
+  sidebarLeftActionsPrimariEl?.appendChild(solaiInterniSidebarButtonEl);
+  wireSolaiInterniUi();
+
+  const solaiInclinatiSidebarButtonEl = document.createElement("button");
+  solaiInclinatiSidebarButtonEl.id = "btn-solai-incl-open";
+  solaiInclinatiSidebarButtonEl.type = "button";
+  solaiInclinatiSidebarButtonEl.className = "btn-action btn-secondary";
+  solaiInclinatiSidebarButtonEl.textContent = "SOLAI INCLINATI";
+  solaiInclinatiSidebarButtonEl.title = "Solai inclinati con formula falda e canale";
+  solaiInclinatiSidebarButtonEl.addEventListener("click", () => {
+    openVistaSolaiInclinati();
+  });
+  sidebarLeftActionsPrimariEl?.appendChild(solaiInclinatiSidebarButtonEl);
+  wireSolaiInclinatiUi();
 
   vaniSidebarButtonEl.id = "btn-vani-open";
   vaniSidebarButtonEl.type = "button";
@@ -10060,8 +11725,8 @@ window.addEventListener("DOMContentLoaded", () => {
   zoccoloSidebarButtonEl.id = "btn-apri-riepilogo-zoccolo";
   zoccoloSidebarButtonEl.type = "button";
   zoccoloSidebarButtonEl.className = "btn-action btn-secondary";
-  zoccoloSidebarButtonEl.textContent = "ZOCCOLO";
-  zoccoloSidebarButtonEl.title = "Pareti con zoccolo attivo nei vani registrati";
+  zoccoloSidebarButtonEl.textContent = "ZOCCOLINO";
+  zoccoloSidebarButtonEl.title = "Pareti con zoccolino attivo nei vani registrati";
   zoccoloSidebarButtonEl.addEventListener("click", () => {
     openRiepilogoZoccoloDialog();
   });
@@ -10334,6 +11999,7 @@ window.addEventListener("DOMContentLoaded", () => {
   loadPiani();
   loadMurDati();
   loadArchivioPianiMisuraFromStorage();
+  loadArchivioCapitoliFromStorage();
   loadVociUnitaOptions();
   loadDavanzaliSbordi();
   loadSoglieSbordi();
@@ -10344,11 +12010,7 @@ window.addEventListener("DOMContentLoaded", () => {
   loadVoci();
   syncArchivioPianiMisuraCompleto();
   migraApertureCollegateVociSuMaster();
-  syncVoceDavanzali();
-  syncVoceSoglie();
-  syncVoceCanali();
-  syncVoceFalsiTelaiLegno();
-  syncVoceFalsiTelaiAlluminio();
+  syncVociDerivateDaApertureMaster();
   loadIfcData();
   updateComputoDirtyIndicator();
   if (ifcDataCache?.source?.fileName && bimViewerStatusEl) {
@@ -10362,11 +12024,13 @@ window.addEventListener("DOMContentLoaded", () => {
   setAperturaFormMode();
   setScavoFormMode();
   setCorselloFormMode();
+  setScivoloFormMode();
   setCamminamentiFormMode();
   setMisurazioniFormMode();
   toggleVoceMmFieldsByTipo(VOCE_MM_TIPO_MANUALE);
   updateFormulaButtonState(scavoFormulaEl, apriFormulaScavoButtonEl);
   updateFormulaButtonState(corselloFormulaEl, apriFormulaCorselloButtonEl);
+  updateFormulaButtonState(scivoloFormulaEl, apriFormulaScivoloButtonEl);
   updateFormulaButtonState(misurazioniFormulaEl, apriFormulaMisurazioniButtonEl);
   apFalsotelaiEl.value = "no";
   mostraPannelloCompilazione("interrato");
@@ -10388,6 +12052,7 @@ window.addEventListener("DOMContentLoaded", () => {
   renderAperture();
   renderScavi();
   renderCorselli();
+  renderScivoli();
   renderCamminamenti();
   renderMisurazioniVarie();
   syncEsterniVersoVoci();
@@ -10424,6 +12089,12 @@ window.addEventListener("DOMContentLoaded", () => {
       if (draft.tipoMisura != null && voceTipoMisuraEl) voceTipoMisuraEl.value = draft.tipoMisura;
       if (draft.testo != null) voceTestoEl.value = draft.testo;
       if (draft.note != null) voceNoteEl.value = draft.note;
+      const voceCorrente =
+        editingVoceId !== null ? voci.find((item) => item.idVoce === editingVoceId) : null;
+      const campiLimitati =
+        draft.editingVoceCampiLimitati === true ||
+        (voceCorrente != null && voceBloccataInVoci(voceCorrente));
+      setVoceDialogModalitaSoloUnitaMisura(campiLimitati);
     }
     voceDialogEl.showModal();
     const focusTesto = draft && draft.focusVoceTesto === true;

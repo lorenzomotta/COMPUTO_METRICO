@@ -1,9 +1,17 @@
 import { dismissCamminamentiIfOpen } from "../camminamenti-misurazione.js";
 import { dismissVaniIfOpen } from "../vani-misurazione.js";
+import { dismissPerimetraliIfOpen } from "../perimetrali-misurazione.js";
+import { dismissElevazioneIfOpen } from "../elevazione-misurazione.js";
+import { dismissSolaiInterniIfOpen } from "../solai-interni-misurazione.js";
+import { dismissSolaiInclinatiIfOpen } from "../solai-inclinati-misurazione.js";
 
 function dismissOverlayMisurazioni() {
   dismissVaniIfOpen();
   dismissCamminamentiIfOpen();
+  dismissPerimetraliIfOpen();
+  dismissElevazioneIfOpen();
+  dismissSolaiInterniIfOpen();
+  dismissSolaiInclinatiIfOpen();
 }
 
 export function updateInterratoPanelSubtitle(targetEl, piano) {

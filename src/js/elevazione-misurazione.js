@@ -1,8 +1,8 @@
 /**
- * Misurazione CAMMINAMENTI — UI fullscreen.
+ * Misurazione speciale ELEVAZIONE — UI fullscreen (pareti ELEVAZIONE + aperture).
  */
 
-import { initCamminamentiUi, prepareVistaCamminamenti } from "./camminamenti-riferimenti.js";
+import { initElevazioneParetiUi, prepareVistaElevazionePareti } from "./elevazione-pareti.js";
 
 const MAIN_VIEW_IDS = [
   "vista-piani",
@@ -14,20 +14,29 @@ const MAIN_VIEW_IDS = [
   "vista-bim",
 ];
 
-function hideOverlay() {
-  const shell = document.getElementById("vista-camminamenti");
+function setElevHelpInlineOpen(open) {
+  const panel = document.getElementById("elev-help-inline");
+  const btn = document.getElementById("btn-elev-help-toggle");
+  if (panel) panel.hidden = !open;
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function hideVistaElevazioneOverlay() {
+  const shell = document.getElementById("vista-elevazione");
   if (shell) shell.hidden = true;
-  document.body.classList.remove("camm-fullscreen-active");
+  setElevHelpInlineOpen(false);
+  document.body.classList.remove("elev-fullscreen-active");
   document.body.style.overflow = "";
 }
 
-export function dismissCamminamentiIfOpen() {
-  const shell = document.getElementById("vista-camminamenti");
+/** Chiude solo l’overlay se è aperto, senza cambiare le altre viste. */
+export function dismissElevazioneIfOpen() {
+  const shell = document.getElementById("vista-elevazione");
   if (!shell || shell.hidden) return;
-  hideOverlay();
+  hideVistaElevazioneOverlay();
 }
 
-export function openVistaCamminamenti() {
+export function openVistaElevazione() {
   const vaniShell = document.getElementById("vista-vani");
   if (vaniShell) {
     vaniShell.hidden = true;
@@ -38,10 +47,10 @@ export function openVistaCamminamenti() {
     perimShell.hidden = true;
     document.body.classList.remove("perim-fullscreen-active");
   }
-  const elevShell = document.getElementById("vista-elevazione");
-  if (elevShell) {
-    elevShell.hidden = true;
-    document.body.classList.remove("elev-fullscreen-active");
+  const cammShell = document.getElementById("vista-camminamenti");
+  if (cammShell) {
+    cammShell.hidden = true;
+    document.body.classList.remove("camm-fullscreen-active");
   }
   const solaiShell = document.getElementById("vista-solai-interni");
   if (solaiShell) {
@@ -57,21 +66,21 @@ export function openVistaCamminamenti() {
     const el = document.getElementById(id);
     if (el) el.hidden = true;
   }
-  const shell = document.getElementById("vista-camminamenti");
+  const shell = document.getElementById("vista-elevazione");
   if (shell) shell.hidden = false;
-  document.body.classList.add("camm-fullscreen-active");
+  document.body.classList.add("elev-fullscreen-active");
   document.body.style.overflow = "hidden";
-  prepareVistaCamminamenti();
+  prepareVistaElevazionePareti();
   window.requestAnimationFrame(() => {
-    document.querySelector("#vista-camminamenti .camm-piano-nome")?.focus();
+    document.querySelector("#vista-elevazione .elev-piano-nome")?.focus();
   });
 }
 
-export function closeVistaCamminamenti() {
-  hideOverlay();
-  const vistaVoci = document.getElementById("vista-voci");
+export function closeVistaElevazione() {
+  hideVistaElevazioneOverlay();
   const vistaPiani = document.getElementById("vista-piani");
   const vistaCompilazione = document.getElementById("vista-compilazione");
+  const vistaVoci = document.getElementById("vista-voci");
   const vistaBim = document.getElementById("vista-bim");
   const altre = document.getElementById("compilazione-altre-tipologie");
   if (vistaPiani) vistaPiani.hidden = true;
@@ -82,18 +91,24 @@ export function closeVistaCamminamenti() {
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
-export function wireCamminamentiUi() {
-  initCamminamentiUi();
+export function wireElevazioneUi() {
+  initElevazioneParetiUi();
 
-  document.getElementById("btn-camm-chiudi")?.addEventListener("click", () => {
-    closeVistaCamminamenti();
+  document.getElementById("btn-elev-help-toggle")?.addEventListener("click", () => {
+    const panel = document.getElementById("elev-help-inline");
+    const next = panel ? panel.hidden : false;
+    setElevHelpInlineOpen(next);
+  });
+
+  document.getElementById("btn-elev-chiudi")?.addEventListener("click", () => {
+    closeVistaElevazione();
   });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    const shell = document.getElementById("vista-camminamenti");
+    const shell = document.getElementById("vista-elevazione");
     if (!shell || shell.hidden) return;
     e.preventDefault();
-    closeVistaCamminamenti();
+    closeVistaElevazione();
   });
 }

@@ -1,8 +1,8 @@
 /**
- * Misurazione CAMMINAMENTI — UI fullscreen.
+ * Misurazione speciale SOLAI INTERNI — UI fullscreen.
  */
 
-import { initCamminamentiUi, prepareVistaCamminamenti } from "./camminamenti-riferimenti.js";
+import { initSolaiInterniUi, prepareVistaSolaiInterni } from "./solai-interni.js";
 
 const MAIN_VIEW_IDS = [
   "vista-piani",
@@ -14,20 +14,29 @@ const MAIN_VIEW_IDS = [
   "vista-bim",
 ];
 
-function hideOverlay() {
-  const shell = document.getElementById("vista-camminamenti");
+function setSolaiHelpInlineOpen(open) {
+  const panel = document.getElementById("solai-help-inline");
+  const btn = document.getElementById("btn-solai-help-toggle");
+  if (panel) panel.hidden = !open;
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function hideVistaSolaiInterniOverlay() {
+  const shell = document.getElementById("vista-solai-interni");
   if (shell) shell.hidden = true;
-  document.body.classList.remove("camm-fullscreen-active");
+  setSolaiHelpInlineOpen(false);
+  document.body.classList.remove("solai-fullscreen-active");
   document.body.style.overflow = "";
 }
 
-export function dismissCamminamentiIfOpen() {
-  const shell = document.getElementById("vista-camminamenti");
+/** Chiude solo l’overlay se è aperto, senza cambiare le altre viste. */
+export function dismissSolaiInterniIfOpen() {
+  const shell = document.getElementById("vista-solai-interni");
   if (!shell || shell.hidden) return;
-  hideOverlay();
+  hideVistaSolaiInterniOverlay();
 }
 
-export function openVistaCamminamenti() {
+export function openVistaSolaiInterni() {
   const vaniShell = document.getElementById("vista-vani");
   if (vaniShell) {
     vaniShell.hidden = true;
@@ -43,10 +52,10 @@ export function openVistaCamminamenti() {
     elevShell.hidden = true;
     document.body.classList.remove("elev-fullscreen-active");
   }
-  const solaiShell = document.getElementById("vista-solai-interni");
-  if (solaiShell) {
-    solaiShell.hidden = true;
-    document.body.classList.remove("solai-fullscreen-active");
+  const cammShell = document.getElementById("vista-camminamenti");
+  if (cammShell) {
+    cammShell.hidden = true;
+    document.body.classList.remove("camm-fullscreen-active");
   }
   const solaiInclShell = document.getElementById("vista-solai-inclinati");
   if (solaiInclShell) {
@@ -57,21 +66,21 @@ export function openVistaCamminamenti() {
     const el = document.getElementById(id);
     if (el) el.hidden = true;
   }
-  const shell = document.getElementById("vista-camminamenti");
+  const shell = document.getElementById("vista-solai-interni");
   if (shell) shell.hidden = false;
-  document.body.classList.add("camm-fullscreen-active");
+  document.body.classList.add("solai-fullscreen-active");
   document.body.style.overflow = "hidden";
-  prepareVistaCamminamenti();
+  prepareVistaSolaiInterni();
   window.requestAnimationFrame(() => {
-    document.querySelector("#vista-camminamenti .camm-piano-nome")?.focus();
+    document.querySelector("#vista-solai-interni .solai-piano-nome")?.focus();
   });
 }
 
-export function closeVistaCamminamenti() {
-  hideOverlay();
-  const vistaVoci = document.getElementById("vista-voci");
+export function closeVistaSolaiInterni() {
+  hideVistaSolaiInterniOverlay();
   const vistaPiani = document.getElementById("vista-piani");
   const vistaCompilazione = document.getElementById("vista-compilazione");
+  const vistaVoci = document.getElementById("vista-voci");
   const vistaBim = document.getElementById("vista-bim");
   const altre = document.getElementById("compilazione-altre-tipologie");
   if (vistaPiani) vistaPiani.hidden = true;
@@ -82,18 +91,24 @@ export function closeVistaCamminamenti() {
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
-export function wireCamminamentiUi() {
-  initCamminamentiUi();
+export function wireSolaiInterniUi() {
+  initSolaiInterniUi();
 
-  document.getElementById("btn-camm-chiudi")?.addEventListener("click", () => {
-    closeVistaCamminamenti();
+  document.getElementById("btn-solai-help-toggle")?.addEventListener("click", () => {
+    const panel = document.getElementById("solai-help-inline");
+    const next = panel ? panel.hidden : false;
+    setSolaiHelpInlineOpen(next);
+  });
+
+  document.getElementById("btn-solai-chiudi")?.addEventListener("click", () => {
+    closeVistaSolaiInterni();
   });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    const shell = document.getElementById("vista-camminamenti");
+    const shell = document.getElementById("vista-solai-interni");
     if (!shell || shell.hidden) return;
     e.preventDefault();
-    closeVistaCamminamenti();
+    closeVistaSolaiInterni();
   });
 }

@@ -1,8 +1,8 @@
 /**
- * Misurazione speciale VANI — UI fullscreen (vano + pareti + aperture archivio).
+ * Misurazione speciale SOLAI INCLINATI — UI fullscreen.
  */
 
-import { initVaniParetiUi, prepareVistaVaniPareti } from "./vani-pareti.js";
+import { initSolaiInclinatiUi, prepareVistaSolaiInclinati } from "./solai-inclinati.js";
 
 const MAIN_VIEW_IDS = [
   "vista-piani",
@@ -14,29 +14,34 @@ const MAIN_VIEW_IDS = [
   "vista-bim",
 ];
 
-function setVaniHelpInlineOpen(open) {
-  const panel = document.getElementById("vani-help-inline");
-  const btn = document.getElementById("btn-vani-help-toggle");
+function setSolaiInclHelpInlineOpen(open) {
+  const panel = document.getElementById("solai-incl-help-inline");
+  const btn = document.getElementById("btn-solai-incl-help-toggle");
   if (panel) panel.hidden = !open;
   if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
-function hideVistaVaniOverlay() {
-  const shell = document.getElementById("vista-vani");
+function hideVistaSolaiInclinatiOverlay() {
+  const shell = document.getElementById("vista-solai-inclinati");
   if (shell) shell.hidden = true;
-  setVaniHelpInlineOpen(false);
-  document.body.classList.remove("vani-fullscreen-active");
+  setSolaiInclHelpInlineOpen(false);
+  document.body.classList.remove("solai-incl-fullscreen-active");
   document.body.style.overflow = "";
 }
 
-/** Chiude solo l’overlay se è aperto, senza cambiare le altre viste (es. passaggio a Piani o Compilazione). */
-export function dismissVaniIfOpen() {
-  const shell = document.getElementById("vista-vani");
+/** Chiude solo l’overlay se è aperto, senza cambiare le altre viste. */
+export function dismissSolaiInclinatiIfOpen() {
+  const shell = document.getElementById("vista-solai-inclinati");
   if (!shell || shell.hidden) return;
-  hideVistaVaniOverlay();
+  hideVistaSolaiInclinatiOverlay();
 }
 
-export function openVistaVani() {
+export function openVistaSolaiInclinati() {
+  const vaniShell = document.getElementById("vista-vani");
+  if (vaniShell) {
+    vaniShell.hidden = true;
+    document.body.classList.remove("vani-fullscreen-active");
+  }
   const perimShell = document.getElementById("vista-perimetrali");
   if (perimShell) {
     perimShell.hidden = true;
@@ -52,33 +57,27 @@ export function openVistaVani() {
     cammShell.hidden = true;
     document.body.classList.remove("camm-fullscreen-active");
   }
-  const solaiShell = document.getElementById("vista-solai-interni");
-  if (solaiShell) {
-    solaiShell.hidden = true;
+  const solaiIntShell = document.getElementById("vista-solai-interni");
+  if (solaiIntShell) {
+    solaiIntShell.hidden = true;
     document.body.classList.remove("solai-fullscreen-active");
-  }
-  const solaiInclShell = document.getElementById("vista-solai-inclinati");
-  if (solaiInclShell) {
-    solaiInclShell.hidden = true;
-    document.body.classList.remove("solai-incl-fullscreen-active");
   }
   for (const id of MAIN_VIEW_IDS) {
     const el = document.getElementById(id);
     if (el) el.hidden = true;
   }
-  const shell = document.getElementById("vista-vani");
+  const shell = document.getElementById("vista-solai-inclinati");
   if (shell) shell.hidden = false;
-  document.body.classList.add("vani-fullscreen-active");
+  document.body.classList.add("solai-incl-fullscreen-active");
   document.body.style.overflow = "hidden";
-  prepareVistaVaniPareti();
+  prepareVistaSolaiInclinati();
   window.requestAnimationFrame(() => {
-    document.querySelector("#vista-vani .vani-piano-nome")?.focus();
+    document.querySelector("#vista-solai-inclinati .solai-incl-piano-nome")?.focus();
   });
 }
 
-/** Chiude VANI e torna alla vista predefinita dell’app (solo VOCI), come all’avvio. */
-export function closeVistaVani() {
-  hideVistaVaniOverlay();
+export function closeVistaSolaiInclinati() {
+  hideVistaSolaiInclinatiOverlay();
   const vistaPiani = document.getElementById("vista-piani");
   const vistaCompilazione = document.getElementById("vista-compilazione");
   const vistaVoci = document.getElementById("vista-voci");
@@ -92,24 +91,24 @@ export function closeVistaVani() {
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
-export function wireVaniUi() {
-  initVaniParetiUi();
+export function wireSolaiInclinatiUi() {
+  initSolaiInclinatiUi();
 
-  document.getElementById("btn-vani-help-toggle")?.addEventListener("click", () => {
-    const panel = document.getElementById("vani-help-inline");
+  document.getElementById("btn-solai-incl-help-toggle")?.addEventListener("click", () => {
+    const panel = document.getElementById("solai-incl-help-inline");
     const next = panel ? panel.hidden : false;
-    setVaniHelpInlineOpen(next);
+    setSolaiInclHelpInlineOpen(next);
   });
 
-  document.getElementById("btn-vani-chiudi")?.addEventListener("click", () => {
-    closeVistaVani();
+  document.getElementById("btn-solai-incl-chiudi")?.addEventListener("click", () => {
+    closeVistaSolaiInclinati();
   });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    const shell = document.getElementById("vista-vani");
+    const shell = document.getElementById("vista-solai-inclinati");
     if (!shell || shell.hidden) return;
     e.preventDefault();
-    closeVistaVani();
+    closeVistaSolaiInclinati();
   });
 }

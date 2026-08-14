@@ -2,10 +2,11 @@
  * Dopo «REGISTRA VANO»:
  * - se una «voce breve» di strato non esiste ancora in VOCI, crea la voce (MANUALE, mq.);
  * - per le voci il cui `voceAbbreviata` coincide: aggiunge righe `misurazioniManuali`
- *   SEMIAUTOMATICA (PARETE, M1/M2 dalla parete) con `apertureCollegate` dagli id scelti in VANI.
+ *   SEMIAUTOMATICA (PARETE / PAVIMENTO / SOFFITTO) collegate al vano.
  */
 
 import { STORAGE_VOCI_ARCHIVIO_KEY } from "./archivioVociVocibrevi.js";
+import { SUPERFICIE_LABELS, TIPI_SUPERFICIE_VANO } from "./vaniSuperficiLocale.js";
 
 /** Stesso valore usato in `main.js` per le righe semiautomatiche. */
 const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
@@ -13,6 +14,8 @@ const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
 const TIPOMISURA_VOCE_MANUALE = "MANUALE";
 /** Unità tipica superfici parete; l’utente può cambiarla dopo in VOCI. */
 const UNITA_MISURA_DEFAULT_VANI = "mq.";
+
+const TIPI_OGGETTO_VANI = new Set(["PARETE", "PAVIMENTO", "SOFFITTO"]);
 
 function abbrevKey(s) {
   return String(s ?? "")
@@ -52,11 +55,11 @@ function buildApertureCollegateRefsFromParete(parete) {
     .map((id) => ({ idAperturaMaster: id }));
 }
 
-function isRigaSemiautoParete(row) {
+function isRigaSemiautoVani(row) {
   if (!row || typeof row !== "object") return false;
   const tipo = String(row.tipo ?? "").trim().toUpperCase();
   const tipoOggetto = String(row.tipoOggetto ?? "").trim().toUpperCase();
-  return tipo === VOCE_MM_TIPO_SEMIAUTOMATICA && tipoOggetto === "PARETE";
+  return tipo === VOCE_MM_TIPO_SEMIAUTOMATICA && TIPI_OGGETTO_VANI.has(tipoOggetto);
 }
 
 /**
@@ -106,14 +109,89 @@ function iterSnapshotLocali(snapshot) {
     return snapshot.locali.map((blocco) => ({
       nomeLocale: typeof blocco.nomeLocale === "string" ? blocco.nomeLocale : "",
       pareti: Array.isArray(blocco.pareti) ? blocco.pareti : [],
+      pavimento: blocco.pavimento && typeof blocco.pavimento === "object" ? blocco.pavimento : null,
+      soffitto: blocco.soffitto && typeof blocco.soffitto === "object" ? blocco.soffitto : null,
     }));
   }
   return [
     {
       nomeLocale: typeof snapshot.nomeLocale === "string" ? snapshot.nomeLocale : "",
       pareti: Array.isArray(snapshot.pareti) ? snapshot.pareti : [],
+      pavimento: snapshot.pavimento && typeof snapshot.pavimento === "object" ? snapshot.pavimento : null,
+      soffitto: snapshot.soffitto && typeof snapshot.soffitto === "object" ? snapshot.soffitto : null,
     },
   ];
+}
+
+/**
+ * @param {{ pianoNome: string, nomeLocale: string, tipo: 'pavimento'|'soffitto', area: object, strato: object, vaniVanoId: string, unitaMisura?: string }} opts
+ */
+function creaRigaMisurazioneSemiautomaticaSuperficie({
+  pianoNome,
+  nomeLocale,
+  tipo,
+  area,
+  strato,
+  vaniVanoId,
+}) {
+  const piano = typeof pianoNome === "string" ? pianoNome : "";
+  const locale = typeof nomeLocale === "string" ? nomeLocale.trim() : "";
+  const label = SUPERFICIE_LABELS[tipo] || tipo;
+  const rifArea = typeof area?.riferimento === "string" ? area.riferimento.trim() : "";
+  const riferimento = [label, locale, rifArea].filter(Boolean).join(" · ");
+  const nStrato =
+    typeof strato?.n === "number" && Number.isFinite(strato.n) ? String(strato.n) : "";
+  const nArea = typeof area?.n === "number" && Number.isFinite(area.n) ? String(area.n) : "";
+  const specificaParts = [];
+  if (nArea) specificaParts.push(`Area ${nArea}`);
+  if (nStrato) specificaParts.push(`Strato ${nStrato}`);
+  const specifica = specificaParts.join(" · ") || label;
+  const misura1 = parseNonNegativeDecimal3OrNull(area?.lato1);
+  const misura2 = parseNonNegativeDecimal3OrNull(area?.lato2);
+  // Spessore vuoto → in voce si usa l’area (mq); spessore compilato → volume (mc).
+  const spessoreTxt = String(strato?.spessore ?? "").trim();
+  const misura3 = spessoreTxt === "" ? null : parseNonNegativeDecimal3OrNull(spessoreTxt);
+  const segno = area?.segno === true;
+  const numero = 1;
+  const m1 = typeof misura1 === "number" && Number.isFinite(misura1) ? misura1 : 0;
+  const m2 = typeof misura2 === "number" && Number.isFinite(misura2) ? misura2 : 0;
+  const raw =
+    misura3 != null
+      ? Number((m1 * m2 * misura3 * numero).toFixed(3))
+      : Number((m1 * m2 * numero).toFixed(3));
+  const risultato = segno ? -Math.abs(raw) : raw;
+  const vid = typeof vaniVanoId === "string" ? vaniVanoId.trim() : "";
+  return {
+    tipo: VOCE_MM_TIPO_SEMIAUTOMATICA,
+    piano,
+    riferimento,
+    tipoOggetto: String(tipo).toUpperCase(),
+    specifica,
+    formula: "",
+    formulaValue: null,
+    misura1,
+    misura2,
+    misura3,
+    canaleGronda: false,
+    grondaCanaleValore: null,
+    numero,
+    segno,
+    risultato,
+    apertureCollegate: [],
+    vaniVanoId: vid,
+    stratoNumero: typeof strato?.n === "number" ? strato.n : null,
+    areaNumero: typeof area?.n === "number" ? area.n : null,
+  };
+}
+
+function raccogliAbbrevDaSuperficie(superficie, abbrevsConStrato) {
+  const strat = Array.isArray(superficie?.strati) ? superficie.strati : [];
+  for (const st of strat) {
+    const vb = typeof st?.vocibreve === "string" ? st.vocibreve.trim() : "";
+    if (!vb) continue;
+    const key = abbrevKey(vb);
+    if (!abbrevsConStrato.has(key)) abbrevsConStrato.set(key, vb);
+  }
 }
 
 /**
@@ -159,6 +237,9 @@ export function aggiornaNoteVociDaSnapshotVanoRegistrato(snapshot) {
         const key = abbrevKey(vb);
         if (!abbrevsConStrato.has(key)) abbrevsConStrato.set(key, vb);
       }
+    }
+    for (const tipo of TIPI_SUPERFICIE_VANO) {
+      raccogliAbbrevDaSuperficie(blocco[tipo], abbrevsConStrato);
     }
   }
 
@@ -235,6 +316,7 @@ export function aggiornaNoteVociDaSnapshotVanoRegistrato(snapshot) {
           const vb = typeof st?.vocibreve === "string" ? st.vocibreve : "";
           if (abbrevKey(vb) !== abbrevKey(ab)) return;
           const dedupeKey = [
+            "parete",
             abbrevKey(rif),
             abbrevKey(pianoNome),
             abbrevKey(nomeLocaleBlocco),
@@ -253,11 +335,44 @@ export function aggiornaNoteVociDaSnapshotVanoRegistrato(snapshot) {
           );
         });
       }
+      for (const tipo of TIPI_SUPERFICIE_VANO) {
+        const superficie = blocco[tipo];
+        const aree = Array.isArray(superficie?.aree) ? superficie.aree : [];
+        const strat = Array.isArray(superficie?.strati) ? superficie.strati : [];
+        // Ogni strato riceve tutte le aree (somma con segni ±).
+        strat.forEach((st, stIdx) => {
+          const vb = typeof st?.vocibreve === "string" ? st.vocibreve : "";
+          if (abbrevKey(vb) !== abbrevKey(ab)) return;
+          aree.forEach((area, areaIdx) => {
+            const dedupeKey = [
+              tipo,
+              abbrevKey(pianoNome),
+              abbrevKey(nomeLocaleBlocco),
+              String(area?.id ?? ""),
+              String(areaIdx),
+              String(st?.id ?? ""),
+              String(stIdx),
+            ].join("|");
+            if (seenMm.has(dedupeKey)) return;
+            seenMm.add(dedupeKey);
+            nuoveRigheMm.push(
+              creaRigaMisurazioneSemiautomaticaSuperficie({
+                pianoNome,
+                nomeLocale: nomeLocaleBlocco,
+                tipo,
+                area,
+                strato: st,
+                vaniVanoId: vanoId,
+              }),
+            );
+          });
+        });
+      }
     }
 
     const mmCorrenti = Array.isArray(item.misurazioniManuali) ? item.misurazioniManuali : [];
     const mmSenzaQuestoVano = mmCorrenti.filter((old) => {
-      if (!isRigaSemiautoParete(old)) return true;
+      if (!isRigaSemiautoVani(old)) return true;
       if (!vanoId) return true;
       const oldVid = typeof old.vaniVanoId === "string" ? old.vaniVanoId.trim() : "";
       return oldVid !== vanoId;
@@ -281,7 +396,7 @@ export function aggiornaNoteVociDaSnapshotVanoRegistrato(snapshot) {
 
 /**
  * Quando un vano viene eliminato dall’elenco VANI, rimuove le righe `misurazioniManuali`
- * semiautomatiche PARETE con `vaniVanoId` uguale a quell’id (stesso storage delle voci).
+ * semiautomatiche PARETE/PAVIMENTO/SOFFITTO con `vaniVanoId` uguale a quell’id.
  * @param {string} vanoId
  */
 export function rimuoviRigheMisurazioniPerVanoId(vanoId) {
@@ -309,7 +424,7 @@ export function rimuoviRigheMisurazioniPerVanoId(vanoId) {
     if (item == null || typeof item !== "object") continue;
     const mm = Array.isArray(item.misurazioniManuali) ? item.misurazioniManuali : [];
     const filtered = mm.filter((row) => {
-      if (!isRigaSemiautoParete(row)) return true;
+      if (!isRigaSemiautoVani(row)) return true;
       const oldVid = typeof row.vaniVanoId === "string" ? row.vaniVanoId.trim() : "";
       return oldVid !== vid;
     });

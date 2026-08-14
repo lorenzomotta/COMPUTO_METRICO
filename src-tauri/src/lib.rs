@@ -143,6 +143,165 @@ fn sanitize_file_name(input: &str) -> String {
     }
 }
 
+/// Nome file template: lettere/numeri/spazi → underscore, senza path traversal.
+fn sanitize_template_stem(input: &str) -> String {
+    let trimmed = input.trim();
+    let mut out = String::with_capacity(trimmed.len());
+    for c in trimmed.chars() {
+        if c.is_alphanumeric() || c == '-' || c == '_' {
+            out.push(c);
+        } else if c.is_whitespace() {
+            if !out.ends_with('_') {
+                out.push('_');
+            }
+        }
+    }
+    let out = out.trim_matches('_').to_string();
+    if out.is_empty() {
+        "template_capitoli".to_string()
+    } else {
+        out.chars().take(80).collect()
+    }
+}
+
+fn capitoli_templates_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let mut dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Cartella dati app non disponibile: {}", e))?;
+    dir.push("templates");
+    dir.push("capitoli");
+    fs::create_dir_all(&dir).map_err(|e| format!("Errore creazione cartella template: {}", e))?;
+    Ok(dir)
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CapitoliTemplateInfo {
+    file_name: String,
+    nome: String,
+}
+
+#[tauri::command]
+fn get_capitoli_templates_dir(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(capitoli_templates_dir(&app)?.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn list_capitoli_templates(app: tauri::AppHandle) -> Result<Vec<CapitoliTemplateInfo>, String> {
+    let dir = capitoli_templates_dir(&app)?;
+    let mut out: Vec<CapitoliTemplateInfo> = Vec::new();
+    let entries = fs::read_dir(&dir).map_err(|e| format!("Errore lettura cartella template: {}", e))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        if file_name.is_empty() {
+            continue;
+        }
+        let mut nome = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&file_name)
+            .replace('_', " ");
+        if let Ok(raw) = fs::read_to_string(&path) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw) {
+                if let Some(n) = val.get("nome").and_then(|v| v.as_str()) {
+                    let t = n.trim();
+                    if !t.is_empty() {
+                        nome = t.to_string();
+                    }
+                }
+            }
+        }
+        out.push(CapitoliTemplateInfo { file_name, nome });
+    }
+    out.sort_by(|a, b| {
+        a.nome
+            .to_lowercase()
+            .cmp(&b.nome.to_lowercase())
+            .then_with(|| a.file_name.cmp(&b.file_name))
+    });
+    Ok(out)
+}
+
+#[tauri::command]
+fn save_capitoli_template(
+    app: tauri::AppHandle,
+    nome: String,
+    content: String,
+    overwrite: bool,
+) -> Result<String, String> {
+    let nome_trim = nome.trim();
+    if nome_trim.is_empty() {
+        return Err("Inserisci un nome per il template.".into());
+    }
+    let stem = sanitize_template_stem(nome_trim);
+    let file_name = format!("{}.json", stem);
+    let mut path = capitoli_templates_dir(&app)?;
+    path.push(&file_name);
+    if path.exists() && !overwrite {
+        return Err(format!("EXISTS:{}", file_name));
+    }
+    fs::write(&path, content).map_err(|e| format!("Errore salvataggio template: {}", e))?;
+    Ok(file_name)
+}
+
+fn safe_template_file_name(input: &str) -> Result<String, String> {
+    let name = input.trim();
+    if name.is_empty()
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains("..")
+        || !name.ends_with(".json")
+    {
+        return Err("Nome file template non valido.".into());
+    }
+    // Solo il nome file, niente path.
+    if std::path::Path::new(name)
+        .file_name()
+        .and_then(|s| s.to_str())
+        != Some(name)
+    {
+        return Err("Nome file template non valido.".into());
+    }
+    Ok(name.to_string())
+}
+
+#[tauri::command]
+fn load_capitoli_template(app: tauri::AppHandle, file_name: String) -> Result<String, String> {
+    let safe = safe_template_file_name(&file_name)?;
+    let mut path = capitoli_templates_dir(&app)?;
+    path.push(&safe);
+    if !path.is_file() {
+        return Err("Template non trovato.".into());
+    }
+    fs::read_to_string(&path).map_err(|e| format!("Errore lettura template: {}", e))
+}
+
+#[tauri::command]
+fn delete_capitoli_template(app: tauri::AppHandle, file_name: String) -> Result<(), String> {
+    let safe = safe_template_file_name(&file_name)?;
+    let mut path = capitoli_templates_dir(&app)?;
+    path.push(&safe);
+    if !path.is_file() {
+        return Err("Template non trovato.".into());
+    }
+    fs::remove_file(&path).map_err(|e| format!("Errore eliminazione template: {}", e))
+}
+
+#[tauri::command]
+fn open_capitoli_templates_dir(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = capitoli_templates_dir(&app)?;
+    open_file_with_system(dir.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[allow(unused_mut)]
@@ -174,7 +333,13 @@ pub fn run() {
             exit_app,
             get_app_version,
             check_app_update,
-            install_app_update
+            install_app_update,
+            get_capitoli_templates_dir,
+            list_capitoli_templates,
+            save_capitoli_template,
+            load_capitoli_template,
+            delete_capitoli_template,
+            open_capitoli_templates_dir
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

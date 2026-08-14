@@ -1,8 +1,8 @@
 /**
- * Misurazione speciale VANI — UI fullscreen (vano + pareti + aperture archivio).
+ * Misurazione speciale PERIMETRALI — UI fullscreen (pareti perimetrali + aperture).
  */
 
-import { initVaniParetiUi, prepareVistaVaniPareti } from "./vani-pareti.js";
+import { initPerimetraliParetiUi, prepareVistaPerimetraliPareti } from "./perimetrali-pareti.js";
 
 const MAIN_VIEW_IDS = [
   "vista-piani",
@@ -10,42 +10,38 @@ const MAIN_VIEW_IDS = [
   "compilazione-altre-tipologie",
   "compilazione-scavo",
   "compilazione-misure-varie",
+  "vista-elevazione",
   "vista-voci",
   "vista-bim",
 ];
 
-function setVaniHelpInlineOpen(open) {
-  const panel = document.getElementById("vani-help-inline");
-  const btn = document.getElementById("btn-vani-help-toggle");
+function setPerimHelpInlineOpen(open) {
+  const panel = document.getElementById("perim-help-inline");
+  const btn = document.getElementById("btn-perim-help-toggle");
   if (panel) panel.hidden = !open;
   if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
-function hideVistaVaniOverlay() {
-  const shell = document.getElementById("vista-vani");
+function hideVistaPerimetraliOverlay() {
+  const shell = document.getElementById("vista-perimetrali");
   if (shell) shell.hidden = true;
-  setVaniHelpInlineOpen(false);
-  document.body.classList.remove("vani-fullscreen-active");
+  setPerimHelpInlineOpen(false);
+  document.body.classList.remove("perim-fullscreen-active");
   document.body.style.overflow = "";
 }
 
-/** Chiude solo l’overlay se è aperto, senza cambiare le altre viste (es. passaggio a Piani o Compilazione). */
-export function dismissVaniIfOpen() {
-  const shell = document.getElementById("vista-vani");
+/** Chiude solo l’overlay se è aperto, senza cambiare le altre viste. */
+export function dismissPerimetraliIfOpen() {
+  const shell = document.getElementById("vista-perimetrali");
   if (!shell || shell.hidden) return;
-  hideVistaVaniOverlay();
+  hideVistaPerimetraliOverlay();
 }
 
-export function openVistaVani() {
-  const perimShell = document.getElementById("vista-perimetrali");
-  if (perimShell) {
-    perimShell.hidden = true;
-    document.body.classList.remove("perim-fullscreen-active");
-  }
-  const elevShell = document.getElementById("vista-elevazione");
-  if (elevShell) {
-    elevShell.hidden = true;
-    document.body.classList.remove("elev-fullscreen-active");
+export function openVistaPerimetrali() {
+  const vaniShell = document.getElementById("vista-vani");
+  if (vaniShell) {
+    vaniShell.hidden = true;
+    document.body.classList.remove("vani-fullscreen-active");
   }
   const cammShell = document.getElementById("vista-camminamenti");
   if (cammShell) {
@@ -66,19 +62,18 @@ export function openVistaVani() {
     const el = document.getElementById(id);
     if (el) el.hidden = true;
   }
-  const shell = document.getElementById("vista-vani");
+  const shell = document.getElementById("vista-perimetrali");
   if (shell) shell.hidden = false;
-  document.body.classList.add("vani-fullscreen-active");
+  document.body.classList.add("perim-fullscreen-active");
   document.body.style.overflow = "hidden";
-  prepareVistaVaniPareti();
+  prepareVistaPerimetraliPareti();
   window.requestAnimationFrame(() => {
-    document.querySelector("#vista-vani .vani-piano-nome")?.focus();
+    document.querySelector("#vista-perimetrali .perim-piano-nome")?.focus();
   });
 }
 
-/** Chiude VANI e torna alla vista predefinita dell’app (solo VOCI), come all’avvio. */
-export function closeVistaVani() {
-  hideVistaVaniOverlay();
+export function closeVistaPerimetrali() {
+  hideVistaPerimetraliOverlay();
   const vistaPiani = document.getElementById("vista-piani");
   const vistaCompilazione = document.getElementById("vista-compilazione");
   const vistaVoci = document.getElementById("vista-voci");
@@ -92,24 +87,24 @@ export function closeVistaVani() {
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
-export function wireVaniUi() {
-  initVaniParetiUi();
+export function wirePerimetraliUi() {
+  initPerimetraliParetiUi();
 
-  document.getElementById("btn-vani-help-toggle")?.addEventListener("click", () => {
-    const panel = document.getElementById("vani-help-inline");
+  document.getElementById("btn-perim-help-toggle")?.addEventListener("click", () => {
+    const panel = document.getElementById("perim-help-inline");
     const next = panel ? panel.hidden : false;
-    setVaniHelpInlineOpen(next);
+    setPerimHelpInlineOpen(next);
   });
 
-  document.getElementById("btn-vani-chiudi")?.addEventListener("click", () => {
-    closeVistaVani();
+  document.getElementById("btn-perim-chiudi")?.addEventListener("click", () => {
+    closeVistaPerimetrali();
   });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    const shell = document.getElementById("vista-vani");
+    const shell = document.getElementById("vista-perimetrali");
     if (!shell || shell.hidden) return;
     e.preventDefault();
-    closeVistaVani();
+    closeVistaPerimetrali();
   });
 }

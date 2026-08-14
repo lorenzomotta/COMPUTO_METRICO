@@ -41,6 +41,16 @@
   align-items: stretch;
 }
 
+#vista-vani .vani-main-column {
+  order: 1;
+  flex: 1;
+  min-width: 0;
+}
+
+#vista-vani .vani-sidebar {
+  order: 2;
+}
+
 .vani-sidebar {
   flex: 0 0 236px;
   display: flex;
@@ -77,6 +87,54 @@
   justify-content: center;
   padding: 5px 8px;
   font-size: 0.8rem;
+}
+
+.vani-sidebar-azioni {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 6px;
+  padding: 6px 0 4px;
+  border-top: 1px solid rgba(16, 35, 63, 0.08);
+  border-bottom: 1px solid rgba(16, 35, 63, 0.08);
+}
+
+.vani-sidebar-azioni-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  opacity: 0.42;
+  transition: opacity 0.15s ease;
+}
+
+.vani-sidebar-azioni-group.is-active {
+  opacity: 1;
+}
+
+.vani-sidebar-azioni-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin: 0 0 1px;
+}
+
+.vani-sidebar-azioni-group.is-active .vani-sidebar-azioni-label {
+  color: #1a3358;
+}
+
+.vani-sidebar-azione {
+  width: 100%;
+  justify-content: center;
+  padding: 4px 6px;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.vani-sidebar-azione:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .vani-registra-feedback {
@@ -1148,4 +1206,252 @@
     overflow-x: visible;
     flex-basis: 100%;
   }
+
+  .vani-schede-tabs {
+    flex-wrap: wrap;
+  }
+
+  .vani-sup-fields {
+    flex-wrap: wrap;
+  }
+}
+
+/* Schede PARETI / PAVIMENTO / SOFFITTO */
+.vani-schede-tabs {
+  display: flex;
+  gap: 0;
+  margin: 4px 0 6px;
+  border: 1px solid rgba(16, 35, 63, 0.14);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f4f7fb;
+  align-self: flex-start;
+}
+
+.vani-scheda-tab {
+  border: none;
+  border-right: 1px solid rgba(16, 35, 63, 0.12);
+  background: transparent;
+  color: #334155;
+  padding: 7px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.vani-scheda-tab:last-child {
+  border-right: none;
+}
+
+.vani-scheda-tab:hover {
+  background: rgba(16, 35, 63, 0.05);
+}
+
+.vani-scheda-tab.is-active {
+  background: #1a3358;
+  color: #fff;
+}
+
+.vani-scheda-tab:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+/* Pavimento / soffitto */
+.vani-sup-scheda-host {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vani-sup-block {
+  background: #fff;
+  border: 1px solid rgba(16, 35, 63, 0.1);
+  border-radius: 10px;
+  padding: 8px 10px 10px;
+  box-shadow: 0 2px 10px rgba(16, 35, 63, 0.04);
+}
+
+.vani-sup-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.vani-sup-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.vani-sup-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1a3358;
+  margin-right: 4px;
+  align-self: center;
+}
+
+.vani-sup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.72rem;
+  color: #475569;
+}
+
+.vani-sup-field input {
+  min-width: 88px;
+  max-width: 120px;
+  padding: 4px 6px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  border-radius: 6px;
+  font-size: 0.84rem;
+}
+
+.vani-sup-field--note input {
+  min-width: 140px;
+  max-width: 220px;
+}
+
+.vani-sup-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.vani-sup-hint {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.vani-sup-table-wrap {
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.vani-sup-section {
+  margin-top: 8px;
+}
+
+.vani-sup-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.vani-sup-section-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1a3358;
+  letter-spacing: 0.02em;
+}
+
+.vani-sup-aree-table,
+.vani-sup-strati-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.vani-sup-aree-table th,
+.vani-sup-aree-table td,
+.vani-sup-strati-table th,
+.vani-sup-strati-table td {
+  border: 1px solid rgba(16, 35, 63, 0.1);
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.vani-sup-aree-table th,
+.vani-sup-strati-table th {
+  background: #eef2f7;
+  color: #1a3358;
+  font-weight: 600;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.vani-sup-area-rif,
+.vani-sup-strato-voce {
+  width: 100%;
+  min-width: 100px;
+  padding: 3px 6px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  border-radius: 5px;
+  font-size: 0.82rem;
+}
+
+.vani-sup-area-lato1,
+.vani-sup-area-lato2,
+.vani-sup-strato-spessore {
+  width: 4.8rem;
+  padding: 3px 4px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  border-radius: 5px;
+  font-size: 0.82rem;
+}
+
+.vani-sup-strato-num {
+  width: 2.2rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.vani-sup-calc {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #243652;
+}
+
+.vani-sup-aree-tfoot td {
+  background: #f8fafc;
+  font-size: 0.76rem;
+}
+
+.vani-sup-strato-segno-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.vani-sup-strato-segno-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #b45309;
+  user-select: none;
+}
+
+.vani-sup-strati-tfoot td {
+  background: #f8fafc;
+  font-size: 0.76rem;
+}
+
+.vani-sup-totale-row--pos td {
+  color: #166534;
+}
+
+.vani-sup-totale-row--neg td {
+  color: #b45309;
+}
+
+.vani-sup-totale-row--netto td {
+  font-weight: 700;
+  color: #1a3358;
 }

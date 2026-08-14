@@ -313,7 +313,7 @@
         <section id="compilazione-esterni-vari" class="card compilazione-panel" hidden>
           <div class="compilazione-topbar">
             <button id="btn-torna-piani-esterni" type="button" class="btn-action btn-back">
-              ← Torna ai Piani
+              ← Torna alle Voci
             </button>
           </div>
 
@@ -323,123 +323,6 @@
               Seleziona <strong>Compila</strong> su un piano di tipo <strong>Altro</strong>.
             </p>
           </header>
-
-          <details class="sub-block collapsible-block" open>
-            <summary class="sub-block-header-inline collapsible-summary">
-              <h3 class="sub-block-title">
-                SCAVO
-                <span id="count-scavi" class="sub-block-count">(0)</span>
-                <span id="sum-area-scavi" class="sub-block-count">Mq. 0.00</span>
-                <span id="sum-volume-scavi" class="sub-block-count">Mc. 0.00</span>
-              </h3>
-            </summary>
-
-            <form id="scavo-form" class="piano-form scavo-form">
-              <div class="field">
-                <label for="idplscavo">IDPLSCAVO</label>
-                <input id="idplscavo" type="text" readonly placeholder="Automatico" />
-              </div>
-
-              <div class="field">
-                <label for="scavo-piano">PIANO</label>
-                <input
-                  id="scavo-piano"
-                  type="text"
-                  placeholder="Scegli o scrivi (archivio)"
-                  list="datalist-piani-misura-archivio"
-                  autocomplete="off"
-                  required
-                />
-              </div>
-
-              <div class="field">
-                <label for="scavo-riferimento">RIFERIMENTO</label>
-                <input id="scavo-riferimento" type="text" placeholder="Es: Area cortile" required />
-              </div>
-
-              <div class="field field-sottrai">
-                <label for="scavo-sottrai">SOTTRAI</label>
-                <div class="checkbox-wrap">
-                  <input id="scavo-sottrai" type="checkbox" />
-                </div>
-              </div>
-
-              <div class="field">
-                <label for="scavo-misura1">MISURA1</label>
-                <input id="scavo-misura1" type="number" step="0.01" min="0" placeholder="0.00" />
-              </div>
-
-              <div class="field">
-                <label for="scavo-misura2">MISURA2</label>
-                <input id="scavo-misura2" type="number" step="0.01" min="0" placeholder="0.00" />
-              </div>
-
-              <div class="field">
-                <label for="scavo-formula">FORMULA</label>
-                <div class="formula-input-row">
-                  <input
-                    id="scavo-formula"
-                    type="text"
-                    placeholder="Clicca su Modifica formula"
-                    readonly
-                    hidden
-                  />
-                  <button id="btn-apri-formula-scavo" type="button" class="btn-action formula-state-button">
-                    INSERISCI
-                  </button>
-                </div>
-              </div>
-
-              <div class="field">
-                <label for="scavo-altezza">ALTEZZA</label>
-                <input id="scavo-altezza" type="number" step="0.01" min="0" placeholder="0.00" required />
-              </div>
-
-              <div class="field">
-                <label for="scavo-idvoce">VOCE</label>
-                <input
-                  id="scavo-idvoce"
-                  type="text"
-                  list="datalist-voci-esterni-vari"
-                  placeholder="Voce abbreviata (opzionale)"
-                  autocomplete="off"
-                />
-              </div>
-
-              <button
-                type="submit"
-                class="btn-action btn-form-add-plus"
-                id="btn-aggiungi-scavo"
-                title="Aggiungi scavo"
-                aria-label="Aggiungi scavo"
-              >
-                +
-              </button>
-            </form>
-
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>IDPLSCAVO</th>
-                    <th>PIANO</th>
-                    <th>RIFERIMENTO</th>
-                    <th>MISURA1</th>
-                    <th>MISURA2</th>
-                    <th>FORMULA</th>
-                    <th>AREA</th>
-                    <th>ALTEZZA</th>
-                    <th>VOLUME</th>
-                    <th>VOCE</th>
-                    <th>AZIONI</th>
-                  </tr>
-                </thead>
-                <tbody id="scavo-body"></tbody>
-              </table>
-            </div>
-          </details>
-
-          <hr class="section-divider" />
 
           <details class="sub-block collapsible-block" open>
             <summary class="sub-block-header-inline collapsible-summary">
@@ -548,6 +431,116 @@
               </table>
             </div>
           </details>
+
+          <hr class="section-divider" />
+
+          <details class="sub-block collapsible-block" open>
+            <summary class="sub-block-header-inline collapsible-summary">
+              <h3 class="sub-block-title">
+                SCIVOLO <span id="count-scivoli" class="sub-block-count">(0)</span>
+                <span id="sum-area-scivoli" class="sub-block-count">Mq. 0.00</span>
+                <span id="sum-volume-scivoli" class="sub-block-count">Mc. 0.00</span>
+              </h3>
+            </summary>
+
+            <form id="scivolo-form" class="piano-form scivolo-form">
+              <div class="field">
+                <label for="idplsciv">IDPLSCIV</label>
+                <input id="idplsciv" type="text" readonly placeholder="Automatico" />
+              </div>
+
+              <div class="field">
+                <label for="scivolo-piano">PIANO</label>
+                <input
+                  id="scivolo-piano"
+                  type="text"
+                  placeholder="Scegli o scrivi (archivio)"
+                  list="datalist-piani-misura-archivio"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label for="scivolo-riferimento">RIFERIMENTO</label>
+                <input id="scivolo-riferimento" type="text" placeholder="Es: Scivolo accesso" required />
+              </div>
+
+              <div class="field field-sottrai">
+                <label for="scivolo-sottrai">SOTTRAI</label>
+                <div class="checkbox-wrap">
+                  <input id="scivolo-sottrai" type="checkbox" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="scivolo-misura1">MISURA1</label>
+                <input id="scivolo-misura1" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="scivolo-misura2">MISURA2</label>
+                <input id="scivolo-misura2" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="scivolo-formula">FORMULA</label>
+                <div class="formula-input-row">
+                  <input id="scivolo-formula" type="text" readonly hidden />
+                  <button id="btn-apri-formula-scivolo" type="button" class="btn-action formula-state-button">
+                    INSERISCI
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="scivolo-altezza">SPESSORE</label>
+                <input id="scivolo-altezza" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="scivolo-idvoce">VOCE</label>
+                <input
+                  id="scivolo-idvoce"
+                  type="text"
+                  list="datalist-voci-esterni-vari"
+                  placeholder="Voce abbreviata (opzionale)"
+                  autocomplete="off"
+                />
+              </div>
+
+              <button
+                type="submit"
+                class="btn-action btn-form-add-plus"
+                id="btn-aggiungi-scivolo"
+                title="Aggiungi scivolo"
+                aria-label="Aggiungi scivolo"
+              >
+                +
+              </button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IDPLSCIV</th>
+                    <th>PIANO</th>
+                    <th>RIFERIMENTO</th>
+                    <th>MISURA1</th>
+                    <th>MISURA2</th>
+                    <th>FORMULA</th>
+                    <th>AREA</th>
+                    <th>SPESSORE</th>
+                    <th>VOLUME</th>
+                    <th>VOCE</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="scivolo-body"></tbody>
+              </table>
+            </div>
+          </details>
         </section>
 
         <dialog id="formula-dialog" class="formula-dialog">
@@ -563,10 +556,138 @@
         </dialog>
           </section>
 
+        <section id="compilazione-scavo" class="card compilazione-panel" hidden>
+          <div class="compilazione-topbar">
+            <button id="btn-torna-piani-scavo" type="button" class="btn-action btn-back">
+              ← Torna alle Voci
+            </button>
+          </div>
+
+          <header class="section-header section-header-inline">
+            <h2>SCAVO</h2>
+            <p id="compilazione-scavo-sottotitolo">
+              Scavi e volumi di terreno, collegati alle voci di capitolato.
+            </p>
+          </header>
+
+          <div class="scavo-block">
+            <h3 class="sub-block-title">
+              Elenco
+              <span id="count-scavi" class="sub-block-count">(0)</span>
+              <span id="sum-area-scavi" class="sub-block-count">Mq. 0.00</span>
+              <span id="sum-volume-scavi" class="sub-block-count">Mc. 0.00</span>
+            </h3>
+
+            <form id="scavo-form" class="piano-form scavo-form">
+              <div class="field">
+                <label for="idplscavo">IDPLSCAVO</label>
+                <input id="idplscavo" type="text" readonly placeholder="Automatico" />
+              </div>
+
+              <div class="field">
+                <label for="scavo-piano">PIANO</label>
+                <input
+                  id="scavo-piano"
+                  type="text"
+                  placeholder="Scegli o scrivi (archivio)"
+                  list="datalist-piani-misura-archivio"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label for="scavo-riferimento">RIFERIMENTO</label>
+                <input id="scavo-riferimento" type="text" placeholder="Es: Area cortile" required />
+              </div>
+
+              <div class="field field-sottrai">
+                <label for="scavo-sottrai">SOTTRAI</label>
+                <div class="checkbox-wrap">
+                  <input id="scavo-sottrai" type="checkbox" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="scavo-misura1">MISURA1</label>
+                <input id="scavo-misura1" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="scavo-misura2">MISURA2</label>
+                <input id="scavo-misura2" type="number" step="0.01" min="0" placeholder="0.00" />
+              </div>
+
+              <div class="field">
+                <label for="scavo-formula">FORMULA</label>
+                <div class="formula-input-row">
+                  <input
+                    id="scavo-formula"
+                    type="text"
+                    placeholder="Clicca su Modifica formula"
+                    readonly
+                    hidden
+                  />
+                  <button id="btn-apri-formula-scavo" type="button" class="btn-action formula-state-button">
+                    INSERISCI
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="scavo-altezza">ALTEZZA</label>
+                <input id="scavo-altezza" type="number" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+
+              <div class="field">
+                <label for="scavo-idvoce">VOCE</label>
+                <input
+                  id="scavo-idvoce"
+                  type="text"
+                  list="datalist-voci-esterni-vari"
+                  placeholder="Voce abbreviata (opzionale)"
+                  autocomplete="off"
+                />
+              </div>
+
+              <button
+                type="submit"
+                class="btn-action btn-form-add-plus"
+                id="btn-aggiungi-scavo"
+                title="Aggiungi scavo"
+                aria-label="Aggiungi scavo"
+              >
+                +
+              </button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IDPLSCAVO</th>
+                    <th>PIANO</th>
+                    <th>RIFERIMENTO</th>
+                    <th>MISURA1</th>
+                    <th>MISURA2</th>
+                    <th>FORMULA</th>
+                    <th>AREA</th>
+                    <th>ALTEZZA</th>
+                    <th>VOLUME</th>
+                    <th>VOCE</th>
+                    <th>AZIONI</th>
+                  </tr>
+                </thead>
+                <tbody id="scavo-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <section id="compilazione-misure-varie" class="card compilazione-panel" hidden>
           <div class="compilazione-topbar">
             <button id="btn-torna-piani-misure-varie" type="button" class="btn-action btn-back">
-              ← Torna ai Piani
+              ← Torna alle Voci
             </button>
           </div>
 
@@ -695,6 +816,12 @@
                   <button type="button" id="btn-chiudi-tutte-voci" class="btn-action btn-secondary" title="Chiudi tutte le voci">
                     ▴
                   </button>
+                  <button type="button" id="btn-chiudi-capitoli-voci" class="btn-action btn-secondary" title="Chiudi tutti i capitoli (mostra solo totali)">
+                    Capitoli ▴
+                  </button>
+                  <button type="button" id="btn-apri-capitoli-voci" class="btn-action btn-secondary" title="Apri tutti i capitoli">
+                    Capitoli ▾
+                  </button>
                   <input
                     id="voci-cerca-abbrev"
                     type="search"
@@ -718,7 +845,7 @@
                       <th>VOCE ABBREVIATA</th>
                       <th>UNITA' MISURA</th>
                       <th>PREZZO</th>
-                      <th>TIPOMISURA</th>
+                      <th>QUANTITÀ NETTA</th>
                       <th>NOTE</th>
                       <th>AZIONI</th>
                     </tr>
@@ -824,8 +951,9 @@
         <form id="voce-dialog-form" method="dialog">
           <h3 id="voce-dialog-title">NUOVA VOCE</h3>
           <p id="voce-dialog-solo-unita-hint" class="voce-dialog-solo-unita-hint" hidden>
-            Voce collegata a VANI: puoi modificare solo l'unità di misura. Al salvataggio i totali delle
-            misurazioni collegate ai vani vengono ricalcolati.
+            Voce automatica o semiautomatica: puoi associare il testo VOCE (anche con CERCA VOCE), il
+            PREZZO e l'unità di misura. Le misurazioni restano gestite dagli strumenti (VANI,
+            PERIMETRALI, aperture…).
           </p>
           <div class="piano-form voce-form">
             <div class="voce-form-riga-uno">
@@ -836,6 +964,12 @@
               <div class="field voce-field-compatta">
                 <label for="voce-posizione">POSIZIONE</label>
                 <input id="voce-posizione" type="number" step="1" min="0" required />
+              </div>
+              <div class="field voce-field-compatta voce-field-capitolo">
+                <label for="voce-capitolo">CAPITOLO</label>
+                <select id="voce-capitolo">
+                  <option value="">— Senza capitolo —</option>
+                </select>
               </div>
               <div class="field voce-field-compatta voce-field-tipo-misura">
                 <label for="voce-tipo-misura">TIPOMISURA</label>
@@ -1056,6 +1190,34 @@
         </form>
       </dialog>
 
+      <dialog id="capitoli-salva-template-dialog" class="formula-dialog capitoli-salva-template-dialog" aria-modal="true">
+        <form id="capitoli-salva-template-form">
+          <h3>SALVA TEMPLATE CAPITOLI</h3>
+          <p class="capitoli-salva-template-note">
+            Verranno salvati solo i capitoli (sequenza e nome), non il computo completo.
+          </p>
+          <div class="field" id="capitoli-salva-template-nome-wrap">
+            <label for="capitoli-salva-template-nome">Nome template</label>
+            <input
+              id="capitoli-salva-template-nome"
+              type="text"
+              maxlength="80"
+              placeholder="Es: Residenziale standard"
+              autocomplete="off"
+            />
+          </div>
+          <p id="capitoli-salva-template-msg" class="capitoli-salva-template-msg" hidden></p>
+          <div class="formula-dialog-actions" id="capitoli-salva-template-actions-main">
+            <button type="button" id="btn-capitoli-salva-template-annulla" class="btn-action btn-secondary">ANNULLA</button>
+            <button type="button" id="btn-capitoli-salva-template-ok" class="btn-action btn-secondary">SALVA</button>
+          </div>
+          <div class="formula-dialog-actions" id="capitoli-salva-template-actions-overwrite" hidden>
+            <button type="button" id="btn-capitoli-salva-template-annulla-ow" class="btn-action btn-secondary">ANNULLA</button>
+            <button type="button" id="btn-capitoli-salva-template-overwrite" class="btn-action btn-inizia-computo">SOVRASCRIVI</button>
+          </div>
+        </form>
+      </dialog>
+
       <section
         id="vista-vani"
         class="vista-vani-overlay"
@@ -1096,11 +1258,16 @@
               Se avevi aperto un vano dalla lista a sinistra, <strong>non si crea una copia</strong>: la stessa voce viene aggiornata.
             </p>
             <p class="vani-help-inline__p vani-help-inline__p--muted">
-              Il pulsante <strong>aggiungi parete</strong> (sulla riga Piano/Locale) aggiunge una parete nello stesso vano; l’<strong>icona due fogli</strong> nella colonna destra duplica quella parete (puoi cambiarne misure o strati dopo). <strong>+S</strong> aggiunge uno strato di finitura sotto quella parete (STRATIAPERTURA arriverà dopo).
+              Il pulsante <strong>Aggiungi parete</strong> (sidebar a sinistra, gruppo Pareti) aggiunge una parete nello stesso vano; l’<strong>icona due fogli</strong> nella colonna destra duplica quella parete (puoi cambiarne misure o strati dopo). <strong>Aggiungi strato</strong> / <strong>Aggiungi apertura</strong> sono sempre nella sidebar.
               Le aperture dipendono dal testo LOCALE (campo sotto «Piano»). Clic su un vano nella sidebar lo ricarica in modifica; l’<strong>icona cestino</strong> accanto elimina quel vano dall’elenco (chiede conferma) e rimuove le righe collegate nelle VOCI. Nel campo LOCALE, clic per selezionare tutto e cambiare nome se serve.
             </p>
             <p class="vani-help-inline__p vani-help-inline__p--muted">
-              Per ogni strato: in <strong>lordo</strong>, <strong>Lungh. parete</strong> × <strong>H strato</strong> → <strong>Mq lordi</strong>.
+              Sotto Piano/Locale trovi tre schede: <strong>Pareti</strong>, <strong>Pavimento</strong> e <strong>Soffitto</strong>.
+              Per aggiungere aree e strati di pavimento/soffitto usa i pulsanti nella <strong>sidebar</strong> (gruppi Pavimenti / Soffitti). Il segno <strong>−</strong> sottrae quell’area.
+              Il <strong>mq netto</strong> (somma delle aree) viene usato da tutti gli <strong>strati</strong> (ciascuno con il suo spessore). Niente elevazione né aperture.
+            </p>
+            <p class="vani-help-inline__p vani-help-inline__p--muted">
+              Per ogni strato parete: in <strong>lordo</strong>, <strong>Lungh. parete</strong> × <strong>H strato</strong> → <strong>Mq lordi</strong>.
               Il dettaglio <strong>«Aperture sottratte»</strong> compare solo se sulla parete hai selezionato almeno un’apertura (<strong>stesso nome locale</strong> negli archivi).
               Con aperture: <strong>lungh.</strong>, <strong>h</strong> inclusa nella fascia strato, <strong>ML/Mq netti</strong> e poi il <strong>mq netto dello strato</strong> (<strong>Mq lordi</strong> − somma mq aperture).
             </p>
@@ -1115,6 +1282,40 @@
                 </button>
               </div>
               <p id="vani-registra-feedback" class="vani-registra-feedback" role="status" aria-live="polite"></p>
+
+              <nav id="vani-sidebar-azioni" class="vani-sidebar-azioni" aria-label="Azioni rapide vano">
+                <div class="vani-sidebar-azioni-group" data-scheda-group="pareti">
+                  <span class="vani-sidebar-azioni-label">Pareti</span>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-parete">
+                    Aggiungi parete
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-apertura">
+                    Aggiungi apertura
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-strato-parete">
+                    Aggiungi strato
+                  </button>
+                </div>
+                <div class="vani-sidebar-azioni-group" data-scheda-group="pavimento">
+                  <span class="vani-sidebar-azioni-label">Pavimenti</span>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-area-pavimento">
+                    Aggiungi area
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-strato-pavimento">
+                    Aggiungi strato
+                  </button>
+                </div>
+                <div class="vani-sidebar-azioni-group" data-scheda-group="soffitto">
+                  <span class="vani-sidebar-azioni-label">Soffitti</span>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-area-soffitto">
+                    Aggiungi area
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-strato-soffitto">
+                    Aggiungi strato
+                  </button>
+                </div>
+              </nav>
+
               <ul id="vani-sidebar-list" class="vani-sidebar-list"></ul>
             </aside>
 
@@ -1224,6 +1425,614 @@
                     <button type="submit" id="vani-nap-salva" class="btn-action btn-secondary">Salva e collega</button>
                   </div>
                 </form>
+              </dialog>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="vista-perimetrali"
+        class="vista-perim-overlay"
+        hidden
+        aria-label="Misurazione PERIMETRALI"
+      >
+        <div class="vani-shell">
+          <header class="vani-header">
+            <h1 class="vani-header-title">Misurazione PERIMETRALI</h1>
+            <div class="vani-header-actions">
+              <button
+                type="button"
+                id="btn-perim-help-toggle"
+                class="vani-btn-help"
+                aria-expanded="false"
+                aria-controls="perim-help-inline"
+                title="Guida rapida"
+                aria-label="Apri o chiudi la guida rapida PERIMETRALI"
+              >
+                <span aria-hidden="true">?</span>
+              </button>
+              <button type="button" id="btn-perim-chiudi" class="btn-action btn-back">
+                Chiudi
+              </button>
+            </div>
+          </header>
+
+          <div
+            id="perim-help-inline"
+            class="vani-help-inline"
+            role="region"
+            aria-label="Guida rapida Misurazione PERIMETRALI"
+            hidden
+          >
+            <p class="vani-help-inline__p">
+              Compila <strong>piano</strong> e <strong>zona/facciata</strong>, poi le pareti perimetrali
+              (lunghezza, altezza, strati di finitura con voce di capitolato).
+              Usa i flag (Zoccolo, Rustico, Civile, Rivestimento, Portante, Cappotto, Isolante,
+              Intonachino, Pittura Esterna, …) per creare strati tipizzati.
+              Collega aperture (per <strong>zona/facciata</strong>) e indica il <strong>locale VANI</strong>
+              quando crei un’apertura: in VANI, digitando lo stesso locale, potrai spuntarla sulle pareti del vano.
+              Premi <strong>REGISTRA PERIMETRALE</strong>: le VOCI si aggiornano in automatico.
+            </p>
+            <p class="vani-help-inline__p vani-help-inline__p--muted">
+              Usa la <strong>sidebar</strong> a sinistra per: Aggiungi parete, Aggiungi apertura, Duplica parete, Aggiungi strato
+              (agiscono sulla parete espansa, oppure sull’ultima). Ogni strato può avere una voce breve diversa. Se la voce non esiste ancora in elenco VOCI,
+              viene creata (mq., prezzo 0). Clic su una scheda a sinistra per modificarla.
+            </p>
+          </div>
+
+          <div class="vani-body-layout">
+            <aside class="vani-sidebar" aria-label="Elenco perimetrali">
+              <div class="vani-sidebar-head">
+                <h2 class="vani-sidebar-title">Perimetrali</h2>
+                <button type="button" id="btn-perim-registra" class="btn-action btn-secondary vani-btn-registra">
+                  REGISTRA PERIMETRALE
+                </button>
+              </div>
+              <p id="perim-registra-feedback" class="vani-registra-feedback" role="status" aria-live="polite"></p>
+
+              <nav id="perim-sidebar-azioni" class="vani-sidebar-azioni" aria-label="Azioni rapide perimetrali">
+                <div class="vani-sidebar-azioni-group is-active" data-scheda-group="pareti">
+                  <span class="vani-sidebar-azioni-label">Pareti</span>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-parete">
+                    Aggiungi parete
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-apertura">
+                    Aggiungi apertura
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="duplica-parete">
+                    Duplica parete
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-strato">
+                    Aggiungi strato
+                  </button>
+                </div>
+              </nav>
+
+              <ul id="perim-sidebar-list" class="vani-sidebar-list"></ul>
+            </aside>
+
+            <div class="vani-main-column">
+              <form id="perim-misurazione-form" class="vani-form card-like vani-form-vano" autocomplete="off">
+                <datalist id="perim-vocibrevi-datalist"></datalist>
+                <datalist id="perim-archivio-locale-datalist"></datalist>
+                <div id="perim-gerarchia-host" class="vani-gerarchia-host"></div>
+              </form>
+
+              <dialog id="perim-conferma-elimina-dialog" class="formula-dialog vani-conferma-elimina-dialog" aria-modal="true">
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3>CONFERMA ELIMINAZIONE</h3>
+                  <p id="perim-conferma-elimina-msg" class="vani-conferma-elimina-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="perim-conferma-elimina-annulla" class="btn-action btn-secondary">
+                      Annulla
+                    </button>
+                    <button type="button" id="perim-conferma-elimina-conferma" class="btn-action btn-delete">
+                      Elimina
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+
+              <dialog id="perim-nuova-apertura-dialog" class="formula-dialog vani-nuova-apertura-dialog" aria-modal="true">
+                <form id="perim-nuova-apertura-form" method="dialog" class="vani-nuova-apertura-form">
+                  <h3 id="perim-nap-titolo">Nuova apertura sulla parete perimetrale</h3>
+                  <p class="vani-nuova-apertura-hint">
+                    <strong>Zona</strong> = facciata perimetrale (per collegarla a questa scheda).
+                    <strong>Locale</strong> = stanza del vano (stesso nome che digiti in VANI): così in VANI potrai associare questa apertura alle pareti di quel locale.
+                  </p>
+                  <input type="hidden" id="perim-nap-edit-id" value="" />
+                  <div class="vani-nuova-apertura-grid">
+                    <label class="field">
+                      <span>Piano</span>
+                      <input id="perim-nap-piano" type="text" autocomplete="off" />
+                    </label>
+                    <label class="field">
+                      <span>Zona / Facciata</span>
+                      <input id="perim-nap-zona" type="text" required autocomplete="off" />
+                    </label>
+                    <label class="field">
+                      <span>Locale (collegamento VANI)</span>
+                      <input
+                        id="perim-nap-locale"
+                        type="text"
+                        list="perim-archivio-locale-datalist"
+                        required
+                        autocomplete="off"
+                        placeholder="es. Cucina, Soggiorno"
+                      />
+                    </label>
+                    <label class="field">
+                      <span>Larghezza (m)</span>
+                      <input id="perim-nap-largh" type="number" step="0.01" min="0" required />
+                    </label>
+                    <label class="field">
+                      <span>Altezza (m)</span>
+                      <input id="perim-nap-alt" type="number" step="0.01" min="0" required />
+                    </label>
+                    <label class="field">
+                      <span>H davanzale (m)</span>
+                      <input id="perim-nap-hdav" type="number" step="0.01" min="0" value="0" required />
+                    </label>
+                    <label class="field">
+                      <span>Ante</span>
+                      <input id="perim-nap-ante" type="number" step="1" min="0" value="1" required />
+                    </label>
+                    <label class="field">
+                      <span>Tipologia</span>
+                      <select id="perim-nap-tipologia" required>
+                        <option value="FINESTRA">FINESTRA</option>
+                        <option value="PORTA FINESTRA">PORTA FINESTRA</option>
+                        <option value="BOCCA LUPO">BOCCA LUPO</option>
+                        <option value="FIN CANTINA">FIN CANTINA</option>
+                        <option value="PORTONCINO">PORTONCINO</option>
+                        <option value="PORTA CANTINA">PORTA CANTINA</option>
+                        <option value="PORTA REI">PORTA REI</option>
+                        <option value="PORTA INTERNA">PORTA INTERNA</option>
+                        <option value="SCRIGNO">SCRIGNO</option>
+                        <option value="BASCULANTE">BASCULANTE</option>
+                        <option value="SEZIONALE">SEZIONALE</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Falso telaio</span>
+                      <select id="perim-nap-falso">
+                        <option value="NO">NO</option>
+                        <option value="ALLUMINIO">ALLUMINIO</option>
+                        <option value="LEGNO">LEGNO</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Scuro</span>
+                      <select id="perim-nap-scuro">
+                        <option value="NO">NO</option>
+                        <option value="PERSIANA">PERSIANA</option>
+                        <option value="TAPPARELLA">TAPPARELLA</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Inferiata</span>
+                      <select id="perim-nap-inferiata">
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Zanzariera</span>
+                      <select id="perim-nap-zanzariera">
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="perim-nap-annulla" class="btn-action btn-secondary">Annulla</button>
+                    <button type="submit" id="perim-nap-salva" class="btn-action btn-secondary">Salva e collega</button>
+                  </div>
+                </form>
+              </dialog>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <section
+        id="vista-elevazione"
+        class="vista-elev-overlay"
+        hidden
+        aria-label="Misurazione ELEVAZIONE"
+      >
+        <div class="vani-shell">
+          <header class="vani-header">
+            <h1 class="vani-header-title">Misurazione ELEVAZIONE</h1>
+            <div class="vani-header-actions">
+              <button
+                type="button"
+                id="btn-elev-help-toggle"
+                class="vani-btn-help"
+                aria-expanded="false"
+                aria-controls="elev-help-inline"
+                title="Guida rapida"
+                aria-label="Apri o chiudi la guida rapida ELEVAZIONE"
+              >
+                <span aria-hidden="true">?</span>
+              </button>
+              <button type="button" id="btn-elev-chiudi" class="btn-action btn-back">
+                Chiudi
+              </button>
+            </div>
+          </header>
+
+          <div
+            id="elev-help-inline"
+            class="vani-help-inline"
+            role="region"
+            aria-label="Guida rapida Misurazione ELEVAZIONE"
+            hidden
+          >
+            <p class="vani-help-inline__p">
+              Compila <strong>piano</strong> e <strong>zona/facciata</strong>, poi le pareti in elevazione
+              (lunghezza, altezza, strati di finitura con voce di capitolato).
+              Usa i flag (Zoccolo, Rustico, Civile, Rivestimento, Portante, Cappotto, Isolante,
+              Intonachino, Pittura Esterna, …) per creare strati tipizzati.
+              Spunta <strong>Fondazione</strong> per inserire larghezza e altezza della fondazione:
+              il volume è <strong>lunghezza × larghezza × altezza</strong> e crea la voce
+              <strong>FONDAZIONE CONTINUA</strong> (mc.).
+              Collega aperture (per <strong>zona/facciata</strong>) e indica il <strong>locale VANI</strong>
+              quando crei un’apertura.
+              Premi <strong>REGISTRA ELEVAZIONE</strong>: le VOCI si aggiornano in automatico.
+            </p>
+            <p class="vani-help-inline__p vani-help-inline__p--muted">
+              Usa la <strong>sidebar</strong> a sinistra per: Aggiungi parete, Aggiungi apertura, Duplica parete, Aggiungi strato
+              (agiscono sulla parete espansa, oppure sull’ultima). Ogni strato può avere una voce breve diversa. Se la voce non esiste ancora in elenco VOCI,
+              viene creata (mq., prezzo 0). Clic su una scheda a sinistra per modificarla.
+            </p>
+          </div>
+
+          <div class="vani-body-layout">
+            <aside class="vani-sidebar" aria-label="Elenco elevazione">
+              <div class="vani-sidebar-head">
+                <h2 class="vani-sidebar-title">Elevazione</h2>
+                <button type="button" id="btn-elev-registra" class="btn-action btn-secondary vani-btn-registra">
+                  REGISTRA ELEVAZIONE
+                </button>
+              </div>
+              <p id="elev-registra-feedback" class="vani-registra-feedback" role="status" aria-live="polite"></p>
+
+              <nav id="elev-sidebar-azioni" class="vani-sidebar-azioni" aria-label="Azioni rapide elevazione">
+                <div class="vani-sidebar-azioni-group is-active" data-scheda-group="pareti">
+                  <span class="vani-sidebar-azioni-label">Pareti</span>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-parete">
+                    Aggiungi parete
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-apertura">
+                    Aggiungi apertura
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="duplica-parete">
+                    Duplica parete
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-strato">
+                    Aggiungi strato
+                  </button>
+                </div>
+              </nav>
+
+              <ul id="elev-sidebar-list" class="vani-sidebar-list"></ul>
+            </aside>
+
+            <div class="vani-main-column">
+              <form id="elev-misurazione-form" class="vani-form card-like vani-form-vano" autocomplete="off">
+                <datalist id="elev-vocibrevi-datalist"></datalist>
+                <datalist id="elev-archivio-locale-datalist"></datalist>
+                <div id="elev-gerarchia-host" class="vani-gerarchia-host"></div>
+              </form>
+
+              <dialog id="elev-conferma-elimina-dialog" class="formula-dialog vani-conferma-elimina-dialog" aria-modal="true">
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3>CONFERMA ELIMINAZIONE</h3>
+                  <p id="elev-conferma-elimina-msg" class="vani-conferma-elimina-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="elev-conferma-elimina-annulla" class="btn-action btn-secondary">
+                      Annulla
+                    </button>
+                    <button type="button" id="elev-conferma-elimina-conferma" class="btn-action btn-delete">
+                      Elimina
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+
+              <dialog id="elev-nuova-apertura-dialog" class="formula-dialog vani-nuova-apertura-dialog" aria-modal="true">
+                <form id="elev-nuova-apertura-form" method="dialog" class="vani-nuova-apertura-form">
+                  <h3 id="elev-nap-titolo">Nuova apertura sulla parete elevazione</h3>
+                  <p class="vani-nuova-apertura-hint">
+                    <strong>Zona</strong> = facciata (per collegarla a questa scheda).
+                    <strong>Locale</strong> = stanza del vano (stesso nome che digiti in VANI): così in VANI potrai associare questa apertura alle pareti di quel locale.
+                  </p>
+                  <input type="hidden" id="elev-nap-edit-id" value="" />
+                  <div class="vani-nuova-apertura-grid">
+                    <label class="field">
+                      <span>Piano</span>
+                      <input id="elev-nap-piano" type="text" autocomplete="off" />
+                    </label>
+                    <label class="field">
+                      <span>Zona / Facciata</span>
+                      <input id="elev-nap-zona" type="text" required autocomplete="off" />
+                    </label>
+                    <label class="field">
+                      <span>Locale (collegamento VANI)</span>
+                      <input
+                        id="elev-nap-locale"
+                        type="text"
+                        list="elev-archivio-locale-datalist"
+                        required
+                        autocomplete="off"
+                        placeholder="es. Cucina, Soggiorno"
+                      />
+                    </label>
+                    <label class="field">
+                      <span>Larghezza (m)</span>
+                      <input id="elev-nap-largh" type="number" step="0.01" min="0" required />
+                    </label>
+                    <label class="field">
+                      <span>Altezza (m)</span>
+                      <input id="elev-nap-alt" type="number" step="0.01" min="0" required />
+                    </label>
+                    <label class="field">
+                      <span>H davanzale (m)</span>
+                      <input id="elev-nap-hdav" type="number" step="0.01" min="0" value="0" required />
+                    </label>
+                    <label class="field">
+                      <span>Ante</span>
+                      <input id="elev-nap-ante" type="number" step="1" min="0" value="1" required />
+                    </label>
+                    <label class="field">
+                      <span>Tipologia</span>
+                      <select id="elev-nap-tipologia" required>
+                        <option value="FINESTRA">FINESTRA</option>
+                        <option value="PORTA FINESTRA">PORTA FINESTRA</option>
+                        <option value="BOCCA LUPO">BOCCA LUPO</option>
+                        <option value="FIN CANTINA">FIN CANTINA</option>
+                        <option value="PORTONCINO">PORTONCINO</option>
+                        <option value="PORTA CANTINA">PORTA CANTINA</option>
+                        <option value="PORTA REI">PORTA REI</option>
+                        <option value="PORTA INTERNA">PORTA INTERNA</option>
+                        <option value="SCRIGNO">SCRIGNO</option>
+                        <option value="BASCULANTE">BASCULANTE</option>
+                        <option value="SEZIONALE">SEZIONALE</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Falso telaio</span>
+                      <select id="elev-nap-falso">
+                        <option value="NO">NO</option>
+                        <option value="ALLUMINIO">ALLUMINIO</option>
+                        <option value="LEGNO">LEGNO</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Scuro</span>
+                      <select id="elev-nap-scuro">
+                        <option value="NO">NO</option>
+                        <option value="PERSIANA">PERSIANA</option>
+                        <option value="TAPPARELLA">TAPPARELLA</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Inferiata</span>
+                      <select id="elev-nap-inferiata">
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Zanzariera</span>
+                      <select id="elev-nap-zanzariera">
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="elev-nap-annulla" class="btn-action btn-secondary">Annulla</button>
+                    <button type="submit" id="elev-nap-salva" class="btn-action btn-secondary">Salva e collega</button>
+                  </div>
+                </form>
+              </dialog>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="vista-solai-interni"
+        class="vista-solai-overlay"
+        hidden
+        aria-label="Misurazione SOLAI INTERNI"
+      >
+        <div class="vani-shell">
+          <header class="vani-header">
+            <h1 class="vani-header-title">Misurazione SOLAI INTERNI</h1>
+            <div class="vani-header-actions">
+              <button
+                type="button"
+                id="btn-solai-help-toggle"
+                class="vani-btn-help"
+                aria-expanded="false"
+                aria-controls="solai-help-inline"
+                title="Guida rapida"
+                aria-label="Apri o chiudi la guida rapida SOLAI INTERNI"
+              >
+                <span aria-hidden="true">?</span>
+              </button>
+              <button type="button" id="btn-solai-chiudi" class="btn-action btn-back">
+                Chiudi
+              </button>
+            </div>
+          </header>
+
+          <div
+            id="solai-help-inline"
+            class="vani-help-inline"
+            role="region"
+            aria-label="Guida rapida Misurazione SOLAI INTERNI"
+            hidden
+          >
+            <p class="vani-help-inline__p">
+              Compila <strong>piano</strong> e una <strong>descrizione</strong>, poi le aree del solaio
+              (Lato 1 × Lato 2). Con <strong>sottrai</strong> puoi spuntare
+              <strong>Trave in spessore</strong> e/o <strong>Trave in altezza</strong>: compare
+              <strong>Altezza trave</strong> e si calcolano i <strong>mc</strong> (L1 × L2 × H).
+              Gli strati usano il mq netto (come i pavimenti in VANI).
+            </p>
+            <p class="vani-help-inline__p vani-help-inline__p--muted">
+              Premi <strong>REGISTRA SOLAIO</strong>: se la voce non esiste viene creata; se esiste già,
+              la misura viene <strong>accodata</strong>. Chiudi per tornare all’elenco VOCI.
+            </p>
+          </div>
+
+          <div class="vani-body-layout">
+            <aside class="vani-sidebar" aria-label="Elenco solai interni">
+              <div class="vani-sidebar-head">
+                <h2 class="vani-sidebar-title">Solai interni</h2>
+                <button type="button" id="btn-solai-registra" class="btn-action btn-secondary vani-btn-registra">
+                  REGISTRA SOLAIO
+                </button>
+              </div>
+              <p id="solai-registra-feedback" class="vani-registra-feedback" role="status" aria-live="polite"></p>
+
+              <nav id="solai-sidebar-azioni" class="vani-sidebar-azioni" aria-label="Azioni rapide solai">
+                <div class="vani-sidebar-azioni-group is-active" data-scheda-group="solaio">
+                  <span class="vani-sidebar-azioni-label">Solaio</span>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-area">
+                    Aggiungi area
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-strato">
+                    Aggiungi strato
+                  </button>
+                </div>
+              </nav>
+
+              <ul id="solai-sidebar-list" class="vani-sidebar-list"></ul>
+            </aside>
+
+            <div class="vani-main-column">
+              <form id="solai-misurazione-form" class="vani-form card-like vani-form-vano" autocomplete="off">
+                <datalist id="solai-vocibrevi-datalist"></datalist>
+                <div id="solai-gerarchia-host" class="vani-gerarchia-host"></div>
+              </form>
+
+              <dialog id="solai-conferma-elimina-dialog" class="formula-dialog vani-conferma-elimina-dialog" aria-modal="true">
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3>CONFERMA ELIMINAZIONE</h3>
+                  <p id="solai-conferma-elimina-msg" class="vani-conferma-elimina-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="solai-conferma-elimina-annulla" class="btn-action btn-secondary">
+                      Annulla
+                    </button>
+                    <button type="button" id="solai-conferma-elimina-conferma" class="btn-action btn-delete">
+                      Elimina
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="vista-solai-inclinati"
+        class="vista-solai-incl-overlay"
+        hidden
+        aria-label="Misurazione SOLAI INCLINATI"
+      >
+        <div class="vani-shell">
+          <header class="vani-header">
+            <h1 class="vani-header-title">Misurazione SOLAI INCLINATI</h1>
+            <div class="vani-header-actions">
+              <button
+                type="button"
+                id="btn-solai-incl-help-toggle"
+                class="vani-btn-help"
+                aria-expanded="false"
+                aria-controls="solai-incl-help-inline"
+                title="Guida rapida"
+                aria-label="Apri o chiudi la guida rapida SOLAI INCLINATI"
+              >
+                <span aria-hidden="true">?</span>
+              </button>
+              <button type="button" id="btn-solai-incl-chiudi" class="btn-action btn-back">
+                Chiudi
+              </button>
+            </div>
+          </header>
+
+          <div
+            id="solai-incl-help-inline"
+            class="vani-help-inline"
+            role="region"
+            aria-label="Guida rapida Misurazione SOLAI INCLINATI"
+            hidden
+          >
+            <p class="vani-help-inline__p">
+              Compila <strong>piano</strong> e <strong>descrizione</strong>. Ogni area usa la
+              <strong>formula falda</strong> (come in misurazioni):
+              <strong>Gronda × (Salita × √(1+(Pendenza%/100)²))</strong>.
+              Spunta <strong>CANALE</strong> per portare la gronda in archivio CANALI.
+              Con <strong>sottrai</strong> puoi aggiungere travi (mc = mq falda × H).
+            </p>
+            <p class="vani-help-inline__p vani-help-inline__p--muted">
+              Premi <strong>REGISTRA SOLAIO</strong>: se la voce non esiste viene creata; se esiste già,
+              la misura viene <strong>accodata</strong>.
+            </p>
+          </div>
+
+          <div class="vani-body-layout">
+            <aside class="vani-sidebar" aria-label="Elenco solai inclinati">
+              <div class="vani-sidebar-head">
+                <h2 class="vani-sidebar-title">Solai inclinati</h2>
+                <button type="button" id="btn-solai-incl-registra" class="btn-action btn-secondary vani-btn-registra">
+                  REGISTRA SOLAIO
+                </button>
+              </div>
+              <p id="solai-incl-registra-feedback" class="vani-registra-feedback" role="status" aria-live="polite"></p>
+
+              <nav id="solai-incl-sidebar-azioni" class="vani-sidebar-azioni" aria-label="Azioni rapide solai inclinati">
+                <div class="vani-sidebar-azioni-group is-active" data-scheda-group="solaio">
+                  <span class="vani-sidebar-azioni-label">Solaio</span>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-area">
+                    Aggiungi area
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-strato">
+                    Aggiungi strato
+                  </button>
+                </div>
+              </nav>
+
+              <ul id="solai-incl-sidebar-list" class="vani-sidebar-list"></ul>
+            </aside>
+
+            <div class="vani-main-column">
+              <form id="solai-incl-misurazione-form" class="vani-form card-like vani-form-vano" autocomplete="off">
+                <datalist id="solai-incl-vocibrevi-datalist"></datalist>
+                <div id="solai-incl-gerarchia-host" class="vani-gerarchia-host"></div>
+              </form>
+
+              <dialog id="solai-incl-conferma-elimina-dialog" class="formula-dialog vani-conferma-elimina-dialog" aria-modal="true">
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3>CONFERMA ELIMINAZIONE</h3>
+                  <p id="solai-incl-conferma-elimina-msg" class="vani-conferma-elimina-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="solai-incl-conferma-elimina-annulla" class="btn-action btn-secondary">
+                      Annulla
+                    </button>
+                    <button type="button" id="solai-incl-conferma-elimina-conferma" class="btn-action btn-delete">
+                      Elimina
+                    </button>
+                  </div>
+                </div>
               </dialog>
             </div>
           </div>

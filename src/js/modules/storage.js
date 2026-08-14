@@ -8,6 +8,7 @@ export function saveMurDati(
   apertureElevazione,
   scaviEsterni = [],
   corselliEsterni = [],
+  scivoliEsterni = [],
   camminamentiEsterni = [],
   misurazioniVarie = [],
 ) {
@@ -15,6 +16,7 @@ export function saveMurDati(
   localStorage.setItem(keys.STORAGE_APERTURE_ELEV, JSON.stringify(apertureElevazione));
   localStorage.setItem(keys.STORAGE_SCAVI_ESTERNI, JSON.stringify(scaviEsterni));
   localStorage.setItem(keys.STORAGE_CORSELLI_ESTERNI, JSON.stringify(corselliEsterni));
+  localStorage.setItem(keys.STORAGE_SCIVOLI_ESTERNI, JSON.stringify(scivoliEsterni));
   localStorage.setItem(keys.STORAGE_CAMMINAMENTI_ESTERNI, JSON.stringify(camminamentiEsterni));
   localStorage.setItem(keys.STORAGE_MISURAZIONI_VARIE, JSON.stringify(misurazioniVarie));
   try {
@@ -69,6 +71,7 @@ export function loadMurDati(keys) {
   let apertureElevazione = [];
   let scaviEsterni = [];
   let corselliEsterni = [];
+  let scivoliEsterni = [];
   let camminamentiEsterni = [];
   let misurazioniVarie = [];
 
@@ -199,6 +202,31 @@ export function loadMurDati(keys) {
         corselliEsterni = [];
       }
     }
+    const rawScivoli = localStorage.getItem(keys.STORAGE_SCIVOLI_ESTERNI);
+    if (rawScivoli) {
+      try {
+        const parsedScivoli = JSON.parse(rawScivoli);
+        scivoliEsterni = Array.isArray(parsedScivoli)
+          ? parsedScivoli.filter(
+              (c) =>
+                typeof c?.idPlSciv === "number" &&
+                typeof c?.piano === "string" &&
+                typeof c?.riferimento === "string" &&
+                (typeof c?.sottrai === "boolean" || typeof c?.sottrai === "undefined") &&
+                (typeof c?.misura1 === "number" || c?.misura1 === null) &&
+                (typeof c?.misura2 === "number" || c?.misura2 === null) &&
+                typeof c?.formula === "string" &&
+                (typeof c?.formulaValue === "number" || c?.formulaValue === null) &&
+                (typeof c?.altezza === "number" || c?.altezza === null) &&
+                typeof c?.area === "number" &&
+                typeof c?.volume === "number" &&
+                typeof c?.idVoce === "string",
+            ).map((c) => ({ ...c, sottrai: c.sottrai === true }))
+          : [];
+      } catch {
+        scivoliEsterni = [];
+      }
+    }
     const rawCamminamenti = localStorage.getItem(keys.STORAGE_CAMMINAMENTI_ESTERNI);
     if (rawCamminamenti) {
       try {
@@ -229,6 +257,7 @@ export function loadMurDati(keys) {
     apertureElevazione = [];
     scaviEsterni = [];
     corselliEsterni = [];
+    scivoliEsterni = [];
     camminamentiEsterni = [];
     pianoMurLegacy = {};
   }
@@ -282,6 +311,7 @@ export function loadMurDati(keys) {
     apertureElevazione.reduce((max, a) => Math.max(max, a.idAperturaElev), 0) + 1;
   const scavoIdCounter = scaviEsterni.reduce((max, s) => Math.max(max, s.idPlScavo), 0) + 1;
   const corselloIdCounter = corselliEsterni.reduce((max, c) => Math.max(max, c.idPlCors), 0) + 1;
+  const scivoloIdCounter = scivoliEsterni.reduce((max, c) => Math.max(max, c.idPlSciv), 0) + 1;
   const camminamentiIdCounter =
     camminamentiEsterni.reduce((max, c) => Math.max(max, c.idPlCamm), 0) + 1;
   const misurazioniIdCounter =
@@ -292,6 +322,7 @@ export function loadMurDati(keys) {
     apertureElevazione,
     scaviEsterni,
     corselliEsterni,
+    scivoliEsterni,
     camminamentiEsterni,
     misurazioniVarie,
     pianoMurLegacy,
@@ -299,6 +330,7 @@ export function loadMurDati(keys) {
     aperturaElevIdCounter,
     scavoIdCounter,
     corselloIdCounter,
+    scivoloIdCounter,
     camminamentiIdCounter,
     misurazioniIdCounter,
   };

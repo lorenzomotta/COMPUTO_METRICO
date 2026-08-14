@@ -1,0 +1,214 @@
+/* Archivio CAPITOLI + righe raggruppate in elenco VOCI */
+
+#capitoli-archivio-dialog {
+  max-width: min(720px, 96vw);
+  width: 100%;
+}
+
+#capitoli-archivio-dialog .capitoli-form-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  align-items: flex-end;
+}
+
+#capitoli-archivio-dialog .capitoli-form-row .field {
+  margin: 0;
+}
+
+#capitoli-archivio-dialog .capitoli-field-seq {
+  width: 90px;
+  flex: 0 0 auto;
+}
+
+#capitoli-archivio-dialog .capitoli-field-nome {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
+/* Tabella archivio: 4 colonne (non le 14 di .table-voce-mm-inline) */
+#capitoli-archivio-dialog .capitoli-archivio-table {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+#capitoli-archivio-dialog .capitoli-archivio-table th:nth-child(1),
+#capitoli-archivio-dialog .capitoli-archivio-table td:nth-child(1) {
+  width: 64px;
+  white-space: nowrap;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+#capitoli-archivio-dialog .capitoli-archivio-table th:nth-child(2),
+#capitoli-archivio-dialog .capitoli-archivio-table td:nth-child(2) {
+  width: auto;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  text-align: left;
+  padding-right: 12px;
+}
+
+#capitoli-archivio-dialog .capitoli-archivio-table th:nth-child(3),
+#capitoli-archivio-dialog .capitoli-archivio-table td:nth-child(3) {
+  width: 64px;
+  white-space: nowrap;
+  text-align: center;
+  overflow: visible;
+}
+
+#capitoli-archivio-dialog .capitoli-archivio-table th:nth-child(4),
+#capitoli-archivio-dialog .capitoli-archivio-table td:nth-child(4) {
+  width: 96px;
+  white-space: nowrap;
+  text-align: center;
+  overflow: visible;
+}
+
+#capitoli-archivio-dialog .capitoli-template-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+#capitoli-archivio-dialog .capitoli-template-picker {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  border-radius: 8px;
+  background: rgba(238, 243, 250, 0.7);
+}
+
+#capitoli-archivio-dialog .capitoli-template-picker[hidden] {
+  display: none !important;
+}
+
+#capitoli-archivio-dialog .capitoli-template-picker label {
+  font-weight: 600;
+  color: #1a3558;
+}
+
+#capitoli-archivio-dialog .capitoli-template-picker select {
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 8px;
+}
+
+#capitoli-archivio-dialog .capitoli-template-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voci-row-capitolo {
+  background: rgba(16, 35, 63, 0.08);
+  cursor: pointer;
+}
+
+.voci-row-capitolo td {
+  font-weight: 700;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-top: 2px solid rgba(16, 35, 63, 0.18);
+}
+
+.voci-row-capitolo .voci-capitolo-toggle {
+  display: inline-block;
+  width: 1.2em;
+  margin-right: 6px;
+}
+
+.voci-row-capitolo .voci-capitolo-totale {
+  float: right;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.voci-row-capitolo-totale {
+  background: rgba(16, 35, 63, 0.04);
+}
+
+.voci-row-capitolo-totale td {
+  font-weight: 600;
+  text-align: right;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.voce-field-capitolo {
+  min-width: 140px;
+}
+
+#btn-chiudi-capitoli-voci,
+#btn-apri-capitoli-voci {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* Modale salva template capitoli */
+.capitoli-salva-template-dialog {
+  max-width: min(440px, 94vw);
+  width: 100%;
+}
+
+.capitoli-salva-template-dialog .capitoli-salva-template-note {
+  margin: 0 0 12px;
+  color: #334e68;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.capitoli-salva-template-dialog .field {
+  margin-bottom: 12px;
+}
+
+.capitoli-salva-template-dialog .field label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: #1a3558;
+}
+
+.capitoli-salva-template-dialog .field input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+}
+
+.capitoli-salva-template-dialog .capitoli-salva-template-msg {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(16, 35, 63, 0.08);
+  color: #1a3558;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.capitoli-salva-template-dialog .capitoli-salva-template-msg.is-error {
+  background: rgba(180, 40, 40, 0.1);
+  color: #8a1f1f;
+}
+
+.capitoli-salva-template-dialog .capitoli-salva-template-msg.is-ok {
+  background: rgba(30, 120, 60, 0.12);
+  color: #1a5c2e;
+}
+
+/* display:flex di .formula-dialog-actions altrimenti vince su [hidden] */
+.capitoli-salva-template-dialog .formula-dialog-actions[hidden],
+.capitoli-salva-template-dialog .field[hidden],
+.capitoli-salva-template-dialog .capitoli-salva-template-msg[hidden] {
+  display: none !important;
+}

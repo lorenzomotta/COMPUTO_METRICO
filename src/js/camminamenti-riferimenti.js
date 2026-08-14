@@ -413,8 +413,9 @@ function renderStratoRow(rif, st, tbody) {
   chk.type = "checkbox";
   chk.className = "camm-strato-segno";
   chk.checked = st.segno === true;
+  chk.setAttribute("aria-label", "Sottrai strato");
   lbl.appendChild(chk);
-  lbl.append(" −");
+  lbl.append(" sottrai");
   tdSegno.appendChild(lbl);
   tr.appendChild(tdSegno);
 
@@ -461,7 +462,7 @@ function renderRiferimentoBlock(rif, host) {
   const table = document.createElement("table");
   table.className = "table camm-strati-table";
   table.innerHTML = `<thead><tr>
-    <th>N°</th><th>VOCE</th><th>M1</th><th>M2</th><th>Spess.</th><th>Mq</th><th>Mc</th><th>−</th><th></th>
+    <th>N°</th><th>VOCE</th><th>M1</th><th>M2</th><th>Spess.</th><th>Mq</th><th>Mc</th><th>Sottrai</th><th></th>
   </tr></thead>`;
   const tbody = document.createElement("tbody");
   tbody.className = "camm-strati-tbody";

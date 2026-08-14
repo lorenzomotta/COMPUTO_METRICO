@@ -33,6 +33,7 @@ export function collectPianiStringheDaMurData({
   misurazioniVarie,
   scaviEsterni,
   corselliEsterni,
+  scivoliEsterni,
   camminamentiEsterni,
   voci,
 }) {
@@ -44,6 +45,7 @@ export function collectPianiStringheDaMurData({
   for (const m of misurazioniVarie || []) push(m?.piano);
   for (const m of scaviEsterni || []) push(m?.piano);
   for (const m of corselliEsterni || []) push(m?.piano);
+  for (const m of scivoliEsterni || []) push(m?.piano);
   for (const m of camminamentiEsterni || []) push(m?.piano);
   for (const v of voci || []) {
     const mm = v?.misurazioniManuali;

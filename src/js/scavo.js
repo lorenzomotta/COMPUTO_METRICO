@@ -1,5 +1,5 @@
 /**
- * Vista dedicata MISURE VARIE (ex sezione in ESTERNI VARI).
+ * Vista dedicata SCAVO (ex sezione in ESTERNI VARI).
  */
 
 import { dismissCamminamentiIfOpen } from "./camminamenti-misurazione.js";
@@ -14,7 +14,7 @@ import { showVistaCompilazione } from "./modules/viewHelpers.js";
  *   onPrepare?: () => void,
  * }} [opts]
  */
-export function openVistaMisureVarie(opts = {}) {
+export function openVistaScavo(opts = {}) {
   dismissVaniIfOpen();
   dismissPerimetraliIfOpen();
   dismissSolaiInterniIfOpen();
@@ -34,8 +34,8 @@ export function openVistaMisureVarie(opts = {}) {
   if (interrato) interrato.hidden = true;
   if (esterni) esterni.hidden = true;
   if (altreTipologiePanelEl) altreTipologiePanelEl.hidden = true;
-  if (scavo) scavo.hidden = true;
-  if (misure) misure.hidden = false;
+  if (misure) misure.hidden = true;
+  if (scavo) scavo.hidden = false;
 
   showVistaCompilazione(vistaPianiEl, vistaCompilazioneEl, altreTipologiePanelEl);
   if (vistaVociEl) vistaVociEl.hidden = true;
@@ -44,14 +44,14 @@ export function openVistaMisureVarie(opts = {}) {
   if (typeof opts.onPrepare === "function") opts.onPrepare();
 
   window.requestAnimationFrame(() => {
-    document.getElementById("misurazioni-piano")?.focus();
+    document.getElementById("scavo-piano")?.focus();
   });
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
-export function closeVistaMisureVarie() {
-  const misure = document.getElementById("compilazione-misure-varie");
-  if (misure) misure.hidden = true;
+export function closeVistaScavo() {
+  const scavo = document.getElementById("compilazione-scavo");
+  if (scavo) scavo.hidden = true;
 
   const vistaPianiEl = document.getElementById("vista-piani");
   const vistaCompilazioneEl = document.getElementById("vista-compilazione");
@@ -65,15 +65,21 @@ export function closeVistaMisureVarie() {
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
+/** Nasconde il pannello SCAVO se aperto (senza cambiare le altre viste). */
+export function dismissScavoIfOpen() {
+  const scavo = document.getElementById("compilazione-scavo");
+  if (scavo) scavo.hidden = true;
+}
+
 /**
  * @param {{
  *   onPrepare?: () => void,
  *   onBack?: () => void,
  * }} [opts]
  */
-export function wireMisureVarieUi(opts = {}) {
-  document.getElementById("btn-torna-piani-misure-varie")?.addEventListener("click", () => {
+export function wireScavoUi(opts = {}) {
+  document.getElementById("btn-torna-piani-scavo")?.addEventListener("click", () => {
     if (typeof opts.onBack === "function") opts.onBack();
-    else closeVistaMisureVarie();
+    else closeVistaScavo();
   });
 }

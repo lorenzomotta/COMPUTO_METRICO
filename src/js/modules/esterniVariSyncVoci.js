@@ -11,6 +11,7 @@ const TIPOMISURA_VOCE_MANUALE = "MANUALE";
 const UNITA_DEFAULT = {
   SCAVO: "mc",
   CORSELLO: "mc",
+  SCIVOLO: "mc",
   MISURAZIONE_VARIA: "a corpo",
 };
 
@@ -82,6 +83,7 @@ function rigaBase({
  * @param {{
  *   scaviEsterni: object[],
  *   corselliEsterni: object[],
+ *   scivoliEsterni: object[],
  *   camminamentiEsterni: object[],
  *   misurazioniVarie: object[],
  * }} data
@@ -89,6 +91,7 @@ function rigaBase({
 export function syncEsterniMisurazioniNelleVoci(data) {
   const scavi = Array.isArray(data?.scaviEsterni) ? data.scaviEsterni : [];
   const corselli = Array.isArray(data?.corselliEsterni) ? data.corselliEsterni : [];
+  const scivoli = Array.isArray(data?.scivoliEsterni) ? data.scivoliEsterni : [];
   const misurazioni = Array.isArray(data?.misurazioniVarie) ? data.misurazioniVarie : [];
   // camminamentiEsterni non più supportati in ESTERNI VARI (modulo CAMMINAMENTI dedicato).
 
@@ -174,6 +177,26 @@ export function syncEsterniMisurazioniNelleVoci(data) {
         formulaValue: item.formulaValue,
       }),
       UNITA_DEFAULT.CORSELLO,
+    );
+  }
+  for (const item of scivoli) {
+    add(
+      item.idVoce,
+      rigaBase({
+        piano: item.piano,
+        riferimento: item.riferimento,
+        tipoOggetto: "SCIVOLO",
+        misura1: item.misura1,
+        misura2: item.misura2,
+        misura3: item.altezza,
+        numero: 1,
+        segno: false,
+        risultato: item.volume,
+        esterniKey: `scivolo:${item.idPlSciv}`,
+        formula: item.formula,
+        formulaValue: item.formulaValue,
+      }),
+      UNITA_DEFAULT.SCIVOLO,
     );
   }
   for (const item of misurazioni) {
