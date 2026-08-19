@@ -18,7 +18,7 @@ import {
   aggiornaVociDaSnapshotPerimetrale,
   rimuoviRigheMisurazioniPerSchedaPerimetrale,
 } from "./modules/perimetraliRegistroAggiornaVoci.js";
-import { altezzaInclusaNelloStratoConElevazione } from "./utils/numberUtils.js";
+import { altezzaInclusaNelloStratoConElevazione, mqAperturaConPercentuale, normalizzaPercentualeApertura } from "./utils/numberUtils.js";
 
 const STORAGE_PERIM_REGISTRATI_KEY = "computo_metrico_perimetrali_registrati";
 
@@ -27,41 +27,44 @@ const PERIM_SVG_FINESTRA =
   '<svg class="vani-icon-finestra" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>';
 
 const PARETE_FLAG_KEYS = [
-  "zoccoloEsterno",
+  "portante",
+  "tamponamento",
+  "isolante",
+  "cappotto",
+  "intonachino",
+  "pitturaEsterna",
   "rusticoEsterno",
   "civileEsterno",
   "rivestimentoEsterno",
-  "portante",
-  "cappotto",
-  "isolante",
-  "intonachino",
-  "pitturaEsterna",
+  "zoccoloEsterno",
   "correa",
 ];
 
 const PARETE_FLAG_LABELS = {
-  zoccoloEsterno: "Zoccolo Esterno",
-  rusticoEsterno: "Rustico Esterno",
-  civileEsterno: "Civile Esterno",
-  rivestimentoEsterno: "Rivestimento esterno",
   portante: "Portante",
-  cappotto: "Cappotto",
+  tamponamento: "Tamponamento",
   isolante: "Isolante",
+  cappotto: "Cappotto",
   intonachino: "Intonachino",
-  pitturaEsterna: "Pittura Esterna",
+  pitturaEsterna: "Pittura esterna",
+  rusticoEsterno: "Rustico Esterno",
+  civileEsterno: "Civile esterno",
+  rivestimentoEsterno: "Rivestimento esterno",
+  zoccoloEsterno: "Zoccolo Esterno",
   correa: "Correa",
 };
 
 const PARETE_FLAG_AUTO_STRATO_NOTE = {
-  zoccoloEsterno: "zoccolo esterno",
+  portante: "portante",
+  tamponamento: "tamponamento",
+  isolante: "isolante",
+  cappotto: "cappotto",
+  intonachino: "intonachino",
+  pitturaEsterna: "pittura esterna",
   rusticoEsterno: "rustico esterno",
   civileEsterno: "civile esterno",
   rivestimentoEsterno: "rivestimento esterno",
-  portante: "portante",
-  cappotto: "cappotto",
-  isolante: "isolante",
-  intonachino: "intonachino",
-  pitturaEsterna: "pittura esterna",
+  zoccoloEsterno: "zoccolo esterno",
   correa: "correa",
 };
 
@@ -315,7 +318,7 @@ function renderApertureCell(pa) {
       const checked = (pa.idApertureMaster || []).includes(id);
       const disabled = !checked && usateAltrove.has(id);
       const loc = typeof ap.locale === "string" && ap.locale.trim() ? ap.locale.trim() : "—";
-      const label = `${id} · ${loc} · L ${ap.largh ?? "—"} × H ${ap.alt ?? "—"}`;
+      const label = `${id} · ${loc} · L ${ap.largh ?? "—"} × H ${ap.alt ?? "—"} × ${normalizzaPercentualeApertura(ap.percentuale)}%`;
       const azioni = checked
         ? `<span class="perim-apertura-azioni">
             <button type="button" class="btn-action btn-edit vani-btn-mini" data-action="edit-apertura" data-parete-id="${pa.id}" data-apertura-id="${escapeHtml(id)}" title="Modifica apertura">✎</button>
@@ -350,7 +353,7 @@ function renderStrati(pa) {
         const ap = getAperturaMasterById(idM);
         if (!ap) continue;
         const hInc = altezzaInclusaNelloStratoConElevazione(elev, H || null, ap) ?? 0;
-        mqAperture += Number((Number(ap.largh || 0) * hInc).toFixed(2));
+        mqAperture += mqAperturaConPercentuale(ap.largh || 0, hInc, ap.percentuale, 2);
       }
       const mqNetti = Number((mqLordi - mqAperture).toFixed(2));
       return `<div class="vani-strato-row" data-parete-id="${pa.id}" data-strato-id="${st.id}">
@@ -767,6 +770,7 @@ function fillDialogAperturaFromValues(vals) {
   set("perim-nap-locale", vals.locale);
   set("perim-nap-largh", vals.largh);
   set("perim-nap-alt", vals.alt);
+  set("perim-nap-percentuale", vals.percentuale);
   set("perim-nap-hdav", vals.hDav);
   set("perim-nap-ante", vals.ante);
   set("perim-nap-tipologia", vals.tipologia);
@@ -774,6 +778,7 @@ function fillDialogAperturaFromValues(vals) {
   set("perim-nap-scuro", vals.scuro);
   set("perim-nap-inferiata", vals.inferiata);
   set("perim-nap-zanzariera", vals.zanzariera);
+  set("perim-nap-controdavanzale", vals.controdavanzale);
 }
 
 function apriDialogNuovaApertura(pareteId) {
@@ -791,6 +796,7 @@ function apriDialogNuovaApertura(pareteId) {
     locale: "",
     largh: "",
     alt: "",
+    percentuale: "100",
     hDav: "0",
     ante: "1",
     tipologia: "FINESTRA",
@@ -798,6 +804,7 @@ function apriDialogNuovaApertura(pareteId) {
     scuro: "NO",
     inferiata: "NO",
     zanzariera: "NO",
+    controdavanzale: "NO",
   });
   document.getElementById("perim-nuova-apertura-dialog")?.showModal();
   window.requestAnimationFrame(() => document.getElementById("perim-nap-locale")?.focus());
@@ -823,6 +830,7 @@ function apriDialogModificaApertura(pareteId, idApertura) {
     locale: ap.locale ?? "",
     largh: ap.largh != null ? String(ap.largh) : "",
     alt: ap.alt != null ? String(ap.alt) : "",
+    percentuale: String(normalizzaPercentualeApertura(ap.percentuale)),
     hDav: ap.hDav != null ? String(ap.hDav) : "0",
     ante: ap.ante != null ? String(ap.ante) : "1",
     tipologia: ap.tipologia || "FINESTRA",
@@ -830,6 +838,7 @@ function apriDialogModificaApertura(pareteId, idApertura) {
     scuro: ap.scuro || "NO",
     inferiata: ap.inferiata || "NO",
     zanzariera: ap.zanzariera || "NO",
+    controdavanzale: ap.controdavanzale || "NO",
   });
   document.getElementById("perim-nuova-apertura-dialog")?.showModal();
   window.requestAnimationFrame(() => document.getElementById("perim-nap-largh")?.focus());
@@ -864,6 +873,7 @@ function onNuovaAperturaSubmit(e) {
     locale,
     largh: document.getElementById("perim-nap-largh")?.value || "",
     alt: document.getElementById("perim-nap-alt")?.value || "",
+    percentuale: document.getElementById("perim-nap-percentuale")?.value || "100",
     hDav: document.getElementById("perim-nap-hdav")?.value || "0",
     ante: document.getElementById("perim-nap-ante")?.value || "1",
     tipologia: document.getElementById("perim-nap-tipologia")?.value || "FINESTRA",
@@ -871,6 +881,7 @@ function onNuovaAperturaSubmit(e) {
     scuro: document.getElementById("perim-nap-scuro")?.value || "NO",
     inferiata: document.getElementById("perim-nap-inferiata")?.value || "NO",
     zanzariera: document.getElementById("perim-nap-zanzariera")?.value || "NO",
+    controdavanzale: document.getElementById("perim-nap-controdavanzale")?.value || "NO",
   };
   const editId =
     editingAperturaId ||

@@ -197,6 +197,20 @@
               </div>
 
               <div class="field">
+                <label for="ap-percentuale">PERCENTUALE (%)</label>
+                <input
+                  id="ap-percentuale"
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="100"
+                  value="100"
+                  required
+                  title="Riduce la superficie da sottrarre: Lunghezza × Altezza × percentuale / 100. 100% = superficie intera."
+                />
+              </div>
+
+              <div class="field">
                 <label for="ap-ante">ANTE</label>
                 <input id="ap-ante" type="number" step="1" min="0" placeholder="0" required />
               </div>
@@ -237,16 +251,17 @@
             <div class="table-wrap table-wrap-aperture">
               <table class="table-aperture">
                 <colgroup>
+                  <col class="table-aperture-col" style="width: 6%" />
+                  <col class="table-aperture-col" style="width: 6%" />
+                  <col class="table-aperture-col" style="width: 12%" />
                   <col class="table-aperture-col" style="width: 7%" />
                   <col class="table-aperture-col" style="width: 7%" />
-                  <col class="table-aperture-col" style="width: 13%" />
-                  <col class="table-aperture-col" style="width: 7%" />
-                  <col class="table-aperture-col" style="width: 7%" />
+                  <col class="table-aperture-col" style="width: 6%" />
                   <col class="table-aperture-col" style="width: 5%" />
-                  <col class="table-aperture-col" style="width: 11%" />
+                  <col class="table-aperture-col" style="width: 10%" />
                   <col class="table-aperture-col" style="width: 6%" />
                   <col class="table-aperture-col" style="width: 7%" />
-                  <col class="table-aperture-col" style="width: 22%" />
+                  <col class="table-aperture-col" style="width: 20%" />
                   <col class="table-aperture-col table-aperture-col-actions" style="width: 8%" />
                 </colgroup>
                 <thead>
@@ -256,6 +271,7 @@
                     <th>LOCALE</th>
                     <th title="Lunghezza">LUNG.</th>
                     <th title="Altezza">ALT.</th>
+                    <th title="Percentuale superficie">%</th>
                     <th>ANTE</th>
                     <th>TIPOLOGIA</th>
                     <th title="Falsotelai">FALSO<br />TEL.</th>
@@ -285,7 +301,7 @@
             <p class="sub-block-desc">
               Per ogni strato <strong>LORDO</strong> e <strong>NETTO strato</strong> compaiono una sola volta; ogni
               apertura ha una riga con LOCALE, misure e m² di pertinenza. Altezza inclusa =
-              min(Altezza apertura, max(0, Altezza strato − H DAVANZALE)). <strong>m² apertura</strong> = L × H inclusa.
+              min(Altezza apertura, max(0, Altezza strato − H DAVANZALE)). <strong>m² apertura</strong> = L × H inclusa × (percentuale / 100).
               <strong>NETTO strato</strong> = LORDO − somma m² aperture.
             </p>
             <div class="table-wrap">
@@ -1269,7 +1285,7 @@
             <p class="vani-help-inline__p vani-help-inline__p--muted">
               Per ogni strato parete: in <strong>lordo</strong>, <strong>Lungh. parete</strong> × <strong>H strato</strong> → <strong>Mq lordi</strong>.
               Il dettaglio <strong>«Aperture sottratte»</strong> compare solo se sulla parete hai selezionato almeno un’apertura (<strong>stesso nome locale</strong> negli archivi).
-              Con aperture: <strong>lungh.</strong>, <strong>h</strong> inclusa nella fascia strato, <strong>ML/Mq netti</strong> e poi il <strong>mq netto dello strato</strong> (<strong>Mq lordi</strong> − somma mq aperture).
+              Con aperture: <strong>lungh.</strong>, <strong>h</strong> inclusa nella fascia strato, <strong>ML/Mq netti</strong> (mq = L × H inclusa × percentuale/100) e poi il <strong>mq netto dello strato</strong> (<strong>Mq lordi</strong> − somma mq aperture).
             </p>
           </div>
 
@@ -1347,6 +1363,7 @@
                   <h3>Nuova apertura sulla parete</h3>
                   <p class="vani-nuova-apertura-hint">
                     L’apertura viene salvata nell’archivio APERTURE e collegata a questa parete. L’elenco si aggiorna subito.
+                    La <strong>percentuale</strong> (da 0 a 100, predefinita 100%) riduce la superficie da sottrarre: Larghezza × Altezza × percentuale / 100.
                   </p>
                   <div class="vani-nuova-apertura-grid">
                     <label class="field">
@@ -1364,6 +1381,19 @@
                     <label class="field">
                       <span>Altezza (m)</span>
                       <input id="vani-nap-alt" type="number" step="0.01" min="0" required />
+                    </label>
+                    <label class="field">
+                      <span>Percentuale (%)</span>
+                      <input
+                        id="vani-nap-percentuale"
+                        type="number"
+                        step="1"
+                        min="0"
+                        max="100"
+                        value="100"
+                        required
+                        title="Riduce la superficie da sottrarre: Larghezza × Altezza × percentuale / 100. 100% = superficie intera."
+                      />
                     </label>
                     <label class="field">
                       <span>H davanzale (m)</span>
@@ -1415,6 +1445,13 @@
                     <label class="field">
                       <span>Zanzariera</span>
                       <select id="vani-nap-zanzariera">
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Controdavanzale</span>
+                      <select id="vani-nap-controdavanzale">
                         <option value="NO">NO</option>
                         <option value="SI">SI</option>
                       </select>
@@ -1540,6 +1577,7 @@
                   <p class="vani-nuova-apertura-hint">
                     <strong>Zona</strong> = facciata perimetrale (per collegarla a questa scheda).
                     <strong>Locale</strong> = stanza del vano (stesso nome che digiti in VANI): così in VANI potrai associare questa apertura alle pareti di quel locale.
+                    La <strong>percentuale</strong> (0–100, predefinita 100%) riduce la superficie da sottrarre: Larghezza × Altezza × percentuale / 100.
                   </p>
                   <input type="hidden" id="perim-nap-edit-id" value="" />
                   <div class="vani-nuova-apertura-grid">
@@ -1569,6 +1607,19 @@
                     <label class="field">
                       <span>Altezza (m)</span>
                       <input id="perim-nap-alt" type="number" step="0.01" min="0" required />
+                    </label>
+                    <label class="field">
+                      <span>Percentuale (%)</span>
+                      <input
+                        id="perim-nap-percentuale"
+                        type="number"
+                        step="1"
+                        min="0"
+                        max="100"
+                        value="100"
+                        required
+                        title="Riduce la superficie da sottrarre: Larghezza × Altezza × percentuale / 100. 100% = superficie intera."
+                      />
                     </label>
                     <label class="field">
                       <span>H davanzale (m)</span>
@@ -1620,6 +1671,13 @@
                     <label class="field">
                       <span>Zanzariera</span>
                       <select id="perim-nap-zanzariera">
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Controdavanzale</span>
+                      <select id="perim-nap-controdavanzale">
                         <option value="NO">NO</option>
                         <option value="SI">SI</option>
                       </select>
@@ -1749,6 +1807,7 @@
                   <p class="vani-nuova-apertura-hint">
                     <strong>Zona</strong> = facciata (per collegarla a questa scheda).
                     <strong>Locale</strong> = stanza del vano (stesso nome che digiti in VANI): così in VANI potrai associare questa apertura alle pareti di quel locale.
+                    La <strong>percentuale</strong> (0–100, predefinita 100%) riduce la superficie da sottrarre: Larghezza × Altezza × percentuale / 100.
                   </p>
                   <input type="hidden" id="elev-nap-edit-id" value="" />
                   <div class="vani-nuova-apertura-grid">
@@ -1778,6 +1837,19 @@
                     <label class="field">
                       <span>Altezza (m)</span>
                       <input id="elev-nap-alt" type="number" step="0.01" min="0" required />
+                    </label>
+                    <label class="field">
+                      <span>Percentuale (%)</span>
+                      <input
+                        id="elev-nap-percentuale"
+                        type="number"
+                        step="1"
+                        min="0"
+                        max="100"
+                        value="100"
+                        required
+                        title="Riduce la superficie da sottrarre: Larghezza × Altezza × percentuale / 100. 100% = superficie intera."
+                      />
                     </label>
                     <label class="field">
                       <span>H davanzale (m)</span>
@@ -1829,6 +1901,13 @@
                     <label class="field">
                       <span>Zanzariera</span>
                       <select id="elev-nap-zanzariera">
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Controdavanzale</span>
+                      <select id="elev-nap-controdavanzale">
                         <option value="NO">NO</option>
                         <option value="SI">SI</option>
                       </select>

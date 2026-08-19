@@ -18,7 +18,7 @@ import {
   aggiornaVociDaSnapshotElevazione,
   rimuoviRigheMisurazioniPerSchedaElevazione,
 } from "./modules/elevazioneRegistroAggiornaVoci.js";
-import { altezzaInclusaNelloStratoConElevazione } from "./utils/numberUtils.js";
+import { altezzaInclusaNelloStratoConElevazione, mqAperturaConPercentuale, normalizzaPercentualeApertura } from "./utils/numberUtils.js";
 
 const STORAGE_ELEV_REGISTRATI_KEY = "computo_metrico_elevazione_registrati";
 const VOCE_FONDAZIONE_CONTINUA = "FONDAZIONE CONTINUA";
@@ -28,42 +28,38 @@ const ELEV_SVG_FINESTRA =
   '<svg class="vani-icon-finestra" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>';
 
 const PARETE_FLAG_KEYS = [
+  "portante",
   "zoccoloEsterno",
   "rusticoEsterno",
   "civileEsterno",
   "rivestimentoEsterno",
-  "portante",
-  "cappotto",
-  "isolante",
-  "intonachino",
   "pitturaEsterna",
   "correa",
 ];
 
 const PARETE_FLAG_LABELS = {
+  portante: "ELEVAZIONE C.A.",
   zoccoloEsterno: "Zoccolo Esterno",
   rusticoEsterno: "Rustico Esterno",
   civileEsterno: "Civile Esterno",
   rivestimentoEsterno: "Rivestimento esterno",
-  portante: "Portante",
-  cappotto: "Cappotto",
-  isolante: "Isolante",
-  intonachino: "Intonachino",
-  pitturaEsterna: "Pittura Esterna",
+  pitturaEsterna: "Pittura esterna",
   correa: "Correa",
 };
 
 const PARETE_FLAG_AUTO_STRATO_NOTE = {
+  portante: "elevazione c.a.",
   zoccoloEsterno: "zoccolo esterno",
   rusticoEsterno: "rustico esterno",
   civileEsterno: "civile esterno",
   rivestimentoEsterno: "rivestimento esterno",
-  portante: "portante",
-  cappotto: "cappotto",
-  isolante: "isolante",
-  intonachino: "intonachino",
   pitturaEsterna: "pittura esterna",
   correa: "correa",
+};
+
+/** Note vecchie ancora valide (non creare un secondo strato). */
+const PARETE_FLAG_NOTE_ALIASES = {
+  portante: ["portante"],
 };
 
 const collapsedPareteIds = new Set();
@@ -249,12 +245,16 @@ function maybeAggiungiStratoPerFlagTipo(parete, flagKey) {
   const noteAttesa = PARETE_FLAG_AUTO_STRATO_NOTE[flagKey];
   if (!noteAttesa || parete[flagKey] !== true) return;
   const noteKey = noteAttesa.toLocaleLowerCase("it-IT");
+  const noteKeys = new Set([
+    noteKey,
+    ...(PARETE_FLAG_NOTE_ALIASES[flagKey] || []).map((a) => String(a).trim().toLocaleLowerCase("it-IT")),
+  ]);
   const voceNome =
     typeof PARETE_FLAG_LABELS[flagKey] === "string" && PARETE_FLAG_LABELS[flagKey].trim()
       ? PARETE_FLAG_LABELS[flagKey].trim()
       : noteAttesa;
-  const haGia = (parete.stratifinitura || []).some(
-    (st) => String(st.note || "").trim().toLocaleLowerCase("it-IT") === noteKey,
+  const haGia = (parete.stratifinitura || []).some((st) =>
+    noteKeys.has(String(st.note || "").trim().toLocaleLowerCase("it-IT")),
   );
   if (haGia) return;
   const vuoto = (parete.stratifinitura || []).find(
@@ -331,7 +331,7 @@ function renderApertureCell(pa) {
       const checked = (pa.idApertureMaster || []).includes(id);
       const disabled = !checked && usateAltrove.has(id);
       const loc = typeof ap.locale === "string" && ap.locale.trim() ? ap.locale.trim() : "—";
-      const label = `${id} · ${loc} · L ${ap.largh ?? "—"} × H ${ap.alt ?? "—"}`;
+      const label = `${id} · ${loc} · L ${ap.largh ?? "—"} × H ${ap.alt ?? "—"} × ${normalizzaPercentualeApertura(ap.percentuale)}%`;
       const azioni = checked
         ? `<span class="elev-apertura-azioni">
             <button type="button" class="btn-action btn-edit vani-btn-mini" data-action="edit-apertura" data-parete-id="${pa.id}" data-apertura-id="${escapeHtml(id)}" title="Modifica apertura">✎</button>
@@ -366,7 +366,7 @@ function renderStrati(pa) {
         const ap = getAperturaMasterById(idM);
         if (!ap) continue;
         const hInc = altezzaInclusaNelloStratoConElevazione(elev, H || null, ap) ?? 0;
-        mqAperture += Number((Number(ap.largh || 0) * hInc).toFixed(2));
+        mqAperture += mqAperturaConPercentuale(ap.largh || 0, hInc, ap.percentuale, 2);
       }
       const mqNetti = Number((mqLordi - mqAperture).toFixed(2));
       return `<div class="vani-strato-row" data-parete-id="${pa.id}" data-strato-id="${st.id}">
@@ -856,6 +856,7 @@ function fillDialogAperturaFromValues(vals) {
   set("elev-nap-locale", vals.locale);
   set("elev-nap-largh", vals.largh);
   set("elev-nap-alt", vals.alt);
+  set("elev-nap-percentuale", vals.percentuale);
   set("elev-nap-hdav", vals.hDav);
   set("elev-nap-ante", vals.ante);
   set("elev-nap-tipologia", vals.tipologia);
@@ -863,6 +864,7 @@ function fillDialogAperturaFromValues(vals) {
   set("elev-nap-scuro", vals.scuro);
   set("elev-nap-inferiata", vals.inferiata);
   set("elev-nap-zanzariera", vals.zanzariera);
+  set("elev-nap-controdavanzale", vals.controdavanzale);
 }
 
 function apriDialogNuovaApertura(pareteId) {
@@ -880,6 +882,7 @@ function apriDialogNuovaApertura(pareteId) {
     locale: "",
     largh: "",
     alt: "",
+    percentuale: "100",
     hDav: "0",
     ante: "1",
     tipologia: "FINESTRA",
@@ -887,6 +890,7 @@ function apriDialogNuovaApertura(pareteId) {
     scuro: "NO",
     inferiata: "NO",
     zanzariera: "NO",
+    controdavanzale: "NO",
   });
   document.getElementById("elev-nuova-apertura-dialog")?.showModal();
   window.requestAnimationFrame(() => document.getElementById("elev-nap-locale")?.focus());
@@ -912,6 +916,7 @@ function apriDialogModificaApertura(pareteId, idApertura) {
     locale: ap.locale ?? "",
     largh: ap.largh != null ? String(ap.largh) : "",
     alt: ap.alt != null ? String(ap.alt) : "",
+    percentuale: String(normalizzaPercentualeApertura(ap.percentuale)),
     hDav: ap.hDav != null ? String(ap.hDav) : "0",
     ante: ap.ante != null ? String(ap.ante) : "1",
     tipologia: ap.tipologia || "FINESTRA",
@@ -919,6 +924,7 @@ function apriDialogModificaApertura(pareteId, idApertura) {
     scuro: ap.scuro || "NO",
     inferiata: ap.inferiata || "NO",
     zanzariera: ap.zanzariera || "NO",
+    controdavanzale: ap.controdavanzale || "NO",
   });
   document.getElementById("elev-nuova-apertura-dialog")?.showModal();
   window.requestAnimationFrame(() => document.getElementById("elev-nap-largh")?.focus());
@@ -953,6 +959,7 @@ function onNuovaAperturaSubmit(e) {
     locale,
     largh: document.getElementById("elev-nap-largh")?.value || "",
     alt: document.getElementById("elev-nap-alt")?.value || "",
+    percentuale: document.getElementById("elev-nap-percentuale")?.value || "100",
     hDav: document.getElementById("elev-nap-hdav")?.value || "0",
     ante: document.getElementById("elev-nap-ante")?.value || "1",
     tipologia: document.getElementById("elev-nap-tipologia")?.value || "FINESTRA",
@@ -960,6 +967,7 @@ function onNuovaAperturaSubmit(e) {
     scuro: document.getElementById("elev-nap-scuro")?.value || "NO",
     inferiata: document.getElementById("elev-nap-inferiata")?.value || "NO",
     zanzariera: document.getElementById("elev-nap-zanzariera")?.value || "NO",
+    controdavanzale: document.getElementById("elev-nap-controdavanzale")?.value || "NO",
   };
   const editId =
     editingAperturaId ||

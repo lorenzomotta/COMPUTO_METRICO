@@ -742,6 +742,41 @@ button {
 }
 
 /* Tabella a tutta larghezza del dialog; colonne “testo” crescono, numeri/azioni restano fissi */
+.aperture-master-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 8px;
+}
+
+.aperture-master-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #3d5a80;
+  font-weight: 600;
+}
+
+.aperture-master-filter select {
+  min-height: 28px;
+  min-width: 180px;
+  padding: 2px 8px;
+  border: 1px solid #c5d4e8;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 500;
+  color: #1a3558;
+  background: #fff;
+}
+
+.aperture-master-count {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: #4d6582;
+}
+
 .table-voce-mm-inline.aperture-master-table {
   width: 100%;
   min-width: 0;
@@ -811,9 +846,20 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* 6 HDAV */
+/* 6 % */
 .table-voce-mm-inline.aperture-master-table th:nth-child(6),
 .table-voce-mm-inline.aperture-master-table td:nth-child(6) {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 7 HDAV */
+.table-voce-mm-inline.aperture-master-table th:nth-child(7),
+.table-voce-mm-inline.aperture-master-table td:nth-child(7) {
   width: 56px;
   min-width: 56px;
   max-width: 56px;
@@ -822,9 +868,9 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* 7 ANTE — colonna stretta */
-.table-voce-mm-inline.aperture-master-table th:nth-child(7),
-.table-voce-mm-inline.aperture-master-table td:nth-child(7) {
+/* 8 ANTE — colonna stretta */
+.table-voce-mm-inline.aperture-master-table th:nth-child(8),
+.table-voce-mm-inline.aperture-master-table td:nth-child(8) {
   width: 38px;
   min-width: 38px;
   max-width: 38px;
@@ -835,37 +881,45 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* 8 TIPOLOGIA */
-.table-voce-mm-inline.aperture-master-table th:nth-child(8),
-.table-voce-mm-inline.aperture-master-table td:nth-child(8) {
+/* 9 TIPOLOGIA */
+.table-voce-mm-inline.aperture-master-table th:nth-child(9),
+.table-voce-mm-inline.aperture-master-table td:nth-child(9) {
   width: 18%;
   min-width: 120px;
   max-width: none;
 }
 
-/* 9–11 FALSO, SCURO, INFERIATA */
-.table-voce-mm-inline.aperture-master-table th:nth-child(9),
-.table-voce-mm-inline.aperture-master-table td:nth-child(9),
+/* 10–12 FALSO, SCURO, INFERIATA */
 .table-voce-mm-inline.aperture-master-table th:nth-child(10),
 .table-voce-mm-inline.aperture-master-table td:nth-child(10),
 .table-voce-mm-inline.aperture-master-table th:nth-child(11),
-.table-voce-mm-inline.aperture-master-table td:nth-child(11) {
+.table-voce-mm-inline.aperture-master-table td:nth-child(11),
+.table-voce-mm-inline.aperture-master-table th:nth-child(12),
+.table-voce-mm-inline.aperture-master-table td:nth-child(12) {
   width: 7%;
   min-width: 72px;
   max-width: none;
 }
 
-/* 12 ZANZARIERA */
-.table-voce-mm-inline.aperture-master-table th:nth-child(12),
-.table-voce-mm-inline.aperture-master-table td:nth-child(12) {
+/* 13 ZANZARIERA */
+.table-voce-mm-inline.aperture-master-table th:nth-child(13),
+.table-voce-mm-inline.aperture-master-table td:nth-child(13) {
   width: 72px;
   min-width: 68px;
   white-space: nowrap;
 }
 
-/* 13 AZIONI */
-.table-voce-mm-inline.aperture-master-table th:nth-child(13),
-.table-voce-mm-inline.aperture-master-table td:nth-child(13) {
+/* 14 CONTRODAVANZALE */
+.table-voce-mm-inline.aperture-master-table th:nth-child(14),
+.table-voce-mm-inline.aperture-master-table td:nth-child(14) {
+  width: 68px;
+  min-width: 64px;
+  white-space: nowrap;
+}
+
+/* 15 AZIONI */
+.table-voce-mm-inline.aperture-master-table th:nth-child(15),
+.table-voce-mm-inline.aperture-master-table td:nth-child(15) {
   width: 88px;
   min-width: 88px;
   white-space: nowrap;
@@ -882,11 +936,12 @@ button {
   padding: 0 4px;
 }
 
-/* Numeriche: LRGH, ALT, HDAV, ANTE (colonne 4–7 in modalità modifica) */
+/* Numeriche: LRGH, ALT, %, HDAV, ANTE (colonne 4–8 in modalità modifica) */
 .table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(4) input,
 .table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(5) input,
 .table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(6) input,
-.table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(7) input {
+.table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(7) input,
+.table-voce-mm-inline.aperture-master-table tr.row-edit-master-apertura td:nth-child(8) input {
   text-align: center;
 }
 
@@ -945,6 +1000,7 @@ button {
     minmax(110px, 1.05fr)
     minmax(52px, 0.5fr)
     minmax(52px, 0.5fr)
+    minmax(44px, 0.42fr)
     minmax(52px, 0.5fr)
     minmax(44px, 0.42fr)
     minmax(116px, 1.2fr)

@@ -3,6 +3,9 @@ import {
   parseNumber,
   parseAnteIntero,
   parseNonNegativeDecimal2,
+  parsePercentualeApertura,
+  normalizzaPercentualeApertura,
+  mqAperturaConPercentuale,
   fmt2,
   altezzaAperturaInclusaNelloStrato,
   altezzaInclusaNelloStratoConElevazione,
@@ -82,7 +85,7 @@ import {
 } from "./solai-inclinati-misurazione.js";
 import { openVistaMisureVarie, wireMisureVarieUi } from "./misure-varie.js";
 import { openVistaScavo, wireScavoUi, dismissScavoIfOpen } from "./scavo.js";
-import { buildRivestimentiRowsFromStorage, buildIntonacoRusticoRowsFromStorage, buildIntonacoCivileRowsFromStorage, buildZoccoloRowsFromStorage } from "./modules/rivestimentiRiepilogo.js";
+import { buildRivestimentiRowsFromStorage, buildRivestimentiElevazioneRowsFromStorage, buildRivestimentiPerimetraliRowsFromStorage, buildIntonacoRusticoRowsFromStorage, buildIntonacoRusticoEsternoRowsFromStorage, buildIntonacoCivileRowsFromStorage, buildIntonacoCivileEsternoRowsFromStorage, buildGessoRowsFromStorage, buildZoccoloRowsFromStorage } from "./modules/rivestimentiRiepilogo.js";
 import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
 import { syncEsterniMisurazioniNelleVoci } from "./modules/esterniVariSyncVoci.js";
 import { wireAggiornamentiAutomatici } from "./aggiornamenti.js";
@@ -117,6 +120,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const apLocaleEl = document.querySelector("#ap-locale");
   const apLunghezzaEl = document.querySelector("#ap-lunghezza");
   const apAltezzaEl = document.querySelector("#ap-altezza");
+  const apPercentualeEl = document.querySelector("#ap-percentuale");
   const apAnteEl = document.querySelector("#ap-ante");
   const apTipologiaEl = document.querySelector("#ap-tipologia");
   const apFalsotelaiEl = document.querySelector("#ap-falsotelai");
@@ -147,6 +151,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const rivestimentiSidebarButtonEl = document.createElement("button");
   const intonacoRusticoSidebarButtonEl = document.createElement("button");
   const intonacoCivileSidebarButtonEl = document.createElement("button");
+  const gessoSidebarButtonEl = document.createElement("button");
   const zoccoloSidebarButtonEl = document.createElement("button");
   const vaniSidebarButtonEl = document.createElement("button");
   const aggiungiVoceButtonEl = document.querySelector("#btn-aggiungi-voce");
@@ -338,6 +343,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const rivestimentiDialogEl = document.createElement("dialog");
   const intonacoRusticoDialogEl = document.createElement("dialog");
   const intonacoCivileDialogEl = document.createElement("dialog");
+  const gessoDialogEl = document.createElement("dialog");
   const zoccoloDialogEl = document.createElement("dialog");
   const vociBodyEl = document.querySelector("#voci-body");
   const vociTotaleComputoEl = document.querySelector("#voci-totale-computo");
@@ -386,7 +392,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let piani = [];
   /** @type {{ idStratoMur: number, idPiano: number, idStrato: string, lunghezza: number, altezza: number, spessore: number, idVoceCapitolato: string }[]} */
   let stratiMurElevazione = [];
-  /** @type {{ idAperturaElev: number, idPiano: number, locale: string, lunghezza: number, altezza: number, ante: number, tipologia: string, falsotelai: boolean, hDavanzale: number, idVoceCapitolato: string }[]} */
+  /** @type {{ idAperturaElev: number, idPiano: number, locale: string, lunghezza: number, altezza: number, percentuale?: number, ante: number, tipologia: string, falsotelai: boolean, hDavanzale: number, idVoceCapitolato: string }[]} */
   let apertureElevazione = [];
   /** @type {{ idPlScavo: number, piano: string, riferimento: string, sottrai: boolean, misura1: number|null, misura2: number|null, formula: string, formulaValue: number|null, area: number, altezza: number|null, volume: number, idVoce: string }[]} */
   let scaviEsterni = [];
@@ -396,11 +402,11 @@ window.addEventListener("DOMContentLoaded", () => {
   let scivoliEsterni = [];
   /** @type {{ idPlCamm: number, piano: string, riferimento: string, sottrai: boolean, misura1: number|null, misura2: number|null, formula: string, formulaValue: number|null, area: number, altezza: number|null, volume: number, idVoce: string }[]} */
   let camminamentiEsterni = [];
-  /** @type {{ idMisurazione: number, idVoce: string, piano: string, riferimento: string, formula: string, formulaValue: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[]} */
+  /** @type {{ idMisurazione: number, idVoce: string, piano: string, riferimento: string, formula: string, formulaValue: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, percentuale?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[]} */
   let misurazioniVarie = [];
-  /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, canaleGronda?: boolean, grondaCanaleValore?: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[] }[]} */
+  /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, canaleGronda?: boolean, grondaCanaleValore?: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, percentuale?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[] }[]} */
   let voci = [];
-  /** @type {{ idAperturaMaster: string, piano: string, zona?: string, locale: string, largh: number, alt: number, hDav: number, ante: number, tipologia: string, falso: string, scuro: string, inferiata: string, zanzariera: string }[]} */
+  /** @type {{ idAperturaMaster: string, piano: string, zona?: string, locale: string, largh: number, alt: number, percentuale: number, hDav: number, ante: number, tipologia: string, falso: string, scuro: string, inferiata: string, zanzariera: string, controdavanzale: string }[]} */
   let apertureMaster = [];
   /** @type {string[]} */
   let vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
@@ -416,6 +422,8 @@ window.addEventListener("DOMContentLoaded", () => {
   let voceMmUseAperturaContext = { idVoce: /** @type {number|null} */ (null), mmIndex: /** @type {number|null} */ (null) };
   let apertureMasterEditingId = null;
   let apertureMasterPendingDeleteId = null;
+  /** Filtro tipologia nell’archivio APERTURE ("" = tutte). */
+  let apertureMasterTipologiaFilter = "";
 
   /** Nomi piano usati in MISURAZIONI VARIE, esterni vari e righe manuali voce (lista univoca, ordinata). */
   let archivioPianiMisura = [];
@@ -1827,6 +1835,7 @@ window.addEventListener("DOMContentLoaded", () => {
       locale: d.locale,
       largh: d.largh,
       alt: d.alt,
+      percentuale: d.percentuale,
       hDav: d.hDav,
       ante: d.ante,
       tipologia: d.tipologia,
@@ -1834,10 +1843,11 @@ window.addEventListener("DOMContentLoaded", () => {
       scuro: d.scuro,
       inferiata: d.inferiata,
       zanzariera: d.zanzariera,
+      controdavanzale: d.controdavanzale,
     });
     if (!parsed) {
       window.alert(
-        "Dati apertura non validi. Controlla locale, larghezza, altezza, H davanzale e ante.",
+        "Dati apertura non validi. Controlla locale, larghezza, altezza, percentuale (0–100), H davanzale e ante.",
       );
       return;
     }
@@ -1868,6 +1878,7 @@ window.addEventListener("DOMContentLoaded", () => {
       locale: d.locale,
       largh: d.largh,
       alt: d.alt,
+      percentuale: d.percentuale,
       hDav: d.hDav,
       ante: d.ante,
       tipologia: d.tipologia,
@@ -1875,10 +1886,11 @@ window.addEventListener("DOMContentLoaded", () => {
       scuro: d.scuro,
       inferiata: d.inferiata,
       zanzariera: d.zanzariera,
+      controdavanzale: d.controdavanzale,
     });
     if (!parsed) {
       window.alert(
-        "Dati apertura non validi. Controlla locale, larghezza, altezza, H davanzale e ante.",
+        "Dati apertura non validi. Controlla locale, larghezza, altezza, percentuale (0–100), H davanzale e ante.",
       );
       return;
     }
@@ -2496,7 +2508,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /** Voci auto da aperture (tipologia, scuro, inferiata, zanzariera, cassonetto). */
+  /** Voci auto da aperture (tipologia, scuro, inferiata, zanzariera, controdavanzale, cassonetto). */
   function voceDerivataDaApertureAccessori(item) {
     const mm = normalizzaMisurazioniManualiVoce(item?.misurazioniManuali, item?.unitaMisura);
     return mm.some((m) => isTipoOggettoAccessorioApertura(m?.tipoOggetto));
@@ -2665,6 +2677,7 @@ window.addEventListener("DOMContentLoaded", () => {
       t === "CASSONETTO" ||
       t === "INFERIATA" ||
       t === "ZANZARIERA" ||
+      t === "CONTRODAVANZALE" ||
       t === "APERTURA"
     );
   }
@@ -2684,14 +2697,15 @@ window.addEventListener("DOMContentLoaded", () => {
   ) {
     const m3 = typeof m3Val === "number" && Number.isFinite(m3Val) ? m3Val : 0;
     const largh = Number(apertura?.largh || 0);
+    const percentuale = normalizzaPercentualeApertura(apertura?.percentuale);
     // Accessori (zanzariera, scuro, …): quantità = L×H intera dell’apertura, senza H inclusa nello strato.
     if (opts.usaAltezzaPienaApertura === true) {
       const alt = Number(apertura?.alt || 0);
       const hInclusa = Number((Number.isFinite(alt) ? alt : 0).toFixed(2));
       const ml = Number((largh || 0).toFixed(2));
-      const mq = Number((largh * hInclusa).toFixed(2));
+      const mq = mqAperturaConPercentuale(largh, hInclusa, percentuale, 2);
       const mc = Number((mq * m3).toFixed(2));
-      return { hInclusa, ml, mq, mc };
+      return { hInclusa, ml, mq, mc, percentuale };
     }
     const m2 = typeof m2AltVal === "number" && Number.isFinite(m2AltVal) ? m2AltVal : null;
     const hInclusaRaw =
@@ -2706,9 +2720,9 @@ window.addEventListener("DOMContentLoaded", () => {
           );
     const hInclusa = Number((hInclusaRaw ?? 0).toFixed(2));
     const ml = Number((largh || 0).toFixed(2));
-    const mq = Number((largh * hInclusa).toFixed(2));
+    const mq = mqAperturaConPercentuale(largh, hInclusa, percentuale, 2);
     const mc = Number((mq * m3).toFixed(2));
-    return { hInclusa, ml, mq, mc };
+    return { hInclusa, ml, mq, mc, percentuale };
   }
 
   function normalizzaUnitaVoceDetrazione(unitaRaw) {
@@ -2873,6 +2887,30 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  const TIPOLOGIE_APERTURA_MASTER = [
+    "FINESTRA",
+    "PORTA FINESTRA",
+    "BOCCA LUPO",
+    "FIN CANTINA",
+    "PORTONCINO",
+    "PORTA CANTINA",
+    "PORTA REI",
+    "PORTA INTERNA",
+    "SCRIGNO",
+    "BASCULANTE",
+    "SEZIONALE",
+  ];
+
+  function getTipologieAperturaMasterPerFiltro() {
+    const extra = [];
+    for (const ap of apertureMaster) {
+      const t = String(ap?.tipologia || "").trim();
+      if (t && !TIPOLOGIE_APERTURA_MASTER.includes(t) && !extra.includes(t)) extra.push(t);
+    }
+    extra.sort((a, b) => a.localeCompare(b, "it"));
+    return [...TIPOLOGIE_APERTURA_MASTER, ...extra];
+  }
+
   function openApertureMasterDialog() {
     const renderOptions = (field, current, options) =>
       options
@@ -2887,23 +2925,32 @@ window.addEventListener("DOMContentLoaded", () => {
             <td><input type="text" data-master-field="locale" value="${escapeHtml(ap.locale)}" /></td>
             <td><input type="number" step="0.01" min="0" data-master-field="largh" value="${escapeHtml(String(ap.largh))}" /></td>
             <td><input type="number" step="0.01" min="0" data-master-field="alt" value="${escapeHtml(String(ap.alt))}" /></td>
+            <td><input type="number" step="1" min="0" max="100" data-master-field="percentuale" value="${escapeHtml(String(normalizzaPercentualeApertura(ap.percentuale)))}" /></td>
             <td><input type="number" step="0.01" min="0" data-master-field="hDav" value="${escapeHtml(String(ap.hDav))}" /></td>
             <td><input type="number" step="1" min="0" data-master-field="ante" value="${escapeHtml(String(ap.ante))}" /></td>
             <td>
               <select data-master-field="tipologia">
-                ${renderOptions("tipologia", ap.tipologia, ["FINESTRA","PORTA FINESTRA","BOCCA LUPO","FIN CANTINA","PORTONCINO","PORTA CANTINA","PORTA REI","PORTA INTERNA","SCRIGNO","BASCULANTE","SEZIONALE"])}
+                ${renderOptions("tipologia", ap.tipologia, TIPOLOGIE_APERTURA_MASTER)}
               </select>
             </td>
             <td><select data-master-field="falso">${renderOptions("falso", ap.falso, ["NO","ALLUMINIO","LEGNO"])}</select></td>
             <td><select data-master-field="scuro">${renderOptions("scuro", ap.scuro, ["NO","PERSIANA","TAPPARELLA"])}</select></td>
             <td><select data-master-field="inferiata">${renderOptions("inferiata", ap.inferiata, ["NO","SI"])}</select></td>
             <td><select data-master-field="zanzariera">${renderOptions("zanzariera", ap.zanzariera, ["NO","SI"])}</select></td>
+            <td><select data-master-field="controdavanzale">${renderOptions("controdavanzale", ap.controdavanzale || "NO", ["NO","SI"])}</select></td>
             <td class="actions-cell">
               <button type="button" class="btn-action btn-secondary" data-action="${idRow === "__new__" ? "save-new-master-apertura-inline" : "save-master-apertura-inline"}" data-id="${escapeHtml(idRow)}">✓</button>
               <button type="button" class="btn-action btn-delete" data-action="cancel-edit-master-apertura" data-id="${escapeHtml(idRow)}">✕</button>
             </td>
           </tr>`;
-    const righe = apertureMaster
+    const filtroTipologia = String(apertureMasterTipologiaFilter || "").trim();
+    const apertureVisibili = apertureMaster.filter((ap) => {
+      if (!filtroTipologia) return true;
+      const id = String(ap.idAperturaMaster || "").trim();
+      if (apertureMasterEditingId && apertureMasterEditingId === id) return true;
+      return String(ap.tipologia || "").trim() === filtroTipologia;
+    });
+    const righe = apertureVisibili
       .map(
         (ap) => {
           const isEditing = apertureMasterEditingId === ap.idAperturaMaster;
@@ -2914,6 +2961,7 @@ window.addEventListener("DOMContentLoaded", () => {
               <td>${escapeHtml(ap.locale)}</td>
               <td>${fmt2(ap.largh)}</td>
               <td>${fmt2(ap.alt)}</td>
+              <td>${fmt2(normalizzaPercentualeApertura(ap.percentuale))}</td>
               <td>${fmt2(ap.hDav)}</td>
               <td>${escapeHtml(String(ap.ante))}</td>
               <td>${escapeHtml(ap.tipologia)}</td>
@@ -2921,6 +2969,7 @@ window.addEventListener("DOMContentLoaded", () => {
               <td>${escapeHtml(ap.scuro)}</td>
               <td>${escapeHtml(ap.inferiata)}</td>
               <td>${escapeHtml(ap.zanzariera)}</td>
+              <td>${escapeHtml(ap.controdavanzale || "NO")}</td>
               <td class="actions-cell">
                 <button type="button" class="btn-action btn-edit" data-action="edit-master-apertura" data-id="${escapeHtml(ap.idAperturaMaster)}">✎</button>
                 <button type="button" class="btn-action btn-delete" data-action="delete-master-apertura" data-id="${escapeHtml(ap.idAperturaMaster)}">🗑</button>
@@ -2937,33 +2986,57 @@ window.addEventListener("DOMContentLoaded", () => {
           locale: "",
           largh: "",
           alt: "",
+          percentuale: "100",
           hDav: "0",
           ante: "1",
-          tipologia: "FINESTRA",
+          tipologia: filtroTipologia || "FINESTRA",
           falso: "NO",
           scuro: "NO",
           inferiata: "NO",
           zanzariera: "NO",
+          controdavanzale: "NO",
         })
       : "";
+    const opzioniFiltro = getTipologieAperturaMasterPerFiltro()
+      .map(
+        (opt) =>
+          `<option value="${escapeHtml(opt)}" ${filtroTipologia === opt ? "selected" : ""}>${escapeHtml(opt)}</option>`,
+      )
+      .join("");
+    const nTotale = apertureMaster.length;
+    const nVisibili = apertureVisibili.length + (newRow ? 1 : 0);
+    const etichettaConteggio = filtroTipologia
+      ? `${nVisibili} di ${nTotale} aperture (${filtroTipologia})`
+      : `${nTotale} aperture`;
+    const emptyMsg = filtroTipologia
+      ? `Nessuna apertura di tipologia «${filtroTipologia}».`
+      : "Nessuna apertura in archivio.";
     apertureMasterDialogEl.innerHTML = `
       <form method="dialog" class="ifc-riepilogo-dialog-form">
         <div class="ifc-riepilogo-dialog-header"><h3>Archivio APERTURE</h3></div>
       </form>
-      <div style="padding:8px;">
+      <div class="aperture-master-toolbar">
         <button type="button" class="btn-action btn-secondary" data-action="new-master-apertura">Nuova apertura</button>
+        <label class="aperture-master-filter">
+          <span>Filtra tipologia</span>
+          <select data-action="filter-master-apertura-tipologia" aria-label="Filtra aperture per tipologia">
+            <option value="" ${filtroTipologia ? "" : "selected"}>Tutte</option>
+            ${opzioniFiltro}
+          </select>
+        </label>
+        <span class="aperture-master-count">${escapeHtml(etichettaConteggio)}</span>
       </div>
       <div class="ifc-riepilogo-table-host">
         <table class="table-voce-mm-inline aperture-master-table">
-          <thead><tr><th>ID</th><th>PIANO</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>FALSO</th><th>SCURO</th><th>INFERIATA</th><th>ZANZARIERA</th><th>AZIONI</th></tr></thead>
-          <tbody>${righe || ""}${newRow || (righe ? "" : `<tr><td colspan="13" class="empty-cell">Nessuna apertura in archivio.</td></tr>`)}</tbody>
+          <thead><tr><th>ID</th><th>PIANO</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>%</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>FALSO</th><th>SCURO</th><th>INFERIATA</th><th>ZANZARIERA</th><th title="Controdavanzale">C.DAV.</th><th>AZIONI</th></tr></thead>
+          <tbody>${righe || ""}${newRow || (righe ? "" : `<tr><td colspan="15" class="empty-cell">${escapeHtml(emptyMsg)}</td></tr>`)}</tbody>
         </table>
       </div>
       <div style="padding:8px;display:flex;justify-content:flex-end;">
         <button type="button" class="btn-action btn-secondary" data-action="close-master-aperture">Chiudi</button>
       </div>
     `;
-    apertureMasterDialogEl.showModal();
+    if (!apertureMasterDialogEl.open) apertureMasterDialogEl.showModal();
   }
 
   function readAperturaMasterInlineDraft(idAperturaMaster) {
@@ -2977,6 +3050,7 @@ window.addEventListener("DOMContentLoaded", () => {
       locale: getValue("locale"),
       largh: getValue("largh"),
       alt: getValue("alt"),
+      percentuale: getValue("percentuale"),
       hDav: getValue("hDav"),
       ante: getValue("ante"),
       tipologia: getValue("tipologia"),
@@ -2984,6 +3058,7 @@ window.addEventListener("DOMContentLoaded", () => {
       scuro: getValue("scuro"),
       inferiata: getValue("inferiata"),
       zanzariera: getValue("zanzariera"),
+      controdavanzale: getValue("controdavanzale"),
     });
     if (!parsed) return null;
     return { ...parsed, piano: getValue("piano") };
@@ -3037,6 +3112,7 @@ window.addEventListener("DOMContentLoaded", () => {
             <td>${escapeHtml(ap.locale)}</td>
             <td>${fmt2(ap.largh)}</td>
             <td>${fmt2(ap.alt)}</td>
+            <td>${fmt2(normalizzaPercentualeApertura(ap.percentuale))}</td>
             <td>${fmt2(ap.hDav)}</td>
             <td>${escapeHtml(String(ap.ante))}</td>
             <td>${escapeHtml(ap.tipologia)}</td>
@@ -3050,8 +3126,8 @@ window.addEventListener("DOMContentLoaded", () => {
       </form>
       <div class="ifc-riepilogo-table-host">
         <table class="table-voce-mm-inline">
-          <thead><tr><th>ID</th><th>PIANO</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>AZIONI</th></tr></thead>
-          <tbody>${rows || `<tr><td colspan="9" class="empty-cell">Archivio APERTURE vuoto.</td></tr>`}</tbody>
+          <thead><tr><th>ID</th><th>PIANO</th><th>LOCALE</th><th>LRGH</th><th>ALT</th><th>%</th><th>HDAV</th><th>ANTE</th><th>TIPOLOGIA</th><th>AZIONI</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="10" class="empty-cell">Archivio APERTURE vuoto.</td></tr>`}</tbody>
         </table>
       </div>
       <div style="padding:8px;display:flex;justify-content:flex-end;">
@@ -3323,39 +3399,198 @@ window.addEventListener("DOMContentLoaded", () => {
     dialogEl.showModal();
   }
 
-  function openRiepilogoRivestimentiDialog() {
-    openRiepilogoParetiFlagDialog({
+  let rivestimentiSchedaAttiva = "vani";
+  let intonacoRusticoSchedaAttiva = "interno";
+  let intonacoCivileSchedaAttiva = "interno";
+
+  /**
+   * @param {{ layout: "vani" | "esterno" | "zona", tabs: { action: string, label: string, active?: boolean }[] }} opts
+   */
+  function openRiepilogoSchedeDialog({
+    dialogEl,
+    titolo,
+    tabs,
+    layout,
+    rows,
+    descrizione,
+    emptyMessage,
+    closeAction,
+  }) {
+    const isVani = layout === "vani";
+    const isEsternoMisto = layout === "esterno";
+    const colCount = isEsternoMisto ? 7 : 6;
+    const theadHtml = isVani
+      ? `<tr><th>LOCALE</th><th>PARETE</th><th>LUNGHEZZA</th><th>ALTEZZA</th><th>MQ LORDI</th><th>MQ NETTI</th></tr>`
+      : isEsternoMisto
+        ? `<tr><th>ORIGINE</th><th>ZONA</th><th>PARETE</th><th>LUNGHEZZA</th><th>ALTEZZA</th><th>MQ LORDI</th><th>MQ NETTI</th></tr>`
+        : `<tr><th>ZONA</th><th>PARETE</th><th>LUNGHEZZA</th><th>ALTEZZA</th><th>MQ LORDI</th><th>MQ NETTI</th></tr>`;
+
+    /** @type {Map<string, typeof rows>} */
+    const byPiano = new Map();
+    for (const row of rows) {
+      if (!byPiano.has(row.piano)) byPiano.set(row.piano, []);
+      byPiano.get(row.piano).push(row);
+    }
+    const fmtDim = (v) => (typeof v === "number" && Number.isFinite(v) ? fmt2(v) : "—");
+    const rigaHtml = (row) => {
+      const dims = `<td>${escapeHtml(fmtDim(row.lunghezza))}</td>
+              <td>${escapeHtml(fmtDim(row.altezza))}</td>
+              <td>${escapeHtml(fmtDim(row.mqLordi))}</td>
+              <td>${escapeHtml(fmtDim(row.mqNetti))}</td>`;
+      if (isEsternoMisto) {
+        return `<tr>
+              <td>${escapeHtml(row.origine || "-")}</td>
+              <td>${escapeHtml(row.locale)}</td>
+              <td>${escapeHtml(row.riferimento)}</td>
+              ${dims}
+            </tr>`;
+      }
+      return `<tr>
+              <td>${escapeHtml(row.locale)}</td>
+              <td>${escapeHtml(row.riferimento)}</td>
+              ${dims}
+            </tr>`;
+    };
+    let tbodyHtml = "";
+    if (rows.length === 0) {
+      tbodyHtml = `<tr><td colspan="${colCount}" class="empty-cell">${escapeHtml(emptyMessage)}</td></tr>`;
+    } else {
+      for (const [piano, pianoRows] of byPiano) {
+        tbodyHtml += `<tr class="bim-props-section-row"><td colspan="${colCount}">${escapeHtml(`PIANO: ${piano}`)}</td></tr>`;
+        tbodyHtml += pianoRows.map(rigaHtml).join("");
+      }
+    }
+    const tabsHtml = (Array.isArray(tabs) ? tabs : [])
+      .map(
+        (tab) =>
+          `<button type="button" class="bim-tab${tab.active ? " is-active" : ""}" data-action="${escapeHtml(tab.action)}">${escapeHtml(tab.label)}</button>`,
+      )
+      .join("");
+
+    dialogEl.innerHTML = `
+      <form method="dialog" class="ifc-riepilogo-dialog-form">
+        <div class="ifc-riepilogo-dialog-header"><h3>${escapeHtml(titolo)}</h3></div>
+        <div class="bim-props-tabs riepilogo-schede-tabs">
+          ${tabsHtml}
+        </div>
+        <p style="padding:0 8px 8px;margin:0;font-size:0.9rem;opacity:0.85;">
+          ${escapeHtml(descrizione)}
+        </p>
+        <div class="table-wrap">
+          <table class="table-voce-mm-inline">
+            <thead>${theadHtml}</thead>
+            <tbody>${tbodyHtml}</tbody>
+          </table>
+        </div>
+        <div style="padding:8px;display:flex;justify-content:flex-end;">
+          <button type="button" class="btn-action btn-secondary" data-action="${escapeHtml(closeAction)}">Chiudi</button>
+        </div>
+      </form>
+    `;
+    if (!dialogEl.open) {
+      dialogEl.showModal();
+    }
+  }
+
+  function openRiepilogoRivestimentiDialog(scheda) {
+    if (scheda === "vani" || scheda === "elevazione" || scheda === "perimetrali") {
+      rivestimentiSchedaAttiva = scheda;
+    }
+    const attiva = rivestimentiSchedaAttiva;
+    const isVani = attiva === "vani";
+    const rows =
+      attiva === "elevazione"
+        ? buildRivestimentiElevazioneRowsFromStorage()
+        : attiva === "perimetrali"
+          ? buildRivestimentiPerimetraliRowsFromStorage()
+          : buildRivestimentiRowsFromStorage();
+    const descrizione = isVani
+      ? "Scheda VANI: pareti interne con flag Rivestimento. H = altezza dello strato rivestimento; MQ lordi = L×H strato; MQ netti = lordi − aperture nella fascia dello strato."
+      : attiva === "elevazione"
+        ? "Scheda ELEVAZIONE: pareti con flag Rivestimento esterno. H = altezza dello strato rivestimento esterno; MQ lordi = L×H strato; MQ netti = lordi − aperture nella fascia dello strato."
+        : "Scheda PERIMETRALI: pareti con flag Rivestimento esterno. H = altezza dello strato rivestimento esterno; MQ lordi = L×H strato; MQ netti = lordi − aperture nella fascia dello strato.";
+    const emptyMessage = isVani
+      ? "Nessuna parete con rivestimento nei vani registrati."
+      : attiva === "elevazione"
+        ? "Nessuna parete con rivestimento esterno in ELEVAZIONE."
+        : "Nessuna parete con rivestimento esterno in PERIMETRALI.";
+    openRiepilogoSchedeDialog({
       dialogEl: rivestimentiDialogEl,
-      rows: buildRivestimentiRowsFromStorage(),
       titolo: "RIVESTIMENTI",
-      descrizione:
-        "Pareti con flag Rivestimento attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
-      emptyMessage: "Nessuna parete con rivestimento nei vani registrati.",
+      layout: isVani ? "vani" : "zona",
+      rows,
+      descrizione,
+      emptyMessage,
+      tabs: [
+        { action: "scheda-rivestimenti-vani", label: "VANI", active: attiva === "vani" },
+        { action: "scheda-rivestimenti-elevazione", label: "ELEVAZIONE", active: attiva === "elevazione" },
+        { action: "scheda-rivestimenti-perimetrali", label: "PERIMETRALI", active: attiva === "perimetrali" },
+      ],
       closeAction: "close-rivestimenti-dialog",
     });
   }
 
-  function openRiepilogoIntonacoRusticoDialog() {
-    openRiepilogoParetiFlagDialog({
+  function openRiepilogoIntonacoRusticoDialog(scheda) {
+    if (scheda === "esterno" || scheda === "interno") {
+      intonacoRusticoSchedaAttiva = scheda;
+    }
+    const isInterno = intonacoRusticoSchedaAttiva === "interno";
+    openRiepilogoSchedeDialog({
       dialogEl: intonacoRusticoDialogEl,
-      rows: buildIntonacoRusticoRowsFromStorage(),
       titolo: "INTONACO RUSTICO",
-      descrizione:
-        "Pareti con flag Rustico attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
-      emptyMessage: "Nessuna parete con rustico nei vani registrati.",
+      layout: isInterno ? "vani" : "esterno",
+      rows: isInterno
+        ? buildIntonacoRusticoRowsFromStorage()
+        : buildIntonacoRusticoEsternoRowsFromStorage(),
+      descrizione: isInterno
+        ? "Scheda INTERNO: pareti VANI con flag Rustico. H = altezza dello strato rustico; MQ lordi = L×H strato; MQ netti = lordi − aperture nella fascia dello strato."
+        : "Scheda ESTERNO: pareti PERIMETRALI ed ELEVAZIONE con flag Rustico Esterno. H = altezza dello strato rustico esterno; MQ lordi = L×H strato; MQ netti = lordi − aperture nella fascia dello strato.",
+      emptyMessage: isInterno
+        ? "Nessuna parete con rustico nei vani registrati."
+        : "Nessuna parete con rustico esterno in PERIMETRALI o ELEVAZIONE.",
+      tabs: [
+        { action: "scheda-intonaco-rustico-interno", label: "Interno", active: isInterno },
+        { action: "scheda-intonaco-rustico-esterno", label: "Esterno", active: !isInterno },
+      ],
       closeAction: "close-intonaco-rustico-dialog",
     });
   }
 
-  function openRiepilogoIntonacoCivileDialog() {
-    openRiepilogoParetiFlagDialog({
+  function openRiepilogoIntonacoCivileDialog(scheda) {
+    if (scheda === "esterno" || scheda === "interno") {
+      intonacoCivileSchedaAttiva = scheda;
+    }
+    const isInterno = intonacoCivileSchedaAttiva === "interno";
+    openRiepilogoSchedeDialog({
       dialogEl: intonacoCivileDialogEl,
-      rows: buildIntonacoCivileRowsFromStorage(),
       titolo: "INTONACO CIVILE",
-      descrizione:
-        "Pareti con flag Civile attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
-      emptyMessage: "Nessuna parete con civile nei vani registrati.",
+      layout: isInterno ? "vani" : "esterno",
+      rows: isInterno
+        ? buildIntonacoCivileRowsFromStorage()
+        : buildIntonacoCivileEsternoRowsFromStorage(),
+      descrizione: isInterno
+        ? "Scheda INTERNO: pareti VANI con flag Civile. H = altezza dello strato civile; MQ lordi = L×H strato; MQ netti = lordi − aperture nella fascia dello strato."
+        : "Scheda ESTERNO: pareti PERIMETRALI ed ELEVAZIONE con flag Civile Esterno. H = altezza dello strato civile esterno; MQ lordi = L×H strato; MQ netti = lordi − aperture nella fascia dello strato.",
+      emptyMessage: isInterno
+        ? "Nessuna parete con civile nei vani registrati."
+        : "Nessuna parete con civile esterno in PERIMETRALI o ELEVAZIONE.",
+      tabs: [
+        { action: "scheda-intonaco-civile-interno", label: "Interno", active: isInterno },
+        { action: "scheda-intonaco-civile-esterno", label: "Esterno", active: !isInterno },
+      ],
       closeAction: "close-intonaco-civile-dialog",
+    });
+  }
+
+  function openRiepilogoGessoDialog() {
+    openRiepilogoParetiFlagDialog({
+      dialogEl: gessoDialogEl,
+      rows: buildGessoRowsFromStorage(),
+      titolo: "GESSO",
+      descrizione:
+        "Pareti con flag Gesso attivo. Altezza e netto come in VANI: H = altezza dello strato gesso; MQ lordi = L×H strato; MQ netti = lordi − aperture nella fascia dello strato.",
+      emptyMessage: "Nessuna parete con gesso nei vani registrati.",
+      closeAction: "close-gesso-dialog",
     });
   }
 
@@ -3365,7 +3600,7 @@ window.addEventListener("DOMContentLoaded", () => {
       rows: buildZoccoloRowsFromStorage(),
       titolo: "ZOCCOLINO",
       descrizione:
-        "Pareti con flag Zoccolino attivo. MQ lordi = L×H; MQ netti = lordi − aperture.",
+        "Pareti con flag Zoccolino attivo. Altezza e netto come in VANI: H = altezza dello strato zoccolino; MQ lordi = L×H strato; MQ netti = lordi − aperture nella fascia dello strato.",
       emptyMessage: "Nessuna parete con zoccolino nei vani registrati.",
       closeAction: "close-zoccolo-dialog",
     });
@@ -3480,7 +3715,9 @@ window.addEventListener("DOMContentLoaded", () => {
     const risultato =
       modo === "ml"
         ? Number(((largh != null ? largh : 0) * numero).toFixed(3))
-        : Number(((largh != null ? largh : 0) * (alt != null ? alt : 0) * numero).toFixed(3));
+        : Number(
+            (mqAperturaConPercentuale(largh ?? 0, alt ?? 0, ap?.percentuale, 3) * numero).toFixed(3),
+          );
     const specifica = [zona, locale].filter(Boolean).join(" · ") || idM || "-";
     return {
       idMisurazione,
@@ -3708,14 +3945,17 @@ window.addEventListener("DOMContentLoaded", () => {
 
   /**
    * Da campi SI/NO delle aperture:
-   * - Inferiata = SI → voce INFERIATA
-   * - Zanzariera = SI → voce ZANZARIERA
+   * - Inferiata = SI → voce INFERIATA (mq)
+   * - Zanzariera = SI → voce ZANZARIERA (mq)
+   * - Controdavanzale = SI → voce CONTRODAVANZALE (ml = larghezza apertura)
    */
   function syncVociApertureInferiataZanzariera() {
     /** @type {object[]} */
     const conInferiata = [];
     /** @type {object[]} */
     const conZanzariera = [];
+    /** @type {object[]} */
+    const conControdavanzale = [];
     for (const ap of apertureMaster) {
       if (!ap || typeof ap !== "object") continue;
       if (
@@ -3731,6 +3971,13 @@ window.addEventListener("DOMContentLoaded", () => {
           .toUpperCase() === "SI"
       ) {
         conZanzariera.push(ap);
+      }
+      if (
+        String(ap.controdavanzale || "")
+          .trim()
+          .toUpperCase() === "SI"
+      ) {
+        conControdavanzale.push(ap);
       }
     }
 
@@ -3757,7 +4004,23 @@ window.addEventListener("DOMContentLoaded", () => {
     if (rZan.voceId != null) handledVoceIds.add(rZan.voceId);
     if (rZan.changed) changed = true;
 
-    if (pulisciMisurazioniTipoOggettoDaVociNonGestite(handledVoceIds, ["INFERIATA", "ZANZARIERA"])) {
+    const rCd = syncVoceApertureGruppo({
+      label: "CONTRODAVANZALE",
+      apertures: conControdavanzale,
+      tipoOggetto: "CONTRODAVANZALE",
+      unitaMisura: "ml.",
+      modo: "ml",
+    });
+    if (rCd.voceId != null) handledVoceIds.add(rCd.voceId);
+    if (rCd.changed) changed = true;
+
+    if (
+      pulisciMisurazioniTipoOggettoDaVociNonGestite(handledVoceIds, [
+        "INFERIATA",
+        "ZANZARIERA",
+        "CONTRODAVANZALE",
+      ])
+    ) {
       changed = true;
     }
 
@@ -4784,6 +5047,7 @@ window.addEventListener("DOMContentLoaded", () => {
       locale: "",
       largh: "",
       alt: "",
+      percentuale: "100",
       hDav: "0",
       ante: "1",
       tipologia: "FINESTRA",
@@ -4791,6 +5055,7 @@ window.addEventListener("DOMContentLoaded", () => {
       scuro: "NO",
       inferiata: "NO",
       zanzariera: "NO",
+      controdavanzale: "NO",
     };
   }
 
@@ -4798,6 +5063,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const locale = String(draft?.locale || "").trim();
     const largh = parseNonNegativeDecimal2(String(draft?.largh || ""));
     const alt = parseNonNegativeDecimal2(String(draft?.alt || ""));
+    const percentuale = parsePercentualeApertura(String(draft?.percentuale ?? "100"));
     const hDav = parseNonNegativeDecimal2(String(draft?.hDav || ""));
     const ante = parseAnteIntero(String(draft?.ante || ""));
     const tipologia = String(draft?.tipologia || "").trim();
@@ -4805,6 +5071,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const scuro = String(draft?.scuro || "").trim().toUpperCase();
     const inferiata = String(draft?.inferiata || "").trim().toUpperCase();
     const zanzariera = String(draft?.zanzariera || "").trim().toUpperCase();
+    const controdavanzale = String(draft?.controdavanzale || "NO").trim().toUpperCase();
     const tipologie = new Set([
       "FINESTRA",
       "PORTA FINESTRA",
@@ -4825,6 +5092,7 @@ window.addEventListener("DOMContentLoaded", () => {
       !locale ||
       largh === null ||
       alt === null ||
+      percentuale === null ||
       hDav === null ||
       ante === null ||
       !tipologia ||
@@ -4832,7 +5100,8 @@ window.addEventListener("DOMContentLoaded", () => {
       !falsi.has(falso) ||
       !scuri.has(scuro) ||
       !siNo.has(inferiata) ||
-      !siNo.has(zanzariera)
+      !siNo.has(zanzariera) ||
+      !siNo.has(controdavanzale)
     ) {
       return null;
     }
@@ -4840,6 +5109,7 @@ window.addEventListener("DOMContentLoaded", () => {
       locale,
       largh,
       alt,
+      percentuale,
       hDav,
       ante,
       tipologia,
@@ -4847,6 +5117,7 @@ window.addEventListener("DOMContentLoaded", () => {
       scuro,
       inferiata,
       zanzariera,
+      controdavanzale,
     };
   }
 
@@ -4943,6 +5214,7 @@ window.addEventListener("DOMContentLoaded", () => {
         locale: item.locale.trim(),
         largh: Number((Number(item.largh ?? item.lunghezza ?? 0)).toFixed(2)),
         alt: Number((Number(item.alt ?? item.altezza ?? 0)).toFixed(2)),
+        percentuale: normalizzaPercentualeApertura(item.percentuale),
         hDav: Number((Number(item.hDav ?? item.hDavanzale ?? 0)).toFixed(2)),
         ante: item.ante,
         tipologia: item.tipologia.trim(),
@@ -4955,6 +5227,8 @@ window.addEventListener("DOMContentLoaded", () => {
         scuro: typeof item?.scuro === "string" ? item.scuro.toUpperCase() : "NO",
         inferiata: typeof item?.inferiata === "string" ? item.inferiata.toUpperCase() : "NO",
         zanzariera: typeof item?.zanzariera === "string" ? item.zanzariera.toUpperCase() : "NO",
+        controdavanzale:
+          typeof item?.controdavanzale === "string" ? item.controdavanzale.toUpperCase() : "NO",
       }));
   }
 
@@ -5347,6 +5621,7 @@ window.addEventListener("DOMContentLoaded", () => {
       locale: src.locale || "",
       largh: String(src.largh ?? ""),
       alt: String(src.alt ?? ""),
+      percentuale: String(normalizzaPercentualeApertura(src.percentuale)),
       hDav: String(src.hDav ?? ""),
       ante: String(src.ante ?? 1),
       tipologia: src.tipologia || "FINESTRA",
@@ -5354,6 +5629,7 @@ window.addEventListener("DOMContentLoaded", () => {
       scuro: src.scuro || "NO",
       inferiata: src.inferiata || "NO",
       zanzariera: src.zanzariera || "NO",
+      controdavanzale: src.controdavanzale || "NO",
       editingAperturaMasterId: src.idAperturaMaster,
     });
     renderVoci();
@@ -5996,6 +6272,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     "LOCALE",
                     "LRGH",
                     "ALT.",
+                    "%",
                     "HDAV",
                     "ANTE",
                     "TIPOLOGIA",
@@ -6003,6 +6280,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     "SCURO",
                     "INFERIATA",
                     "ZANZARIERA",
+                    "C.DAV.",
                     "H INCL.",
                     "MQ",
                     "MC",
@@ -6047,6 +6325,11 @@ window.addEventListener("DOMContentLoaded", () => {
                         input.dataset.idVoce = String(item.idVoce);
                         input.dataset.mmIndex = String(idx);
                         input.dataset.field = field;
+                        if (field === "percentuale") {
+                          input.min = "0";
+                          input.max = "100";
+                          input.step = "1";
+                        }
                         c.appendChild(input);
                         row.appendChild(c);
                       };
@@ -6072,6 +6355,11 @@ window.addEventListener("DOMContentLoaded", () => {
                       buildInputCell("locale", draft?.locale || "");
                       buildInputCell("largh", draft?.largh || "", "number");
                       buildInputCell("alt", draft?.alt || "", "number");
+                      buildInputCell(
+                        "percentuale",
+                        draft?.percentuale || "100",
+                        "number",
+                      );
                       buildInputCell("hDav", draft?.hDav || "", "number");
                       buildInputCell("ante", draft?.ante || "", "number");
                       buildSelectCell("tipologia", draft?.tipologia || "FINESTRA", [
@@ -6091,6 +6379,7 @@ window.addEventListener("DOMContentLoaded", () => {
                       buildSelectCell("scuro", draft?.scuro || "NO", ["NO", "PERSIANA", "TAPPARELLA"]);
                       buildSelectCell("inferiata", draft?.inferiata || "NO", ["NO", "SI"]);
                       buildSelectCell("zanzariera", draft?.zanzariera || "NO", ["NO", "SI"]);
+                      buildSelectCell("controdavanzale", draft?.controdavanzale || "NO", ["NO", "SI"]);
                       const metric = calcolaMetricheAperturaMisurazione(
                         apertura,
                         mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
@@ -6148,6 +6437,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     pushTextCell(apertura.locale || "");
                     pushTextCell(fmt2(apertura.largh));
                     pushTextCell(fmt2(apertura.alt));
+                    pushTextCell(`${fmt2(normalizzaPercentualeApertura(apertura.percentuale))}%`);
                     pushTextCell(fmt2(apertura.hDav));
                     pushTextCell(String(apertura.ante));
                     pushTextCell(apertura.tipologia || "");
@@ -6155,6 +6445,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     pushTextCell(apertura.scuro || "NO");
                     pushTextCell(apertura.inferiata || "NO");
                     pushTextCell(apertura.zanzariera || "NO");
+                    pushTextCell(apertura.controdavanzale || "NO");
                     const metric = calcolaMetricheAperturaMisurazione(
                       apertura,
                       mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
@@ -6252,6 +6543,11 @@ window.addEventListener("DOMContentLoaded", () => {
                     input.dataset.idVoce = String(item.idVoce);
                     input.dataset.mmIndex = String(idx);
                     input.dataset.field = field;
+                    if (field === "percentuale") {
+                      input.min = "0";
+                      input.max = "100";
+                      input.step = "1";
+                    }
                     return input;
                   };
                   const buildSelect = (field, current, options) => {
@@ -6285,6 +6581,7 @@ window.addEventListener("DOMContentLoaded", () => {
                   buildField("LOCALE", buildInput(draft.locale, "locale"));
                   buildField("LRGH", buildInput(draft.largh, "largh", "number"));
                   buildField("ALT", buildInput(draft.alt, "alt", "number"));
+                  buildField("%", buildInput(draft.percentuale || "100", "percentuale", "number"));
                   buildField("HDAV", buildInput(draft.hDav, "hDav", "number"));
                   buildField("ANTE", buildInput(draft.ante, "ante", "number"));
                   buildField(
@@ -6307,10 +6604,15 @@ window.addEventListener("DOMContentLoaded", () => {
                   buildField("SCURO", buildSelect("scuro", draft.scuro, ["NO", "PERSIANA", "TAPPARELLA"]));
                   buildField("INFERIATA", buildSelect("inferiata", draft.inferiata, ["NO", "SI"]));
                   buildField("ZANZARIERA", buildSelect("zanzariera", draft.zanzariera, ["NO", "SI"]));
+                  buildField(
+                    "C.DAV.",
+                    buildSelect("controdavanzale", draft.controdavanzale || "NO", ["NO", "SI"]),
+                  );
                   const draftMetric = calcolaMetricheAperturaMisurazione(
                     {
                       largh: parseNonNegativeDecimal2(String(draft?.largh || "")) ?? 0,
                       alt: parseNonNegativeDecimal2(String(draft?.alt || "")) ?? 0,
+                      percentuale: parsePercentualeApertura(String(draft?.percentuale ?? "100")) ?? 100,
                       hDav: parseNonNegativeDecimal2(String(draft?.hDav || "")) ?? 0,
                     },
                     mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? misura2Val : null,
@@ -7016,6 +7318,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     locale: apertura.locale || "-",
                     largh: apertura.largh,
                     hInclusa: metriche.hInclusa,
+                    percentuale: metriche.percentuale,
                     valoreMetrica: valoreNum,
                   });
                 });
@@ -7060,7 +7363,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 drawText(
                   leftTextX + 2,
                   y + 3.8,
-                  `${ap.locale} - ${fmtRis(ap.largh)} (lrg) x ${fmtRis(ap.hInclusa)} (H incl)`,
+                  `${ap.locale} - ${fmtRis(ap.largh)} (lrg) x ${fmtRis(ap.hInclusa)} (H incl) x ${fmtRis(ap.percentuale ?? 100)}%`,
                   false,
                   aperturePdfFontSize,
                 );
@@ -7435,7 +7738,7 @@ window.addEventListener("DOMContentLoaded", () => {
                     "APERTURA",
                     apertura.locale || "-",
                     "-",
-                    `${fmt2(apertura.largh)} (lrg) x ${fmt2(metriche.hInclusa)} (H incl)`,
+                    `${fmt2(apertura.largh)} (lrg) x ${fmt2(metriche.hInclusa)} (H incl) x ${fmt2(metriche.percentuale ?? 100)}%`,
                     "",
                     "",
                     Number((-valoreMetrica).toFixed(3)),
@@ -8468,6 +8771,7 @@ window.addEventListener("DOMContentLoaded", () => {
           locale: openingLabel || `Apertura IFC #${openingId}`,
           lunghezza: dims.lunghezza,
           altezza: dims.altezza,
+          percentuale: 100,
           spessoreIfc: dims.spessore,
           lunghezzaIfc: dims.lunghezza,
           altezzaIfc: dims.altezza,
@@ -9265,7 +9569,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (compilazionePianoId === null) {
         const row = document.createElement("tr");
         const cell = document.createElement("td");
-        cell.colSpan = 11;
+        cell.colSpan = 12;
         cell.className = "empty-cell";
         cell.textContent =
           "Apri Compila su un piano Interrato e verifica Riferimento / Spessore muro sopra per gestire le aperture.";
@@ -9278,7 +9582,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (visibili.length === 0) {
         const row = document.createElement("tr");
         const cell = document.createElement("td");
-        cell.colSpan = 11;
+        cell.colSpan = 12;
         cell.className = "empty-cell";
         cell.textContent = "Nessuna apertura per questo piano.";
         row.appendChild(cell);
@@ -9293,6 +9597,7 @@ window.addEventListener("DOMContentLoaded", () => {
         row.appendChild(createCell(item.locale));
         row.appendChild(createCell(fmt2(item.lunghezza)));
         row.appendChild(createCell(fmt2(item.altezza)));
+        row.appendChild(createCell(`${fmt2(normalizzaPercentualeApertura(item.percentuale))}%`));
         row.appendChild(createCell(String(item.ante)));
         row.appendChild(createCell(item.tipologia));
         row.appendChild(createCell(item.falsotelai ? "Si" : "No"));
@@ -9692,6 +9997,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const locale = apLocaleEl.value.trim();
     const lunghezza = parseNumber(apLunghezzaEl.value);
     const altezza = parseNumber(apAltezzaEl.value);
+    const percentuale = parsePercentualeApertura(apPercentualeEl?.value ?? "100");
     const ante = parseAnteIntero(apAnteEl.value);
     const tipologia = apTipologiaEl.value;
     const falsotelai = apFalsotelaiEl.value === "si";
@@ -9702,6 +10008,7 @@ window.addEventListener("DOMContentLoaded", () => {
       !locale ||
       lunghezza === null ||
       altezza === null ||
+      percentuale === null ||
       ante === null ||
       !tipologia ||
       hDavanzale === null
@@ -9716,6 +10023,7 @@ window.addEventListener("DOMContentLoaded", () => {
         locale,
         lunghezza,
         altezza,
+        percentuale,
         ante,
         tipologia,
         falsotelai,
@@ -9730,6 +10038,7 @@ window.addEventListener("DOMContentLoaded", () => {
               locale,
               lunghezza,
               altezza,
+              percentuale,
               ante,
               tipologia,
               falsotelai,
@@ -10867,6 +11176,7 @@ window.addEventListener("DOMContentLoaded", () => {
       apLocaleEl.value = row.locale;
       apLunghezzaEl.value = fmt2(row.lunghezza);
       apAltezzaEl.value = fmt2(row.altezza);
+      if (apPercentualeEl) apPercentualeEl.value = String(normalizzaPercentualeApertura(row.percentuale));
       apAnteEl.value = String(row.ante);
       apTipologiaEl.value = row.tipologia;
       apFalsotelaiEl.value = row.falsotelai ? "si" : "no";
@@ -11325,6 +11635,12 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
   });
+  apertureMasterDialogEl.addEventListener("change", (event) => {
+    const sel = event.target.closest("select[data-action='filter-master-apertura-tipologia']");
+    if (!(sel instanceof HTMLSelectElement)) return;
+    apertureMasterTipologiaFilter = String(sel.value || "").trim();
+    openApertureMasterDialog();
+  });
   document.body.appendChild(apertureMasterDialogEl);
 
   pianiMisuraArchivioDialogEl.id = "piani-misura-archivio-dialog";
@@ -11696,7 +12012,7 @@ window.addEventListener("DOMContentLoaded", () => {
   rivestimentiSidebarButtonEl.type = "button";
   rivestimentiSidebarButtonEl.className = "btn-action btn-secondary";
   rivestimentiSidebarButtonEl.textContent = "RIVESTIMENTI";
-  rivestimentiSidebarButtonEl.title = "Pareti con rivestimento attivo nei vani registrati";
+  rivestimentiSidebarButtonEl.title = "Rivestimento: VANI, ELEVAZIONE e PERIMETRALI";
   rivestimentiSidebarButtonEl.addEventListener("click", () => {
     openRiepilogoRivestimentiDialog();
   });
@@ -11706,7 +12022,7 @@ window.addEventListener("DOMContentLoaded", () => {
   intonacoRusticoSidebarButtonEl.type = "button";
   intonacoRusticoSidebarButtonEl.className = "btn-action btn-secondary";
   intonacoRusticoSidebarButtonEl.textContent = "INTONACO RUSTICO";
-  intonacoRusticoSidebarButtonEl.title = "Pareti con rustico attivo nei vani registrati";
+  intonacoRusticoSidebarButtonEl.title = "Intonaco rustico interno (VANI) ed esterno (PERIMETRALI ed ELEVAZIONE)";
   intonacoRusticoSidebarButtonEl.addEventListener("click", () => {
     openRiepilogoIntonacoRusticoDialog();
   });
@@ -11716,11 +12032,21 @@ window.addEventListener("DOMContentLoaded", () => {
   intonacoCivileSidebarButtonEl.type = "button";
   intonacoCivileSidebarButtonEl.className = "btn-action btn-secondary";
   intonacoCivileSidebarButtonEl.textContent = "INTONACO CIVILE";
-  intonacoCivileSidebarButtonEl.title = "Pareti con civile attivo nei vani registrati";
+  intonacoCivileSidebarButtonEl.title = "Intonaco civile interno (VANI) ed esterno (PERIMETRALI ed ELEVAZIONE)";
   intonacoCivileSidebarButtonEl.addEventListener("click", () => {
     openRiepilogoIntonacoCivileDialog();
   });
   sidebarLeftActionsSecondariEl?.appendChild(intonacoCivileSidebarButtonEl);
+
+  gessoSidebarButtonEl.id = "btn-apri-riepilogo-gesso";
+  gessoSidebarButtonEl.type = "button";
+  gessoSidebarButtonEl.className = "btn-action btn-secondary";
+  gessoSidebarButtonEl.textContent = "GESSO";
+  gessoSidebarButtonEl.title = "Pareti con gesso attivo nei vani registrati";
+  gessoSidebarButtonEl.addEventListener("click", () => {
+    openRiepilogoGessoDialog();
+  });
+  sidebarLeftActionsSecondariEl?.appendChild(gessoSidebarButtonEl);
 
   zoccoloSidebarButtonEl.id = "btn-apri-riepilogo-zoccolo";
   zoccoloSidebarButtonEl.type = "button";
@@ -11889,6 +12215,18 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!button) return;
     if (button.dataset.action === "close-rivestimenti-dialog") {
       rivestimentiDialogEl.close();
+      return;
+    }
+    if (button.dataset.action === "scheda-rivestimenti-vani") {
+      openRiepilogoRivestimentiDialog("vani");
+      return;
+    }
+    if (button.dataset.action === "scheda-rivestimenti-elevazione") {
+      openRiepilogoRivestimentiDialog("elevazione");
+      return;
+    }
+    if (button.dataset.action === "scheda-rivestimenti-perimetrali") {
+      openRiepilogoRivestimentiDialog("perimetrali");
     }
   });
   document.body.appendChild(rivestimentiDialogEl);
@@ -11900,6 +12238,14 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!button) return;
     if (button.dataset.action === "close-intonaco-rustico-dialog") {
       intonacoRusticoDialogEl.close();
+      return;
+    }
+    if (button.dataset.action === "scheda-intonaco-rustico-interno") {
+      openRiepilogoIntonacoRusticoDialog("interno");
+      return;
+    }
+    if (button.dataset.action === "scheda-intonaco-rustico-esterno") {
+      openRiepilogoIntonacoRusticoDialog("esterno");
     }
   });
   document.body.appendChild(intonacoRusticoDialogEl);
@@ -11911,9 +12257,28 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!button) return;
     if (button.dataset.action === "close-intonaco-civile-dialog") {
       intonacoCivileDialogEl.close();
+      return;
+    }
+    if (button.dataset.action === "scheda-intonaco-civile-interno") {
+      openRiepilogoIntonacoCivileDialog("interno");
+      return;
+    }
+    if (button.dataset.action === "scheda-intonaco-civile-esterno") {
+      openRiepilogoIntonacoCivileDialog("esterno");
     }
   });
   document.body.appendChild(intonacoCivileDialogEl);
+
+  gessoDialogEl.id = "gesso-dialog";
+  gessoDialogEl.className = "ifc-riepilogo-dialog";
+  gessoDialogEl.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    if (button.dataset.action === "close-gesso-dialog") {
+      gessoDialogEl.close();
+    }
+  });
+  document.body.appendChild(gessoDialogEl);
 
   zoccoloDialogEl.id = "zoccolo-dialog";
   zoccoloDialogEl.className = "ifc-riepilogo-dialog";

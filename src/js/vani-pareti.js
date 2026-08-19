@@ -32,7 +32,7 @@ import {
   aggiornaCalcoliSuperficieBlock,
   maxIdStratiSuperficiNeiLocali,
 } from "./modules/vaniSuperficiLocale.js";
-import { altezzaInclusaNelloStratoConElevazione } from "./utils/numberUtils.js";
+import { altezzaInclusaNelloStratoConElevazione, mqAperturaConPercentuale, normalizzaPercentualeApertura } from "./utils/numberUtils.js";
 
 /** Salvataggio elenco vani registrati (uno per voce). */
 const STORAGE_VANI_REGISTRATI_KEY = "computo_metrico_vani_registrati";
@@ -846,7 +846,8 @@ function formatApLabel(ap) {
   const largh = ap.largh ?? ap.lunghezza;
   const alt = ap.alt ?? ap.altezza;
   const hDav = ap.hDav ?? ap.hDavanzale;
-  return `LARGHEZZA ${fmtDimApLabel(largh)}, ALTEZZA ${fmtDimApLabel(alt)}, HDAVANZALE ${fmtDimApLabel(hDav)}`;
+  const pct = normalizzaPercentualeApertura(ap.percentuale);
+  return `LARGHEZZA ${fmtDimApLabel(largh)}, ALTEZZA ${fmtDimApLabel(alt)}, % ${pct}, HDAVANZALE ${fmtDimApLabel(hDav)}`;
 }
 
 /** ID aperture già scelte su altre pareti dello stesso locale (stringhe normalizzate). */
@@ -1351,7 +1352,9 @@ function buildStratiNettiSection(parete, nomeLocale, stratListInput = null, titl
         let mq = null;
         if (stratoHxOk) {
           hInc = altezzaInclusaNelloStratoConElevazione(E, H, apRow);
-          if (hInc !== null && lar !== null) mq = Number((lar * hInc).toFixed(6));
+          if (hInc !== null && lar !== null) {
+            mq = mqAperturaConPercentuale(lar, hInc, apRow.percentuale, 6);
+          }
         }
         renderApRow(lar, hInc, mq);
       }
@@ -2043,6 +2046,7 @@ function apriDialogNuovaAperturaParete(pareteId) {
   const localeEl = document.getElementById("vani-nap-locale");
   const larghEl = document.getElementById("vani-nap-largh");
   const altEl = document.getElementById("vani-nap-alt");
+  const pctEl = document.getElementById("vani-nap-percentuale");
   const hdavEl = document.getElementById("vani-nap-hdav");
   const anteEl = document.getElementById("vani-nap-ante");
   const tipEl = document.getElementById("vani-nap-tipologia");
@@ -2050,10 +2054,12 @@ function apriDialogNuovaAperturaParete(pareteId) {
   const scuroEl = document.getElementById("vani-nap-scuro");
   const infEl = document.getElementById("vani-nap-inferiata");
   const zanEl = document.getElementById("vani-nap-zanzariera");
+  const cdEl = document.getElementById("vani-nap-controdavanzale");
   if (pianoEl) pianoEl.value = String(hit.piano?.nome ?? "").trim();
   if (localeEl) localeEl.value = localeNome;
   if (larghEl) larghEl.value = "";
   if (altEl) altEl.value = "";
+  if (pctEl) pctEl.value = "100";
   if (hdavEl) hdavEl.value = "0";
   if (anteEl) anteEl.value = "1";
   if (tipEl) tipEl.value = "FINESTRA";
@@ -2061,6 +2067,7 @@ function apriDialogNuovaAperturaParete(pareteId) {
   if (scuroEl) scuroEl.value = "NO";
   if (infEl) infEl.value = "NO";
   if (zanEl) zanEl.value = "NO";
+  if (cdEl) cdEl.value = "NO";
   dlg?.showModal();
   setTimeout(() => larghEl?.focus(), 0);
 }
@@ -2080,6 +2087,7 @@ function onSubmitNuovaAperturaParete(event) {
     locale: document.getElementById("vani-nap-locale")?.value ?? "",
     largh: document.getElementById("vani-nap-largh")?.value ?? "",
     alt: document.getElementById("vani-nap-alt")?.value ?? "",
+    percentuale: document.getElementById("vani-nap-percentuale")?.value ?? "100",
     hDav: document.getElementById("vani-nap-hdav")?.value ?? "0",
     ante: document.getElementById("vani-nap-ante")?.value ?? "1",
     tipologia: document.getElementById("vani-nap-tipologia")?.value ?? "FINESTRA",
@@ -2087,6 +2095,7 @@ function onSubmitNuovaAperturaParete(event) {
     scuro: document.getElementById("vani-nap-scuro")?.value ?? "NO",
     inferiata: document.getElementById("vani-nap-inferiata")?.value ?? "NO",
     zanzariera: document.getElementById("vani-nap-zanzariera")?.value ?? "NO",
+    controdavanzale: document.getElementById("vani-nap-controdavanzale")?.value ?? "NO",
   };
   document.dispatchEvent(
     new CustomEvent("computo-vani-richiedi-nuova-apertura", { detail: payload }),

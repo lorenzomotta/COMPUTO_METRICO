@@ -1,3 +1,5 @@
+import { mqAperturaConPercentuale } from "../utils/numberUtils.js";
+
 export function renderStratiNetti({
   stratiNettiBodyEl,
   compilazionePianoId,
@@ -39,7 +41,7 @@ export function renderStratiNetti({
     const spessoreStrato = Number(strato.spessore || 0);
     const dettagli = aperture.map((ap) => {
       const hInc = altezzaAperturaInclusaNelloStrato(strato.altezza, ap);
-      const m2 = ap.lunghezza * hInc;
+      const m2 = mqAperturaConPercentuale(ap.lunghezza, hInc, ap.percentuale, 2);
       return { ap, hInc, m2 };
     });
     const sommaApertura = dettagli.reduce((s, d) => s + d.m2, 0);

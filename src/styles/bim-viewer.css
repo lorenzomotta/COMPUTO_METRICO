@@ -195,6 +195,10 @@
   font-size: 1rem;
 }
 
+.ifc-riepilogo-dialog .riepilogo-schede-tabs {
+  margin: 0 0 10px;
+}
+
 .ifc-riepilogo-table-host {
   margin-bottom: 10px;
 }
