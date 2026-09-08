@@ -675,21 +675,21 @@ button {
 
 .table-voce-mm-inline th:nth-child(14),
 .table-voce-mm-inline td:nth-child(14) {
-  width: 74px;
+  width: 152px;
   white-space: nowrap;
   text-align: center;
 }
 
 .table-voce-mm-inline .mm-actions-cell {
-  width: 74px;
-  min-width: 74px;
+  width: 152px;
+  min-width: 152px;
   text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
 }
 
@@ -703,6 +703,24 @@ button {
   color: #1a3558;
 }
 
+.table-voce-mm-inline .mm-actions-cell .btn-mm-up,
+.table-voce-mm-inline .mm-actions-cell .btn-mm-down {
+  min-height: 22px;
+  min-width: 20px;
+  padding: 2px 3px;
+  font-size: 0.72rem;
+  line-height: 1;
+  background: linear-gradient(180deg, #f0f7ff 0%, #e4eef9 100%);
+  border: 1px solid #7aa3d6;
+  color: #1a3558;
+}
+
+.table-voce-mm-inline .mm-actions-cell .btn-mm-up:disabled,
+.table-voce-mm-inline .mm-actions-cell .btn-mm-down:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .table-voce-mm-inline .mm-actions-cell .btn-mm-dup:hover {
   filter: brightness(1.04);
 }
@@ -712,6 +730,40 @@ button {
   padding: 2px 5px;
   min-height: 22px;
   min-width: 24px;
+}
+
+.table-voce-mm-inline .mm-actions-cell .btn-mm-add-ap,
+.table-voce-mm-inline .mm-actions-cell .btn-mm-use-ap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  min-width: 22px;
+  padding: 2px 3px;
+  line-height: 0;
+  border: none;
+}
+
+.table-voce-mm-inline .mm-actions-cell .btn-mm-add-ap {
+  background: linear-gradient(135deg, #1f8d63 0%, #2eaf7d 100%);
+  color: #fff;
+}
+
+.table-voce-mm-inline .mm-actions-cell .btn-mm-use-ap {
+  background: linear-gradient(135deg, #d4a017 0%, #f0c93a 100%);
+  color: #5a4300;
+}
+
+.table-voce-mm-inline .mm-actions-cell .btn-mm-add-ap:hover,
+.table-voce-mm-inline .mm-actions-cell .btn-mm-use-ap:hover {
+  filter: brightness(1.06);
+}
+
+.table-voce-mm-inline .mm-icon-apertura {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .table-voce-mm-inline td.voce-mm-m3-missing {
@@ -959,6 +1011,15 @@ button {
   padding-bottom: 2px !important;
 }
 
+.table-voce-mm-inline td.voce-mm-aperture-cell,
+.table-voce-mm-inline td.voce-mm-aperture-editor-cell {
+  width: auto;
+  max-width: none;
+  white-space: normal;
+  text-align: left;
+  overflow: visible;
+}
+
 .voce-mm-aperture-empty {
   font-size: 0.72rem;
   color: #6a7f99;
@@ -1011,7 +1072,8 @@ button {
     minmax(56px, 0.5fr)
     minmax(56px, 0.5fr)
     minmax(56px, 0.5fr)
-    minmax(74px, auto);
+    minmax(56px, 0.5fr)
+    minmax(64px, max-content);
   gap: 2px;
   align-items: center;
 }
@@ -1030,7 +1092,17 @@ button {
 }
 
 .voce-mm-ap-col-actions {
-  text-align: center;
+  text-align: right;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.voce-mm-ap-col-input.voce-mm-ap-col-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  min-width: 56px;
 }
 
 .voce-mm-ap-saved-cell {
@@ -1161,6 +1233,28 @@ tr.voce-mm-data-row:hover {
 
 .table-voce-mm-inline .voce-mm-subtotal-actions {
   background: #f4f8fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.table-voce-mm-inline .voce-mm-subtotal-actions .btn-mm-up,
+.table-voce-mm-inline .voce-mm-subtotal-actions .btn-mm-down {
+  min-height: 22px;
+  min-width: 20px;
+  padding: 2px 3px;
+  font-size: 0.72rem;
+  line-height: 1;
+  background: linear-gradient(180deg, #f0f7ff 0%, #e4eef9 100%);
+  border: 1px solid #7aa3d6;
+  color: #1a3558;
+}
+
+.table-voce-mm-inline .voce-mm-subtotal-actions .btn-mm-up:disabled,
+.table-voce-mm-inline .voce-mm-subtotal-actions .btn-mm-down:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .table-voce-mm-inline tr.voce-mm-subtotal-piano .voce-mm-subtotal-label,
@@ -1221,7 +1315,7 @@ tr.voce-mm-data-row:hover {
 }
 
 #vista-voci.voce-focus-mode .table-voce-mm-inline {
-  min-width: 1210px;
+  min-width: 1292px;
 }
 
 #vista-voci:not(.voce-focus-mode) .voci-mm-table-wrap {

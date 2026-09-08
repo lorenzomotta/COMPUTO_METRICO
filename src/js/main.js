@@ -377,6 +377,10 @@ window.addEventListener("DOMContentLoaded", () => {
   const TIPOMISURA_VOCE_MANUALE = "MANUALE";
   const VOCE_MM_TIPO_MANUALE = "MANUALE";
   const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
+  const MM_SVG_FINESTRA_AGGIUNGI =
+    '<svg class="mm-icon-apertura" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="13.5" height="13.5" rx="1.5"/><path d="M2.5 9.25h13.5"/><path d="M9.25 2.5v13.5"/><path d="M18 16.5v6"/><path d="M15 19.5h6"/></svg>';
+  const MM_SVG_FINESTRA_USA =
+    '<svg class="mm-icon-apertura" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="13.5" height="13.5" rx="1.5"/><path d="M2.5 9.25h13.5"/><path d="M9.25 2.5v13.5"/><path d="M21.5 19.5H15.5"/><path d="M18 16.5l-3 3 3 3"/></svg>';
   const STORAGE_KEYS = {
     STORAGE_MUR_ELE,
     STORAGE_STRATI_MUR,
@@ -5577,6 +5581,97 @@ window.addEventListener("DOMContentLoaded", () => {
     openVoceMmRigaDialog(idVoce, index + 1);
   }
 
+  /** Gruppi visivi piano+riferimento, nello stesso ordine della tabella misurazioni. */
+  function elencoGruppiMisurazioniVoce(mm) {
+    const grouped = new Map();
+    mm.forEach((m, idx) => {
+      const pianoKey = (m?.piano || "-").trim() || "-";
+      const rifKey = (m?.riferimento || "-").trim() || "-";
+      if (!grouped.has(pianoKey)) grouped.set(pianoKey, new Map());
+      const rifMap = grouped.get(pianoKey);
+      if (!rifMap.has(rifKey)) rifMap.set(rifKey, []);
+      rifMap.get(rifKey).push(idx);
+    });
+    /** @type {number[][]} */
+    const gruppi = [];
+    grouped.forEach((rifMap) => {
+      rifMap.forEach((idxs) => gruppi.push(idxs));
+    });
+    return gruppi;
+  }
+
+  function scambiaDraftApertureMm(idVoce, idxA, idxB) {
+    if (idxA === idxB) return;
+    const keyA = getVoceMmAperturaDraftKey(idVoce, idxA);
+    const keyB = getVoceMmAperturaDraftKey(idVoce, idxB);
+    const draftA = voceMmAperturaDraftByKey.get(keyA);
+    const draftB = voceMmAperturaDraftByKey.get(keyB);
+    voceMmAperturaDraftByKey.delete(keyA);
+    voceMmAperturaDraftByKey.delete(keyB);
+    if (draftB) voceMmAperturaDraftByKey.set(keyA, draftB);
+    if (draftA) voceMmAperturaDraftByKey.set(keyB, draftA);
+  }
+
+  function applicaOrdineMisurazioniVoce(idVoce, mm, ordineVecchiIndici) {
+    const newMm = ordineVecchiIndici.map((oldI) => mm[oldI]);
+    const saved = ordineVecchiIndici.map((oldI) =>
+      voceMmAperturaDraftByKey.get(getVoceMmAperturaDraftKey(idVoce, oldI)),
+    );
+    ordineVecchiIndici.forEach((oldI) => {
+      voceMmAperturaDraftByKey.delete(getVoceMmAperturaDraftKey(idVoce, oldI));
+    });
+    saved.forEach((draft, newI) => {
+      if (draft) voceMmAperturaDraftByKey.set(getVoceMmAperturaDraftKey(idVoce, newI), draft);
+    });
+    voci = voci.map((item) =>
+      item.idVoce === idVoce ? { ...item, misurazioniManuali: newMm } : item,
+    );
+    saveVoci();
+    renderVoci();
+  }
+
+  /**
+   * Sposta una singola misurazione sopra (-1) o sotto (+1) nello stesso riferimento.
+   */
+  function spostaMisurazioneManualeVoce(idVoce, mmIndex, direzione) {
+    const voce = voci.find((item) => item.idVoce === idVoce);
+    if (!voce) return;
+    const mm = [...normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura)];
+    if (mmIndex < 0 || mmIndex >= mm.length) return;
+    const gruppi = elencoGruppiMisurazioniVoce(mm);
+    const gIdx = gruppi.findIndex((idxs) => idxs.includes(mmIndex));
+    if (gIdx < 0) return;
+    const idxs = gruppi[gIdx];
+    const pos = idxs.indexOf(mmIndex);
+    const targetPos = pos + direzione;
+    if (pos < 0 || targetPos < 0 || targetPos >= idxs.length) return;
+    const otherIndex = idxs[targetPos];
+    const tmp = mm[mmIndex];
+    mm[mmIndex] = mm[otherIndex];
+    mm[otherIndex] = tmp;
+    scambiaDraftApertureMm(idVoce, mmIndex, otherIndex);
+    voci = voci.map((item) =>
+      item.idVoce === idVoce ? { ...item, misurazioniManuali: mm } : item,
+    );
+    saveVoci();
+    renderVoci();
+  }
+
+  /** Scambia un blocco piano+riferimento con quello precedente (-1) o successivo (+1). */
+  function spostaGruppoMisurazioniVoce(idVoce, groupIndex, direzione) {
+    const voce = voci.find((item) => item.idVoce === idVoce);
+    if (!voce) return;
+    const mm = [...normalizzaMisurazioniManualiVoce(voce.misurazioniManuali, voce.unitaMisura)];
+    const gruppi = elencoGruppiMisurazioniVoce(mm);
+    const target = groupIndex + direzione;
+    if (groupIndex < 0 || groupIndex >= gruppi.length || target < 0 || target >= gruppi.length) return;
+    const newGruppi = [...gruppi];
+    const swapped = newGruppi[target];
+    newGruppi[target] = newGruppi[groupIndex];
+    newGruppi[groupIndex] = swapped;
+    applicaOrdineMisurazioniVoce(idVoce, mm, newGruppi.flat());
+  }
+
   /** Duplica una voce completa (con misurazioni e collegamenti aperture) subito sotto l'originale. */
   function duplicaVoceCompleta(idVoce) {
     normalizzaPosizioniVoci();
@@ -6029,8 +6124,8 @@ window.addEventListener("DOMContentLoaded", () => {
         const colgroup = document.createElement("colgroup");
         const isVoceFullscreen = voceFocusId === item.idVoce;
         const colWidths = isVoceFullscreen
-          ? [48, 48, 110, 120, 120, 120, 210, 58, 58, 58, 58, 58, 58, 74]
-          : [36, 36, 76, 88, 88, 88, 130, 42, 42, 42, 42, 42, 46, 52];
+          ? [48, 48, 110, 120, 120, 120, 210, 58, 58, 58, 58, 58, 58, 152]
+          : [36, 36, 76, 88, 88, 88, 130, 42, 42, 42, 42, 42, 46, 132];
         colWidths.forEach((w) => {
           const col = document.createElement("col");
           col.style.width = `${w}px`;
@@ -6064,7 +6159,7 @@ window.addEventListener("DOMContentLoaded", () => {
         table.appendChild(thead);
 
         const tbody = document.createElement("tbody");
-        const appendSubtotalRow = (label, value, className) => {
+        const appendSubtotalRow = (label, value, className, groupMove = null) => {
           const trSubtotal = document.createElement("tr");
           trSubtotal.className = `voce-mm-subtotal-row ${className}`;
 
@@ -6079,7 +6174,38 @@ window.addEventListener("DOMContentLoaded", () => {
 
           const tdActions = document.createElement("td");
           tdActions.className = "voce-mm-subtotal-actions";
-          tdActions.textContent = "";
+          if (groupMove) {
+            const upG = document.createElement("button");
+            upG.type = "button";
+            upG.className = "btn-action btn-secondary btn-icon-mini btn-mm-up";
+            upG.dataset.action = "move-voce-mm-group-up";
+            upG.dataset.idVoce = String(groupMove.idVoce);
+            upG.dataset.groupIndex = String(groupMove.groupIndex);
+            upG.textContent = "↑";
+            upG.title = "Sposta questo riferimento sopra";
+            upG.setAttribute("aria-label", "Sposta gruppo riferimento sopra");
+            upG.disabled = !groupMove.canUp || groupMove.bloccata;
+            if (!groupMove.canUp) upG.title = "Già il primo riferimento";
+            const downG = document.createElement("button");
+            downG.type = "button";
+            downG.className = "btn-action btn-secondary btn-icon-mini btn-mm-down";
+            downG.dataset.action = "move-voce-mm-group-down";
+            downG.dataset.idVoce = String(groupMove.idVoce);
+            downG.dataset.groupIndex = String(groupMove.groupIndex);
+            downG.textContent = "↓";
+            downG.title = "Sposta questo riferimento sotto";
+            downG.setAttribute("aria-label", "Sposta gruppo riferimento sotto");
+            downG.disabled = !groupMove.canDown || groupMove.bloccata;
+            if (!groupMove.canDown) downG.title = "Già l'ultimo riferimento";
+            if (groupMove.bloccata) {
+              const tip = "Misurazione automatica: non modificabile da VOCI";
+              upG.disabled = true;
+              downG.disabled = true;
+              upG.title = tip;
+              downG.title = tip;
+            }
+            tdActions.append(upG, downG);
+          }
 
           trSubtotal.append(tdLabel, tdVal, tdActions);
           tbody.appendChild(trSubtotal);
@@ -6105,13 +6231,18 @@ window.addEventListener("DOMContentLoaded", () => {
             rifMap.get(rifKey).push({ m, idx });
           });
 
+          const gruppiVisivi = [];
+          grouped.forEach((rifMap) => {
+            rifMap.forEach((rows) => gruppiVisivi.push(rows));
+          });
+          let gruppoVisivoIdx = 0;
           grouped.forEach((rifMap, pianoKey) => {
             let sumPiano = 0;
             let sumPianoAperture = 0;
             rifMap.forEach((rows, rifKey) => {
               let sumRif = 0;
               let sumRifAperture = 0;
-              rows.forEach(({ m, idx }) => {
+              rows.forEach(({ m, idx }, rowPos) => {
                 const trMm = document.createElement("tr");
                 trMm.className = "voce-mm-data-row";
                 trMm.dataset.idVoce = String(item.idVoce);
@@ -6155,6 +6286,70 @@ window.addEventListener("DOMContentLoaded", () => {
                 trMm.appendChild(createCell(fmt2(m.risultato)));
                 const ac = document.createElement("td");
                 ac.className = "actions-cell mm-actions-cell";
+                const isMisurazioneDaVani =
+                  (typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "") ||
+                  (typeof m?.perimetraliSchedaId === "string" && m.perimetraliSchedaId.trim() !== "") ||
+                  (typeof m?.elevazioneSchedaId === "string" && m.elevazioneSchedaId.trim() !== "") ||
+                  (typeof m?.solaiInterniSchedaId === "string" && m.solaiInterniSchedaId.trim() !== "") ||
+                  (typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "");
+                const upMm = document.createElement("button");
+                upMm.type = "button";
+                upMm.className = "btn-action btn-secondary btn-icon-mini btn-mm-up";
+                upMm.dataset.action = "move-voce-mm-up";
+                upMm.dataset.idVoce = String(item.idVoce);
+                upMm.dataset.mmIndex = String(idx);
+                upMm.textContent = "↑";
+                upMm.title = "Sposta questa misurazione sopra (stesso riferimento)";
+                upMm.setAttribute("aria-label", "Sposta misurazione sopra");
+                upMm.disabled = rowPos === 0;
+                if (upMm.disabled) {
+                  upMm.title =
+                    rows.length === 1
+                      ? "Per spostare tutto il riferimento usa le frecce sul Totale RIFERIMENTO"
+                      : "Già la prima misurazione di questo riferimento";
+                }
+                const downMm = document.createElement("button");
+                downMm.type = "button";
+                downMm.className = "btn-action btn-secondary btn-icon-mini btn-mm-down";
+                downMm.dataset.action = "move-voce-mm-down";
+                downMm.dataset.idVoce = String(item.idVoce);
+                downMm.dataset.mmIndex = String(idx);
+                downMm.textContent = "↓";
+                downMm.title = "Sposta questa misurazione sotto (stesso riferimento)";
+                downMm.setAttribute("aria-label", "Sposta misurazione sotto");
+                downMm.disabled = rowPos === rows.length - 1;
+                if (downMm.disabled) {
+                  downMm.title =
+                    rows.length === 1
+                      ? "Per spostare tutto il riferimento usa le frecce sul Totale RIFERIMENTO"
+                      : "Già l'ultima misurazione di questo riferimento";
+                }
+                ac.append(upMm, downMm);
+                const mostraAzioniAperture =
+                  !isVoceSpecialeNoTotaleRiferimento(item) &&
+                  !isTipoOggettoAccessorioApertura(m?.tipoOggetto) &&
+                  !isMisurazioneDaVani;
+                if (mostraAzioniAperture) {
+                  const addApBtn = document.createElement("button");
+                  addApBtn.type = "button";
+                  addApBtn.className = "btn-action btn-secondary btn-icon-mini btn-mm-add-ap";
+                  addApBtn.dataset.action = "open-voce-mm-apertura-editor";
+                  addApBtn.dataset.idVoce = String(item.idVoce);
+                  addApBtn.dataset.mmIndex = String(idx);
+                  addApBtn.innerHTML = MM_SVG_FINESTRA_AGGIUNGI;
+                  addApBtn.title = "Nuova apertura";
+                  addApBtn.setAttribute("aria-label", "Nuova apertura");
+                  const useApBtn = document.createElement("button");
+                  useApBtn.type = "button";
+                  useApBtn.className = "btn-action btn-secondary btn-icon-mini btn-mm-use-ap";
+                  useApBtn.dataset.action = "use-voce-mm-apertura";
+                  useApBtn.dataset.idVoce = String(item.idVoce);
+                  useApBtn.dataset.mmIndex = String(idx);
+                  useApBtn.innerHTML = MM_SVG_FINESTRA_USA;
+                  useApBtn.title = "Usa apertura esistente";
+                  useApBtn.setAttribute("aria-label", "Usa apertura esistente");
+                  ac.append(addApBtn, useApBtn);
+                }
                 const dup = document.createElement("button");
                 dup.type = "button";
                 dup.className = "btn-action btn-mm-dup";
@@ -6179,6 +6374,10 @@ window.addEventListener("DOMContentLoaded", () => {
                   del.disabled = true;
                   dup.title = tip;
                   del.title = tip;
+                  ac.querySelectorAll("button").forEach((btn) => {
+                    btn.disabled = true;
+                    btn.title = tip;
+                  });
                 }
                 ac.append(dup, del);
                 trMm.appendChild(ac);
@@ -6195,12 +6394,6 @@ window.addEventListener("DOMContentLoaded", () => {
                   const tdAp = document.createElement("td");
                   tdAp.colSpan = mmTotalColumns;
                   tdAp.className = "empty-cell voce-mm-aperture-cell";
-                  const isMisurazioneDaVani =
-                    (typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "") ||
-                    (typeof m?.perimetraliSchedaId === "string" && m.perimetraliSchedaId.trim() !== "") ||
-                    (typeof m?.elevazioneSchedaId === "string" && m.elevazioneSchedaId.trim() !== "") ||
-                    (typeof m?.solaiInterniSchedaId === "string" && m.solaiInterniSchedaId.trim() !== "") ||
-                    (typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "");
                   if (isMisurazioneDaVani) {
                     const misura2Val =
                       typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
@@ -6210,28 +6403,21 @@ window.addEventListener("DOMContentLoaded", () => {
                           : null;
                     const misura3Val =
                       typeof m.misura3 === "number" ? Number(m.misura3) : null;
-                    const savedWrap = document.createElement("div");
-                    savedWrap.className =
-                      "voce-mm-aperture-editor-wrap voce-mm-aperture-saved-wrap voce-mm-aperture-saved-wrap--vani";
-                    const savedHead = document.createElement("div");
-                    savedHead.className = "voce-mm-aperture-editor-head";
-                    ["Lungh. apertura (m)", "h inclusa (m)", "ML netti (m)", "Mq netti (m²)"].forEach(
-                      (label) => {
-                        const cell = document.createElement("div");
-                        cell.className = "voce-mm-ap-col-label";
-                        cell.textContent = label;
-                        savedHead.appendChild(cell);
-                      },
-                    );
-                    savedWrap.appendChild(savedHead);
-
-                    if (apertureCollegate.length === 0) {
-                      const emptyText = document.createElement("div");
-                      emptyText.className = "voce-mm-aperture-empty";
-                      emptyText.textContent = "Nessuna apertura";
-                      tdAp.appendChild(savedWrap);
-                      tdAp.appendChild(emptyText);
-                    } else {
+                    if (apertureCollegate.length > 0) {
+                      const savedWrap = document.createElement("div");
+                      savedWrap.className =
+                        "voce-mm-aperture-editor-wrap voce-mm-aperture-saved-wrap voce-mm-aperture-saved-wrap--vani";
+                      const savedHead = document.createElement("div");
+                      savedHead.className = "voce-mm-aperture-editor-head";
+                      ["Lungh. apertura (m)", "h inclusa (m)", "ML netti (m)", "Mq netti (m²)"].forEach(
+                        (label) => {
+                          const cell = document.createElement("div");
+                          cell.className = "voce-mm-ap-col-label";
+                          cell.textContent = label;
+                          savedHead.appendChild(cell);
+                        },
+                      );
+                      savedWrap.appendChild(savedHead);
                       apertureCollegate.forEach((apertura) => {
                         const row = document.createElement("div");
                         row.className = "voce-mm-aperture-editor-inputs voce-mm-aperture-saved-row";
@@ -6257,13 +6443,23 @@ window.addEventListener("DOMContentLoaded", () => {
                         savedWrap.appendChild(row);
                       });
                       tdAp.appendChild(savedWrap);
+                      trAp.appendChild(tdAp);
+                      tbody.appendChild(trAp);
                     }
-                    trAp.appendChild(tdAp);
-                    tbody.appendChild(trAp);
                   } else {
                   const draftKey = getVoceMmAperturaDraftKey(item.idVoce, idx);
                   const draft = voceMmAperturaDraftByKey.get(draftKey);
                   const editingAperturaMasterId = String(draft?.editingAperturaMasterId || "").trim();
+                  const misura2Val =
+                    typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
+                      ? Number(m.stratoAltezza)
+                      : typeof m.misura2 === "number"
+                        ? Number(m.misura2)
+                        : null;
+                  const misura3Val =
+                    typeof m.misura3 === "number" ? Number(m.misura3) : null;
+
+                if (apertureCollegate.length > 0) {
                   const savedWrap = document.createElement("div");
                   savedWrap.className = "voce-mm-aperture-editor-wrap voce-mm-aperture-saved-wrap";
                   const savedHead = document.createElement("div");
@@ -6293,22 +6489,6 @@ window.addEventListener("DOMContentLoaded", () => {
                     savedHead.appendChild(cell);
                   });
                   savedWrap.appendChild(savedHead);
-                  const misura2Val =
-                    typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
-                      ? Number(m.stratoAltezza)
-                      : typeof m.misura2 === "number"
-                        ? Number(m.misura2)
-                        : null;
-                  const misura3Val =
-                    typeof m.misura3 === "number" ? Number(m.misura3) : null;
-
-                if (apertureCollegate.length === 0) {
-                  const emptyText = document.createElement("div");
-                  emptyText.className = "voce-mm-aperture-empty";
-                  emptyText.textContent = "Nessuna apertura";
-                  tdAp.appendChild(savedWrap);
-                  tdAp.appendChild(emptyText);
-                } else {
                   apertureCollegate.forEach((apertura) => {
                     if (editingAperturaMasterId && editingAperturaMasterId === apertura.idAperturaMaster) {
                       const row = document.createElement("div");
@@ -6496,29 +6676,9 @@ window.addEventListener("DOMContentLoaded", () => {
                     savedWrap.appendChild(row);
                   });
                   tdAp.appendChild(savedWrap);
-                }
-                  const addApBtn = document.createElement("button");
-                  addApBtn.type = "button";
-                  addApBtn.className = "btn-action btn-secondary btn-icon-mini";
-                  addApBtn.dataset.action = "open-voce-mm-apertura-editor";
-                  addApBtn.dataset.idVoce = String(item.idVoce);
-                  addApBtn.dataset.mmIndex = String(idx);
-                  addApBtn.textContent = "+";
-                  addApBtn.title = "Nuova apertura";
-                  addApBtn.setAttribute("aria-label", "Nuova apertura");
-                  tdAp.appendChild(addApBtn);
-                  const useApBtn = document.createElement("button");
-                  useApBtn.type = "button";
-                  useApBtn.className = "btn-action btn-secondary btn-icon-mini";
-                  useApBtn.dataset.action = "use-voce-mm-apertura";
-                  useApBtn.dataset.idVoce = String(item.idVoce);
-                  useApBtn.dataset.mmIndex = String(idx);
-                  useApBtn.textContent = "↳";
-                  useApBtn.title = "Usa apertura esistente";
-                  useApBtn.setAttribute("aria-label", "Usa apertura esistente");
-                  tdAp.appendChild(useApBtn);
                   trAp.appendChild(tdAp);
                   tbody.appendChild(trAp);
+                }
 
                   if (draft && !editingAperturaMasterId) {
                   const trEditor = document.createElement("tr");
@@ -6688,8 +6848,15 @@ window.addEventListener("DOMContentLoaded", () => {
                 const labelRif = voceSenzaSottrazioneApertureUi(item)
                   ? `Totale RIFERIMENTO: ${rifKey}`
                   : `Totale RIFERIMENTO: ${rifKey} (Lordo ${fmt2(sumRif)} - Aperture ${fmt2(sumRifAperture)})`;
-                appendSubtotalRow(labelRif, sumRifNetto, "voce-mm-subtotal-rif");
+                appendSubtotalRow(labelRif, sumRifNetto, "voce-mm-subtotal-rif", {
+                  idVoce: item.idVoce,
+                  groupIndex: gruppoVisivoIdx,
+                  canUp: gruppoVisivoIdx > 0,
+                  canDown: gruppoVisivoIdx < gruppiVisivi.length - 1,
+                  bloccata: bloccataInVoci,
+                });
               }
+              gruppoVisivoIdx += 1;
             });
 
             const sumPianoNetto = sumPiano - sumPianoAperture;
@@ -10709,6 +10876,10 @@ window.addEventListener("DOMContentLoaded", () => {
     const azioniBloccateDaVani = new Set([
       "add-voce-mm",
       "duplicate-voce-mm-row",
+      "move-voce-mm-up",
+      "move-voce-mm-down",
+      "move-voce-mm-group-up",
+      "move-voce-mm-group-down",
       "open-voce-mm-apertura-editor",
       "use-voce-mm-apertura",
       "edit-voce-mm-apertura",
@@ -10753,6 +10924,38 @@ window.addEventListener("DOMContentLoaded", () => {
       const idVoce = Number(button.dataset.idVoce);
       const idx = Number(button.dataset.mmIndex);
       if (!Number.isNaN(idVoce) && !Number.isNaN(idx)) duplicaVoceMmRiga(idVoce, idx);
+      return;
+    }
+
+    if (button.dataset.action === "move-voce-mm-up") {
+      const idVoce = Number(button.dataset.idVoce);
+      const idx = Number(button.dataset.mmIndex);
+      if (!Number.isNaN(idVoce) && !Number.isNaN(idx)) spostaMisurazioneManualeVoce(idVoce, idx, -1);
+      return;
+    }
+
+    if (button.dataset.action === "move-voce-mm-down") {
+      const idVoce = Number(button.dataset.idVoce);
+      const idx = Number(button.dataset.mmIndex);
+      if (!Number.isNaN(idVoce) && !Number.isNaN(idx)) spostaMisurazioneManualeVoce(idVoce, idx, 1);
+      return;
+    }
+
+    if (button.dataset.action === "move-voce-mm-group-up") {
+      const idVoce = Number(button.dataset.idVoce);
+      const groupIndex = Number(button.dataset.groupIndex);
+      if (!Number.isNaN(idVoce) && !Number.isNaN(groupIndex)) {
+        spostaGruppoMisurazioniVoce(idVoce, groupIndex, -1);
+      }
+      return;
+    }
+
+    if (button.dataset.action === "move-voce-mm-group-down") {
+      const idVoce = Number(button.dataset.idVoce);
+      const groupIndex = Number(button.dataset.groupIndex);
+      if (!Number.isNaN(idVoce) && !Number.isNaN(groupIndex)) {
+        spostaGruppoMisurazioniVoce(idVoce, groupIndex, 1);
+      }
       return;
     }
 
