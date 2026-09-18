@@ -88,16 +88,38 @@ function saveRegistrati() {
 
 function mostraFeedback(msg, isErr = false) {
   const el = document.getElementById("strade-registra-feedback");
-  if (!el) return;
-  el.textContent = msg || "";
-  el.classList.toggle("vani-registra-feedback--err", Boolean(isErr) && Boolean(msg));
-  window.clearTimeout(feedbackTimer);
-  if (msg) {
-    feedbackTimer = window.setTimeout(() => {
-      el.textContent = "";
-      el.classList.remove("vani-registra-feedback--err");
-    }, isErr ? 6000 : 3500);
+  if (el) {
+    el.textContent = isErr ? "" : msg || "";
+    el.classList.remove("vani-registra-feedback--err");
+    window.clearTimeout(feedbackTimer);
+    if (!isErr && msg) {
+      feedbackTimer = window.setTimeout(() => {
+        el.textContent = "";
+      }, 3500);
+    }
   }
+  if (isErr && msg) mostraAvvisoModale(msg);
+}
+
+function mostraAvvisoModale(msg, titolo = "Attenzione") {
+  const dlg = document.getElementById("strade-avviso-dialog");
+  const titleEl = document.getElementById("strade-avviso-title");
+  const msgEl = document.getElementById("strade-avviso-msg");
+  if (titleEl) titleEl.textContent = titolo;
+  if (msgEl) msgEl.textContent = msg || "";
+  if (dlg && typeof dlg.showModal === "function") {
+    if (!dlg.open) dlg.showModal();
+    queueMicrotask(() => {
+      document.getElementById("strade-avviso-ok")?.focus();
+    });
+    return;
+  }
+  window.alert(msg);
+}
+
+function chiudiAvvisoModale() {
+  const dlg = document.getElementById("strade-avviso-dialog");
+  if (dlg && typeof dlg.close === "function" && dlg.open) dlg.close();
 }
 
 function nuovaSchedaId() {
@@ -532,6 +554,19 @@ export function initStradeUi() {
   });
   document.getElementById("strade-conferma-elimina-conferma")?.addEventListener("click", () => {
     confermaElimina();
+  });
+
+  document.getElementById("strade-avviso-ok")?.addEventListener("click", () => {
+    chiudiAvvisoModale();
+  });
+  document.getElementById("strade-avviso-dialog")?.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    chiudiAvvisoModale();
+  });
+  document.getElementById("strade-avviso-dialog")?.addEventListener("click", (e) => {
+    const dlg = e.currentTarget;
+    if (!(dlg instanceof HTMLDialogElement)) return;
+    if (e.target === dlg) chiudiAvvisoModale();
   });
 
   document.addEventListener("computo-nuovo-iniziato", () => {

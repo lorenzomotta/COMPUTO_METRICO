@@ -351,3 +351,15 @@
   color: #10233f;
   background: #fff;
 }
+
+#vista-strade .strade-avviso-dialog {
+  z-index: 13000;
+}
+
+#vista-strade .strade-avviso-dialog h3 {
+  color: #9b2c2c;
+}
+
+#vista-strade .strade-avviso-dialog .formula-dialog-actions {
+  justify-content: flex-end;
+}

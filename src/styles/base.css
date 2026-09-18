@@ -294,28 +294,55 @@ body {
   font-size: 0.8rem;
 }
 
-.voce-form-riga-uno .voce-form-cerca-wrap {
-  margin-left: auto;
-  align-self: flex-end;
-  flex: 0 0 auto;
+.voce-testo-label-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
-.voce-form-riga-uno .voce-btn-cerca {
-  text-decoration: none;
+.voce-testo-label-row > label {
+  margin-bottom: 0;
+}
+
+.voce-testo-label-row .voce-form-cerca-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.voce-btn-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;
+  width: 30px;
+  height: 30px;
   min-height: 30px;
-  padding: 5px 10px;
-  font-size: 0.76rem;
+  padding: 0;
   border: none;
+  border-radius: 8px;
   cursor: pointer;
   font-family: inherit;
+  color: #1a3558;
+  line-height: 0;
+}
+
+.voce-btn-icon:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+.voce-btn-icon:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.voce-btn-icon-svg {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
 .voce-form .voce-field-full {
@@ -324,9 +351,14 @@ body {
 
 .voce-um-row {
   display: grid;
-  grid-template-columns: minmax(110px, 150px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: end;
+}
+
+.voce-um-row #voce-unita-misura {
+  width: 100%;
+  min-width: 0;
 }
 
 .voce-um-row .btn-action {
@@ -334,6 +366,39 @@ body {
   padding: 7px 10px;
   font-size: 0.8rem;
   white-space: nowrap;
+}
+
+.voce-unita-nuovo-dialog {
+  max-width: min(420px, 94vw);
+  width: 100%;
+}
+
+.voce-unita-nuovo-dialog .voce-unita-nuovo-note {
+  margin: 0 0 12px;
+  color: #334e68;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.voce-unita-nuovo-dialog .field {
+  margin-bottom: 14px;
+}
+
+.voce-unita-nuovo-dialog .field label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: #1a3558;
+  font-size: 0.85rem;
+}
+
+.voce-unita-nuovo-dialog .field input {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #c8d6ea;
+  border-radius: 8px;
+  font-size: 0.92rem;
 }
 
 .voce-form textarea {
@@ -480,7 +545,7 @@ button {
 }
 
 #voce-dialog.voce-dialog--solo-unita .voce-form :is(input, select, textarea):disabled,
-#voce-dialog.voce-dialog--solo-unita .voce-btn-cerca:disabled {
+#voce-dialog.voce-dialog--solo-unita .voce-btn-icon:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }

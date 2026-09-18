@@ -2,16 +2,6 @@
 
 #voce-btn-usa-esistente {
   display: none;
-  text-decoration: none;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  min-height: 30px;
-  padding: 5px 10px;
-  font-size: 0.76rem;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
 }
 
 #voce-dialog.voce-dialog--solo-unita #voce-btn-usa-esistente {

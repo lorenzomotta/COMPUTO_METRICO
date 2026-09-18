@@ -993,9 +993,19 @@
               </div>
               <div class="field voce-field-compatta voce-field-capitolo">
                 <label for="voce-capitolo">CAPITOLO</label>
-                <select id="voce-capitolo">
-                  <option value="">— Senza capitolo —</option>
-                </select>
+                <div class="voce-capitolo-row">
+                  <select id="voce-capitolo">
+                    <option value="">— Senza capitolo —</option>
+                  </select>
+                  <button
+                    id="voce-capitolo-add"
+                    type="button"
+                    class="btn-action btn-secondary"
+                    title="Crea un nuovo capitolo"
+                  >
+                    Aggiungi
+                  </button>
+                </div>
               </div>
               <div class="field voce-field-compatta voce-field-tipo-misura">
                 <label for="voce-tipo-misura">TIPOMISURA</label>
@@ -1008,14 +1018,6 @@
                 <label for="voce-prezzo">PREZZO (&euro;)</label>
                 <input id="voce-prezzo" type="number" step="0.01" min="0" placeholder="0,00" required />
               </div>
-              <div class="voce-form-cerca-wrap">
-                <button type="button" id="voce-btn-cerca" class="btn-action btn-secondary voce-btn-cerca">
-                  CERCA VOCE
-                </button>
-                <button type="button" id="voce-btn-usa-esistente" class="btn-action btn-secondary voce-btn-cerca">
-                  USA VOCE ESISTENTE
-                </button>
-              </div>
             </div>
             <div class="field">
               <label for="voce-abbreviata">VOCE ABBREVIATA</label>
@@ -1025,12 +1027,65 @@
               <label for="voce-unita-misura">UNITA' MISURA</label>
               <div class="voce-um-row">
                 <select id="voce-unita-misura"></select>
-                <input id="voce-unita-nuova" type="text" placeholder="Nuova opzione" />
-                <button id="voce-unita-add" type="button" class="btn-action btn-secondary">Aggiungi</button>
+                <button
+                  id="voce-unita-add"
+                  type="button"
+                  class="btn-action btn-secondary"
+                  title="Aggiungi una nuova unità di misura"
+                >
+                  Aggiungi
+                </button>
               </div>
             </div>
             <div class="field voce-field-full">
-              <label for="voce-testo">VOCE</label>
+              <div class="voce-testo-label-row">
+                <label for="voce-testo">VOCE</label>
+                <div class="voce-form-cerca-wrap">
+                  <button
+                    type="button"
+                    id="voce-btn-cerca"
+                    class="btn-action btn-secondary voce-btn-icon"
+                    title="Cerca voce"
+                    aria-label="Cerca voce"
+                  >
+                    <svg class="voce-btn-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <circle cx="10.5" cy="10.5" r="6.25" fill="none" stroke="currentColor" stroke-width="2" />
+                      <path d="M15.5 15.5 L20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    id="voce-btn-usa-esistente"
+                    class="btn-action btn-secondary voce-btn-icon"
+                    title="Usa voce esistente"
+                    aria-label="Usa voce esistente"
+                  >
+                    <svg class="voce-btn-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path
+                        d="M4 5.5c0-.83.67-1.5 1.5-1.5H11v15.5H5.5A1.5 1.5 0 0 1 4 18V5.5z"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M20 5.5c0-.83-.67-1.5-1.5-1.5H13v15.5h5.5A1.5 1.5 0 0 0 20 18V5.5z"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M12 4v15.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
               <textarea id="voce-testo" rows="4" placeholder="Inserisci testo voce..." required></textarea>
             </div>
             <div class="field voce-field-full">
@@ -1274,6 +1329,66 @@
           <div class="formula-dialog-actions" id="capitoli-salva-template-actions-overwrite" hidden>
             <button type="button" id="btn-capitoli-salva-template-annulla-ow" class="btn-action btn-secondary">ANNULLA</button>
             <button type="button" id="btn-capitoli-salva-template-overwrite" class="btn-action btn-inizia-computo">SOVRASCRIVI</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="voce-capitolo-nuovo-dialog" class="formula-dialog voce-capitolo-nuovo-dialog" aria-modal="true">
+        <form id="voce-capitolo-nuovo-form">
+          <h3>NUOVO CAPITOLO</h3>
+          <p class="voce-capitolo-nuovo-note">
+            Inserisci sequenza e nome. La sequenza decide l’ordine in elenco e in stampa (1.1, 2.1…).
+          </p>
+          <div class="voce-capitolo-nuovo-fields">
+            <div class="field voce-capitolo-nuovo-field-seq">
+              <label for="voce-capitolo-nuovo-seq">Sequenza</label>
+              <input id="voce-capitolo-nuovo-seq" type="number" min="1" step="1" required />
+            </div>
+            <div class="field voce-capitolo-nuovo-field-nome">
+              <label for="voce-capitolo-nuovo-nome">Nome capitolo</label>
+              <input
+                id="voce-capitolo-nuovo-nome"
+                type="text"
+                placeholder="Es: STRADE E MARCIAPIEDI"
+                autocomplete="off"
+                required
+              />
+            </div>
+          </div>
+          <div class="formula-dialog-actions">
+            <button type="button" id="voce-capitolo-nuovo-annulla" class="btn-action btn-secondary">
+              ANNULLA
+            </button>
+            <button type="submit" id="voce-capitolo-nuovo-ok" class="btn-action btn-inizia-computo">
+              CREA
+            </button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="voce-unita-nuovo-dialog" class="formula-dialog voce-unita-nuovo-dialog" aria-modal="true">
+        <form id="voce-unita-nuovo-form">
+          <h3>NUOVA UNITÀ DI MISURA</h3>
+          <p class="voce-unita-nuovo-note">
+            Scrivi l’unità da aggiungere all’elenco (es. mq, mc, ml, a corpo…).
+          </p>
+          <div class="field">
+            <label for="voce-unita-nuovo-nome">Unità di misura</label>
+            <input
+              id="voce-unita-nuovo-nome"
+              type="text"
+              placeholder="Es: mq"
+              autocomplete="off"
+              required
+            />
+          </div>
+          <div class="formula-dialog-actions">
+            <button type="button" id="voce-unita-nuovo-annulla" class="btn-action btn-secondary">
+              ANNULLA
+            </button>
+            <button type="submit" id="voce-unita-nuovo-ok" class="btn-action btn-inizia-computo">
+              CREA
+            </button>
           </div>
         </form>
       </dialog>
@@ -2388,6 +2503,23 @@
                     </button>
                     <button type="button" id="strade-conferma-elimina-conferma" class="btn-action btn-delete">
                       Elimina
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+
+              <dialog
+                id="strade-avviso-dialog"
+                class="formula-dialog vani-conferma-elimina-dialog strade-avviso-dialog"
+                aria-modal="true"
+                aria-labelledby="strade-avviso-title"
+              >
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3 id="strade-avviso-title">Attenzione</h3>
+                  <p id="strade-avviso-msg" class="vani-conferma-elimina-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="strade-avviso-ok" class="btn-action btn-secondary">
+                      OK
                     </button>
                   </div>
                 </div>

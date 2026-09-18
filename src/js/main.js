@@ -313,11 +313,20 @@ window.addEventListener("DOMContentLoaded", () => {
   const voceIdEl = document.querySelector("#voce-id");
   const vocePosizioneEl = document.querySelector("#voce-posizione");
   const voceCapitoloEl = document.querySelector("#voce-capitolo");
+  const voceCapitoloAddButtonEl = document.querySelector("#voce-capitolo-add");
+  const voceCapitoloNuovoDialogEl = document.querySelector("#voce-capitolo-nuovo-dialog");
+  const voceCapitoloNuovoFormEl = document.querySelector("#voce-capitolo-nuovo-form");
+  const voceCapitoloNuovoSeqEl = document.querySelector("#voce-capitolo-nuovo-seq");
+  const voceCapitoloNuovoNomeEl = document.querySelector("#voce-capitolo-nuovo-nome");
+  const voceCapitoloNuovoAnnullaEl = document.querySelector("#voce-capitolo-nuovo-annulla");
   const voceAbbreviataEl = document.querySelector("#voce-abbreviata");
   const voceUnitaMisuraEl = document.querySelector("#voce-unita-misura");
   const vocePrezzoEl = document.querySelector("#voce-prezzo");
-  const voceUnitaNuovaEl = document.querySelector("#voce-unita-nuova");
   const voceUnitaAddButtonEl = document.querySelector("#voce-unita-add");
+  const voceUnitaNuovoDialogEl = document.querySelector("#voce-unita-nuovo-dialog");
+  const voceUnitaNuovoFormEl = document.querySelector("#voce-unita-nuovo-form");
+  const voceUnitaNuovoNomeEl = document.querySelector("#voce-unita-nuovo-nome");
+  const voceUnitaNuovoAnnullaEl = document.querySelector("#voce-unita-nuovo-annulla");
   const voceTestoEl = document.querySelector("#voce-testo");
   const voceNoteEl = document.querySelector("#voce-note");
   const voceTipoMisuraEl = document.querySelector("#voce-tipo-misura");
@@ -5846,12 +5855,97 @@ window.addEventListener("DOMContentLoaded", () => {
     voceAbbreviataEl.value = "";
     renderVociUnitaOptions();
     if (vocePrezzoEl) vocePrezzoEl.value = fmt2(0);
-    voceUnitaNuovaEl.value = "";
     if (voceTipoMisuraEl) voceTipoMisuraEl.value = TIPOMISURA_VOCE_AUTOMATICA;
     voceTestoEl.value = "";
     voceNoteEl.value = "";
     editingVoceId = null;
     setVoceDialogModalitaSoloUnitaMisura(false);
+  }
+
+  function nextCapitoloSequenzaDisponibile() {
+    return archivioCapitoli.reduce((max, c) => Math.max(max, Number(c.sequenza) || 0), 0) + 1;
+  }
+
+  function openVoceCapitoloNuovoDialog() {
+    if (!(voceCapitoloNuovoDialogEl instanceof HTMLDialogElement)) return;
+    if (voceCapitoloNuovoSeqEl instanceof HTMLInputElement) {
+      voceCapitoloNuovoSeqEl.value = String(nextCapitoloSequenzaDisponibile());
+    }
+    if (voceCapitoloNuovoNomeEl instanceof HTMLInputElement) {
+      voceCapitoloNuovoNomeEl.value = "";
+    }
+    if (!voceCapitoloNuovoDialogEl.open) voceCapitoloNuovoDialogEl.showModal();
+    queueMicrotask(() => voceCapitoloNuovoNomeEl?.focus());
+  }
+
+  function closeVoceCapitoloNuovoDialog() {
+    if (voceCapitoloNuovoDialogEl instanceof HTMLDialogElement && voceCapitoloNuovoDialogEl.open) {
+      voceCapitoloNuovoDialogEl.close();
+    }
+  }
+
+  /** Crea un capitolo dal popup del dialog voce e lo seleziona subito. */
+  function creaCapitoloDaVoceDialogPopup() {
+    if (!voceCapitoloEl) return false;
+    const sequenza = Number.parseInt(
+      voceCapitoloNuovoSeqEl instanceof HTMLInputElement ? voceCapitoloNuovoSeqEl.value : "",
+      10,
+    );
+    const nome =
+      voceCapitoloNuovoNomeEl instanceof HTMLInputElement
+        ? voceCapitoloNuovoNomeEl.value.trim()
+        : "";
+    if (!Number.isInteger(sequenza) || sequenza < 1) {
+      window.alert("Inserisci una sequenza valida (numero intero ≥ 1).");
+      voceCapitoloNuovoSeqEl?.focus();
+      return false;
+    }
+    if (!nome) {
+      window.alert("Inserisci il nome del capitolo.");
+      voceCapitoloNuovoNomeEl?.focus();
+      return false;
+    }
+    const esistente = archivioCapitoli.find(
+      (c) => String(c.nome || "").trim().toLowerCase() === nome.toLowerCase(),
+    );
+    if (esistente) {
+      const usaEsistente = window.confirm(
+        `Esiste già un capitolo chiamato «${esistente.nome}» (seq. ${esistente.sequenza}).\nVuoi selezionarlo invece di crearne uno nuovo?`,
+      );
+      if (!usaEsistente) {
+        voceCapitoloNuovoNomeEl?.focus();
+        return false;
+      }
+      popolaSelectCapitoliVoce(esistente.id);
+      if (!editingVoceSoloUnitaMisura && vocePosizioneEl && editingVoceId === null) {
+        vocePosizioneEl.value = String(getPrimaPosizioneVoceDisponibile(esistente.id));
+      }
+      return true;
+    }
+    const seqOccupata = archivioCapitoli.some((c) => c.sequenza === sequenza);
+    if (seqOccupata) {
+      window.alert(
+        `La sequenza ${sequenza} è già usata. Scegli un altro numero (suggerito: ${nextCapitoloSequenzaDisponibile()}).`,
+      );
+      voceCapitoloNuovoSeqEl?.focus();
+      return false;
+    }
+    const nuovoId = createCapitoloId();
+    archivioCapitoli.push({
+      id: nuovoId,
+      sequenza,
+      nome,
+    });
+    saveArchivioCapitoliToStorage();
+    popolaSelectCapitoliVoce(nuovoId);
+    if (!editingVoceSoloUnitaMisura && vocePosizioneEl && editingVoceId === null) {
+      vocePosizioneEl.value = String(getPrimaPosizioneVoceDisponibile(nuovoId));
+    }
+    if (capitoliArchivioDialogEl?.open) {
+      openArchivioCapitoliDialog();
+    }
+    renderVoci();
+    return true;
   }
 
   function getPrimaPosizioneVoceDisponibile(capitoloId = "") {
@@ -7341,8 +7435,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const gapAfterVoce = 2.6;
     const voceFontSize = 10;
     const voceLineH = 5.4;
-    const detailFontSize = 9;
-    const detailLineH = 4.9;
+    const detailFontSize = 8;
+    const detailLineH = 4.5;
     const totalFontSize = 10;
     const voceColW = contentWidth * 0.32;
     const leftTextX = marginLeft + 8;
@@ -7352,6 +7446,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const partiUgualiX = rightX - 30;
     const prezzoRightX = rightX + 52;
     const totaleRightX = rightX + 84;
+    /** Larghezza max testo sotto DESCRIZIONE VOCE (non invasione di «Parti Uguali»). */
+    const descDetailMaxW = Math.max(24, partiUgualiX - leftTextX - 3);
     const headerFontSize = 10;
     const headerBaselineY = marginTop + 3.8;
     const headerContentStartY = marginTop + 10;
@@ -7370,6 +7466,23 @@ window.addEventListener("DOMContentLoaded", () => {
       doc.setFont("helvetica", bold ? "bold" : "normal");
       doc.setFontSize(size);
       doc.text(normalizePdfText(text), x, yTop, { align: "right" });
+    };
+
+    /** Testo a capo nella colonna descrizione; eventuale importo a destra sulla prima riga. */
+    const drawWrappedDescLine = (text, rightText = null, bold = false, size = detailFontSize) => {
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(size);
+      const lines = doc.splitTextToSize(normalizePdfText(String(text ?? "")), descDetailMaxW);
+      const list = lines.length > 0 ? lines : [""];
+      list.forEach((line, idx) => {
+        ensureSpace(detailLineH);
+        drawText(leftTextX, y + 3.8, line, bold, size);
+        if (idx === 0 && rightText != null && rightText !== "") {
+          drawTextRight(resultRightX, y + 3.8, rightText, bold, size);
+        }
+        y += detailLineH;
+      });
+      return list.length;
     };
 
     const drawPageHeader = () => {
@@ -7551,14 +7664,11 @@ window.addEventListener("DOMContentLoaded", () => {
           let sumPianoLordo = 0;
           let sumPianoAperture = 0;
           ensureSpace(detailLineH);
-          drawText(leftTextX, y + 3.8, `PIANO: ${piano}`, false, detailFontSize);
-          y += detailLineH;
+          drawWrappedDescLine(`PIANO: ${piano}`);
           rifMap.forEach((rows, rif) => {
             let sumRifLordo = 0;
             let sumRifAperture = 0;
-            ensureSpace(detailLineH);
-            drawText(leftTextX, y + 3.8, `RIFERIMENTO: ${rif}`, false, detailFontSize);
-            y += detailLineH;
+            drawWrappedDescLine(`RIFERIMENTO: ${rif}`);
             const haCamminamenti = rows.some(
               (row) =>
                 typeof row?.camminamentiSchedaId === "string" &&
@@ -7620,7 +7730,7 @@ window.addEventListener("DOMContentLoaded", () => {
               const formulaLines = misurazioneDaStrade
                 ? doc.splitTextToSize(
                     normalizePdfText(detailLine),
-                    Math.max(20, partiUgualiX - leftTextX - 4),
+                    descDetailMaxW,
                   )
                 : [detailLine];
               formulaLines.forEach((line, lineIdx) => {
@@ -7746,17 +7856,11 @@ window.addEventListener("DOMContentLoaded", () => {
               y += detailLineH;
             }
             if (!isVoceSpecialeNoTotaleRiferimento(item)) {
-              ensureSpace(detailLineH);
-              drawText(leftTextX, y + 3.8, `Totale ${rif}`, false, detailFontSize);
-              drawTextRight(resultRightX, y + 3.8, fmtRis(sumRifNetto), false, detailFontSize);
-              y += detailLineH;
+              drawWrappedDescLine(`Totale ${rif}`, fmtRis(sumRifNetto));
             }
           });
           const sumPianoNetto = sumPianoLordo - sumPianoAperture;
-          ensureSpace(detailLineH);
-          drawText(leftTextX, y + 3.8, `Totale ${piano}`, false, detailFontSize);
-          drawTextRight(resultRightX, y + 3.8, fmtRis(sumPianoNetto), false, detailFontSize);
-          y += detailLineH;
+          drawWrappedDescLine(`Totale ${piano}`, fmtRis(sumPianoNetto));
         });
 
         const sumMm = mm.reduce((acc, m) => acc + Number(m.risultato || 0), 0);
@@ -11443,7 +11547,6 @@ window.addEventListener("DOMContentLoaded", () => {
       voceAbbreviataEl.value = row.voceAbbreviata || "";
       renderVociUnitaOptions(row.unitaMisura || "");
       if (vocePrezzoEl) vocePrezzoEl.value = fmt2(row.prezzo ?? 0);
-      voceUnitaNuovaEl.value = "";
       if (voceTipoMisuraEl) voceTipoMisuraEl.value = normalizzaTipoMisuraVoce(row.tipoMisura);
       voceTestoEl.value = row.voce;
       voceNoteEl.value = row.note;
@@ -11638,25 +11741,83 @@ window.addEventListener("DOMContentLoaded", () => {
     fileInput.click();
   });
 
-  voceUnitaAddButtonEl.addEventListener("click", () => {
-    const nuovaUnita = voceUnitaNuovaEl.value.trim();
-    if (!nuovaUnita) return;
+  function openVoceUnitaNuovoDialog() {
+    if (!(voceUnitaNuovoDialogEl instanceof HTMLDialogElement)) return;
+    if (voceUnitaNuovoNomeEl instanceof HTMLInputElement) {
+      voceUnitaNuovoNomeEl.value = "";
+    }
+    if (!voceUnitaNuovoDialogEl.open) voceUnitaNuovoDialogEl.showModal();
+    queueMicrotask(() => voceUnitaNuovoNomeEl?.focus());
+  }
+
+  function closeVoceUnitaNuovoDialog() {
+    if (voceUnitaNuovoDialogEl instanceof HTMLDialogElement && voceUnitaNuovoDialogEl.open) {
+      voceUnitaNuovoDialogEl.close();
+    }
+  }
+
+  /** Aggiunge un'unità di misura dal popup e la seleziona subito. */
+  function creaUnitaDaVoceDialogPopup() {
+    const nuovaUnita =
+      voceUnitaNuovoNomeEl instanceof HTMLInputElement
+        ? voceUnitaNuovoNomeEl.value.trim()
+        : "";
+    if (!nuovaUnita) {
+      window.alert("Inserisci l'unità di misura.");
+      voceUnitaNuovoNomeEl?.focus();
+      return false;
+    }
     const exists = vociUnitaMisuraOptions.some(
       (item) => item.toLowerCase() === nuovaUnita.toLowerCase(),
     );
     if (!exists) {
       vociUnitaMisuraOptions.push(nuovaUnita);
       saveVociUnitaOptions();
+    } else {
+      const giaPresente = vociUnitaMisuraOptions.find(
+        (item) => item.toLowerCase() === nuovaUnita.toLowerCase(),
+      );
+      renderVociUnitaOptions(giaPresente || nuovaUnita);
+      return true;
     }
     renderVociUnitaOptions(nuovaUnita);
-    voceUnitaNuovaEl.value = "";
-    voceUnitaNuovaEl.focus();
+    return true;
+  }
+
+  voceUnitaAddButtonEl?.addEventListener("click", () => {
+    openVoceUnitaNuovoDialog();
   });
 
-  voceUnitaNuovaEl.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
+  voceUnitaNuovoAnnullaEl?.addEventListener("click", () => {
+    closeVoceUnitaNuovoDialog();
+  });
+
+  voceUnitaNuovoFormEl?.addEventListener("submit", (event) => {
     event.preventDefault();
-    voceUnitaAddButtonEl.click();
+    if (creaUnitaDaVoceDialogPopup()) {
+      closeVoceUnitaNuovoDialog();
+    }
+  });
+
+  voceCapitoloAddButtonEl?.addEventListener("click", () => {
+    openVoceCapitoloNuovoDialog();
+  });
+
+  voceCapitoloNuovoAnnullaEl?.addEventListener("click", () => {
+    closeVoceCapitoloNuovoDialog();
+  });
+
+  voceCapitoloNuovoFormEl?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (creaCapitoloDaVoceDialogPopup()) {
+      closeVoceCapitoloNuovoDialog();
+    }
+  });
+
+  voceCapitoloEl?.addEventListener("change", () => {
+    if (editingVoceSoloUnitaMisura || editingVoceId !== null || !vocePosizioneEl) return;
+    const cid = normalizeCapitoloIdOnVoce(voceCapitoloEl.value);
+    vocePosizioneEl.value = String(getPrimaPosizioneVoceDisponibile(cid));
   });
 
   murParamsRiferimentoEl?.addEventListener("change", () => {
