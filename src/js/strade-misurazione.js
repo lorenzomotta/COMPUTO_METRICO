@@ -1,8 +1,8 @@
 /**
- * Misurazione speciale SOLAI INCLINATI — UI fullscreen.
+ * Misurazione speciale STRADE — UI fullscreen.
  */
 
-import { initSolaiInclinatiUi, prepareVistaSolaiInclinati } from "./solai-inclinati.js";
+import { initStradeUi, prepareVistaStrade } from "./strade.js";
 
 const MAIN_VIEW_IDS = [
   "vista-piani",
@@ -14,29 +14,22 @@ const MAIN_VIEW_IDS = [
   "vista-bim",
 ];
 
-function setSolaiInclHelpInlineOpen(open) {
-  const panel = document.getElementById("solai-incl-help-inline");
-  const btn = document.getElementById("btn-solai-incl-help-toggle");
+function setStradeHelpInlineOpen(open) {
+  const panel = document.getElementById("strade-help-inline");
+  const btn = document.getElementById("btn-strade-help-toggle");
   if (panel) panel.hidden = !open;
   if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
-function hideVistaSolaiInclinatiOverlay() {
-  const shell = document.getElementById("vista-solai-inclinati");
+function hideVistaStradeOverlay() {
+  const shell = document.getElementById("vista-strade");
   if (shell) shell.hidden = true;
-  setSolaiInclHelpInlineOpen(false);
-  document.body.classList.remove("solai-incl-fullscreen-active");
+  setStradeHelpInlineOpen(false);
+  document.body.classList.remove("strade-fullscreen-active");
   document.body.style.overflow = "";
 }
 
-/** Chiude solo l’overlay se è aperto, senza cambiare le altre viste. */
-export function dismissSolaiInclinatiIfOpen() {
-  const shell = document.getElementById("vista-solai-inclinati");
-  if (!shell || shell.hidden) return;
-  hideVistaSolaiInclinatiOverlay();
-}
-
-export function openVistaSolaiInclinati() {
+function hideAltriOverlayMisurazione() {
   const vaniShell = document.getElementById("vista-vani");
   if (vaniShell) {
     vaniShell.hidden = true;
@@ -57,32 +50,43 @@ export function openVistaSolaiInclinati() {
     cammShell.hidden = true;
     document.body.classList.remove("camm-fullscreen-active");
   }
-  const solaiIntShell = document.getElementById("vista-solai-interni");
-  if (solaiIntShell) {
-    solaiIntShell.hidden = true;
+  const solaiShell = document.getElementById("vista-solai-interni");
+  if (solaiShell) {
+    solaiShell.hidden = true;
     document.body.classList.remove("solai-fullscreen-active");
   }
-  const stradeShell = document.getElementById("vista-strade");
-  if (stradeShell) {
-    stradeShell.hidden = true;
-    document.body.classList.remove("strade-fullscreen-active");
+  const solaiInclShell = document.getElementById("vista-solai-inclinati");
+  if (solaiInclShell) {
+    solaiInclShell.hidden = true;
+    document.body.classList.remove("solai-incl-fullscreen-active");
   }
+}
+
+/** Chiude solo l’overlay se è aperto, senza cambiare le altre viste. */
+export function dismissStradeIfOpen() {
+  const shell = document.getElementById("vista-strade");
+  if (!shell || shell.hidden) return;
+  hideVistaStradeOverlay();
+}
+
+export function openVistaStrade() {
+  hideAltriOverlayMisurazione();
   for (const id of MAIN_VIEW_IDS) {
     const el = document.getElementById(id);
     if (el) el.hidden = true;
   }
-  const shell = document.getElementById("vista-solai-inclinati");
+  const shell = document.getElementById("vista-strade");
   if (shell) shell.hidden = false;
-  document.body.classList.add("solai-incl-fullscreen-active");
+  document.body.classList.add("strade-fullscreen-active");
   document.body.style.overflow = "hidden";
-  prepareVistaSolaiInclinati();
+  prepareVistaStrade();
   window.requestAnimationFrame(() => {
-    document.querySelector("#vista-solai-inclinati .solai-incl-piano-nome")?.focus();
+    document.querySelector("#vista-strade .strade-piano-nome")?.focus();
   });
 }
 
-export function closeVistaSolaiInclinati() {
-  hideVistaSolaiInclinatiOverlay();
+export function closeVistaStrade() {
+  hideVistaStradeOverlay();
   const vistaPiani = document.getElementById("vista-piani");
   const vistaCompilazione = document.getElementById("vista-compilazione");
   const vistaVoci = document.getElementById("vista-voci");
@@ -96,24 +100,24 @@ export function closeVistaSolaiInclinati() {
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
-export function wireSolaiInclinatiUi() {
-  initSolaiInclinatiUi();
+export function wireStradeUi() {
+  initStradeUi();
 
-  document.getElementById("btn-solai-incl-help-toggle")?.addEventListener("click", () => {
-    const panel = document.getElementById("solai-incl-help-inline");
+  document.getElementById("btn-strade-help-toggle")?.addEventListener("click", () => {
+    const panel = document.getElementById("strade-help-inline");
     const next = panel ? panel.hidden : false;
-    setSolaiInclHelpInlineOpen(next);
+    setStradeHelpInlineOpen(next);
   });
 
-  document.getElementById("btn-solai-incl-chiudi")?.addEventListener("click", () => {
-    closeVistaSolaiInclinati();
+  document.getElementById("btn-strade-chiudi")?.addEventListener("click", () => {
+    closeVistaStrade();
   });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    const shell = document.getElementById("vista-solai-inclinati");
+    const shell = document.getElementById("vista-strade");
     if (!shell || shell.hidden) return;
     e.preventDefault();
-    closeVistaSolaiInclinati();
+    closeVistaStrade();
   });
 }

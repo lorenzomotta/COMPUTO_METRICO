@@ -83,11 +83,25 @@ import {
   openVistaSolaiInclinati,
   wireSolaiInclinatiUi,
 } from "./solai-inclinati-misurazione.js";
+import {
+  dismissStradeIfOpen,
+  openVistaStrade,
+  wireStradeUi,
+} from "./strade-misurazione.js";
 import { openVistaMisureVarie, wireMisureVarieUi } from "./misure-varie.js";
 import { openVistaScavo, wireScavoUi, dismissScavoIfOpen } from "./scavo.js";
 import { buildRivestimentiRowsFromStorage, buildRivestimentiElevazioneRowsFromStorage, buildRivestimentiPerimetraliRowsFromStorage, buildIntonacoRusticoRowsFromStorage, buildIntonacoRusticoEsternoRowsFromStorage, buildIntonacoCivileRowsFromStorage, buildIntonacoCivileEsternoRowsFromStorage, buildGessoRowsFromStorage, buildZoccoloRowsFromStorage } from "./modules/rivestimentiRiepilogo.js";
 import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
 import { syncEsterniMisurazioniNelleVoci } from "./modules/esterniVariSyncVoci.js";
+import { abbrevKey, initVoceUsaEsistente } from "./modules/voceUsaEsistente.js";
+import {
+  canUndoComputo,
+  clearUndoComputo,
+  installUndoLocalStorageHook,
+  restoreUndoSnapshot,
+  runWithoutUndoCapture,
+  setUndoComputoOnChange,
+} from "./modules/undoComputo.js";
 import { wireAggiornamentiAutomatici } from "./aggiornamenti.js";
 import { wireTitoloConVersione } from "./versione-titolo.js";
 
@@ -372,7 +386,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const STORAGE_SOGLIE_SBORDI = "computo_metrico_soglie_sbordi";
   const STORAGE_FALSITELAI_LEGNO_AGGIUNTE = "computo_metrico_falsitelai_legno_aggiunte";
   const STORAGE_FALSITELAI_ALLUMINIO_AGGIUNTE = "computo_metrico_falsitelai_alluminio_aggiunte";
-  const UNITA_MISURA_DEFAULT_OPTIONS = ["ml.", "mq.", "mc", "Kg.", "a corpo", "percentuale"];
+  const UNITA_MISURA_DEFAULT_OPTIONS = ["ml.", "mq.", "mc", "n.", "Kg.", "a corpo", "percentuale"];
   const TIPOMISURA_VOCE_AUTOMATICA = "AUTOMATICA";
   const TIPOMISURA_VOCE_MANUALE = "MANUALE";
   const VOCE_MM_TIPO_MANUALE = "MANUALE";
@@ -2444,13 +2458,20 @@ window.addEventListener("DOMContentLoaded", () => {
     elevazioneSchedaId,
     solaiInterniSchedaId,
     solaiInclinatiSchedaId,
+    stradeSchedaId,
     stratoAltezza,
     tipoOggetto,
+    divisore,
   }) {
     if (!Number.isInteger(numero) || numero < 0) return 0;
     const tipoOg = String(tipoOggetto ?? "")
       .trim()
       .toUpperCase();
+    if (tipoOg === "STRADA_MANUFATTO" || tipoOg === "STRADA_CORDOLI" || tipoOg === "STRADA_SEGNALETICA" || tipoOg === "STRADA_FOGNA" || tipoOg === "STRADA_LUCE_PUBBLICA" || tipoOg === "STRADA_LUCE_PRIVATA" || tipoOg === "STRADA_GAS" || tipoOg === "STRADA_ACQUA") {
+      const m1 = mmFactorOrOne(misura1);
+      const raw = Number((m1 * numero).toFixed(3));
+      return segno ? -Math.abs(raw) : raw;
+    }
     // Pavimento/soffitto/solaio: spessore (o altezza trave) compilato → volume; vuoto → area.
     if (
       tipoOg === "PAVIMENTO" ||
@@ -2459,14 +2480,29 @@ window.addEventListener("DOMContentLoaded", () => {
       tipoOg === "SOLAIO_TRAVE" ||
       tipoOg === "SOLAIO_INCLINATO" ||
       tipoOg === "SOLAIO_INCLINATO_TRAVE" ||
-      tipoOg === "ELEVAZIONE_FONDAZIONE"
+      tipoOg === "ELEVAZIONE_FONDAZIONE" ||
+      tipoOg === "STRADA_INGOMBRO" ||
+      tipoOg === "STRADA_MARCIAPIEDE" ||
+      tipoOg === "STRADA_AIUOLA" ||
+      tipoOg === "STRADA_PARCHEGGIO" ||
+      tipoOg === "STRADA_SEDE"
     ) {
       const m1 = mmFactorOrOne(misura1);
       const m2 = mmFactorOrOne(misura2);
       const hasSpessore = typeof misura3 === "number" && Number.isFinite(misura3);
+      const d =
+        (tipoOg === "SOLAIO_INTERNO" ||
+          tipoOg === "SOLAIO_TRAVE" ||
+          tipoOg === "PAVIMENTO" ||
+          tipoOg === "SOFFITTO") &&
+        typeof divisore === "number" &&
+        Number.isFinite(divisore) &&
+        divisore > 0
+          ? divisore
+          : 1;
       const raw = hasSpessore
-        ? Number((m1 * m2 * misura3 * numero).toFixed(3))
-        : Number((m1 * m2 * numero).toFixed(3));
+        ? Number(((m1 * m2 * misura3 * numero) / d).toFixed(3))
+        : Number(((m1 * m2 * numero) / d).toFixed(3));
       return segno ? -Math.abs(raw) : raw;
     }
     const daModuloSpeciale =
@@ -2475,7 +2511,8 @@ window.addEventListener("DOMContentLoaded", () => {
       (typeof perimetraliSchedaId === "string" && perimetraliSchedaId.trim() !== "") ||
       (typeof elevazioneSchedaId === "string" && elevazioneSchedaId.trim() !== "") ||
       (typeof solaiInterniSchedaId === "string" && solaiInterniSchedaId.trim() !== "") ||
-      (typeof solaiInclinatiSchedaId === "string" && solaiInclinatiSchedaId.trim() !== "");
+      (typeof solaiInclinatiSchedaId === "string" && solaiInclinatiSchedaId.trim() !== "") ||
+      (typeof stradeSchedaId === "string" && stradeSchedaId.trim() !== "");
     if (!daModuloSpeciale) {
       const calc = calcolaMisurazioneVoceSemiautomatica(misura1, misura2, misura3, numero, segno);
       return calc.ok ? Number(calc.risultato || 0) : 0;
@@ -2489,6 +2526,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (unitaNorm.includes("ml")) raw = Number((m1 * numero).toFixed(3));
     else if (unitaNorm.includes("mq")) raw = Number((m1 * m2 * numero).toFixed(3));
     else if (unitaNorm.includes("mc")) raw = Number((m1 * m2 * m3 * numero).toFixed(3));
+    else if (unitaNorm === "n" || unitaNorm === "nr" || unitaNorm === "cad")
+      raw = Number((m1 * numero).toFixed(3));
     else raw = Number((m1 * m2 * m3 * numero).toFixed(3));
     return segno ? -Math.abs(raw) : raw;
   }
@@ -2507,8 +2546,9 @@ window.addEventListener("DOMContentLoaded", () => {
         typeof m?.solaiInterniSchedaId === "string" && m.solaiInterniSchedaId.trim() !== "";
       const daSolaiIncl =
         typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "";
+      const daStrade = typeof m?.stradeSchedaId === "string" && m.stradeSchedaId.trim() !== "";
       const daEsterni = typeof m?.esterniKey === "string" && m.esterniKey.trim() !== "";
-      return daVani || daCamm || daPerim || daElev || daSolai || daSolaiIncl || daEsterni;
+      return daVani || daCamm || daPerim || daElev || daSolai || daSolaiIncl || daStrade || daEsterni;
     });
   }
 
@@ -2608,11 +2648,16 @@ window.addEventListener("DOMContentLoaded", () => {
           typeof m?.solaiInterniSchedaId === "string" ? m.solaiInterniSchedaId : "";
         const solaiInclinatiSchedaId =
           typeof m?.solaiInclinatiSchedaId === "string" ? m.solaiInclinatiSchedaId : "";
+        const stradeSchedaId = typeof m?.stradeSchedaId === "string" ? m.stradeSchedaId : "";
         const esterniKey = typeof m?.esterniKey === "string" ? m.esterniKey.trim() : "";
         const stratoAltezza =
           typeof m?.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
             ? Number(m.stratoAltezza.toFixed(3))
             : null;
+        const divisore =
+          typeof m?.divisore === "number" && Number.isFinite(m.divisore) && m.divisore > 0
+            ? Number(m.divisore)
+            : 1;
         const risultatoNormalizzato =
           esterniKey !== ""
             ? Number(m.risultato || 0)
@@ -2630,8 +2675,10 @@ window.addEventListener("DOMContentLoaded", () => {
                   elevazioneSchedaId,
                   solaiInterniSchedaId,
                   solaiInclinatiSchedaId,
+                  stradeSchedaId,
                   stratoAltezza,
                   tipoOggetto: typeof m?.tipoOggetto === "string" ? m.tipoOggetto : "",
+                  divisore,
                 })
               : Number(m.risultato || 0);
         return {
@@ -2660,6 +2707,7 @@ window.addEventListener("DOMContentLoaded", () => {
         elevazioneSchedaId,
         solaiInterniSchedaId,
         solaiInclinatiSchedaId,
+        stradeSchedaId,
         esterniKey,
         stratoAltezza,
         stratoElevazione:
@@ -2668,6 +2716,7 @@ window.addEventListener("DOMContentLoaded", () => {
             : null,
         stratoNumero:
           typeof m?.stratoNumero === "number" && Number.isFinite(m.stratoNumero) ? m.stratoNumero : null,
+        divisore,
       };
     });
   }
@@ -4681,6 +4730,7 @@ window.addEventListener("DOMContentLoaded", () => {
     dismissElevazioneIfOpen();
     dismissSolaiInterniIfOpen();
     dismissSolaiInclinatiIfOpen();
+    dismissStradeIfOpen();
     dismissCamminamentiIfOpen();
     dismissScavoIfOpen();
     openVistaMisureVarie({
@@ -4704,6 +4754,7 @@ window.addEventListener("DOMContentLoaded", () => {
     dismissElevazioneIfOpen();
     dismissSolaiInterniIfOpen();
     dismissSolaiInclinatiIfOpen();
+    dismissStradeIfOpen();
     dismissCamminamentiIfOpen();
     openVistaScavo({
       onPrepare: () => {
@@ -4768,6 +4819,28 @@ window.addEventListener("DOMContentLoaded", () => {
     popolaDatalistVocibrevi("datalist-voci-esterni-vari");
   }
 
+  function retargetEsterniIdVoceInMemoria(fromAbbrev, fromId, toAbbrev) {
+    const fromKey = abbrevKey(fromAbbrev);
+    const to = String(toAbbrev ?? "").trim();
+    if (!fromKey || !to) return false;
+    let changed = false;
+    const patch = (row) => {
+      if (!row) return;
+      const raw = String(row.idVoce ?? "").trim();
+      if (!raw) return;
+      if (abbrevKey(raw) === fromKey || raw === String(fromId)) {
+        row.idVoce = to;
+        changed = true;
+      }
+    };
+    scaviEsterni.forEach(patch);
+    corselliEsterni.forEach(patch);
+    scivoliEsterni.forEach(patch);
+    camminamentiEsterni.forEach(patch);
+    misurazioniVarie.forEach(patch);
+    return changed;
+  }
+
   function openCompilazioneEsterniVariDaSidebar() {
     openCompilazioneEsterniVari();
   }
@@ -4788,6 +4861,7 @@ window.addEventListener("DOMContentLoaded", () => {
     dismissElevazioneIfOpen();
     dismissSolaiInterniIfOpen();
     dismissSolaiInclinatiIfOpen();
+    dismissStradeIfOpen();
     dismissCamminamentiIfOpen();
     dismissScavoIfOpen();
     vistaPianiEl.hidden = true;
@@ -4804,6 +4878,7 @@ window.addEventListener("DOMContentLoaded", () => {
     dismissElevazioneIfOpen();
     dismissSolaiInterniIfOpen();
     dismissSolaiInclinatiIfOpen();
+    dismissStradeIfOpen();
     dismissCamminamentiIfOpen();
     dismissScavoIfOpen();
     vistaPianiEl.hidden = true;
@@ -5529,8 +5604,10 @@ window.addEventListener("DOMContentLoaded", () => {
               elevazioneSchedaId: row.elevazioneSchedaId,
               solaiInterniSchedaId: row.solaiInterniSchedaId,
               solaiInclinatiSchedaId: row.solaiInclinatiSchedaId,
+              stradeSchedaId: row.stradeSchedaId,
               stratoAltezza: row.stratoAltezza,
               tipoOggetto: row.tipoOggetto,
+              divisore: row.divisore,
             }),
           }
         : calcolaMisurazioneVaria(row.formula, row.numero, row.segno);
@@ -5564,8 +5641,13 @@ window.addEventListener("DOMContentLoaded", () => {
       elevazioneSchedaId: row.elevazioneSchedaId || "",
       solaiInterniSchedaId: row.solaiInterniSchedaId || "",
       solaiInclinatiSchedaId: row.solaiInclinatiSchedaId || "",
+      stradeSchedaId: row.stradeSchedaId || "",
       stratoAltezza: row.stratoAltezza ?? null,
       stratoElevazione: row.stratoElevazione ?? null,
+      divisore:
+        typeof row.divisore === "number" && Number.isFinite(row.divisore) && row.divisore > 0
+          ? row.divisore
+          : 1,
     };
     voci = voci.map((vv) => {
       if (vv.idVoce !== idVoce) return vv;
@@ -6291,7 +6373,8 @@ window.addEventListener("DOMContentLoaded", () => {
                   (typeof m?.perimetraliSchedaId === "string" && m.perimetraliSchedaId.trim() !== "") ||
                   (typeof m?.elevazioneSchedaId === "string" && m.elevazioneSchedaId.trim() !== "") ||
                   (typeof m?.solaiInterniSchedaId === "string" && m.solaiInterniSchedaId.trim() !== "") ||
-                  (typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "");
+                  (typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "") ||
+                  (typeof m?.stradeSchedaId === "string" && m.stradeSchedaId.trim() !== "");
                 const upMm = document.createElement("button");
                 upMm.type = "button";
                 upMm.className = "btn-action btn-secondary btn-icon-mini btn-mm-up";
@@ -7350,6 +7433,74 @@ window.addEventListener("DOMContentLoaded", () => {
         minimumFractionDigits: 3,
         maximumFractionDigits: 3,
       });
+    const formatPdfDettaglioStrada = (m) => {
+      const formulaTxt = String(m?.formula ?? "")
+        .trim()
+        .replaceAll("−", "-")
+        .replaceAll("×", "x");
+      const extra = [];
+      const fv =
+        typeof m?.formulaValue === "number" && Number.isFinite(m.formulaValue) && m.formulaValue !== 0
+          ? m.formulaValue
+          : null;
+      const m1 = typeof m?.misura1 === "number" && Number.isFinite(m.misura1) ? m.misura1 : null;
+      if (formulaTxt && fv != null && m1 != null) {
+        const mol = m1 / fv;
+        if (Number.isFinite(mol) && Math.abs(mol - 1) > 0.0005) {
+          extra.push(
+            Number(mol).toLocaleString("it-IT", {
+              maximumFractionDigits: 6,
+            }),
+          );
+        }
+      }
+      if (typeof m?.misura3 === "number" && Number.isFinite(m.misura3)) {
+        extra.push(fmt3(m.misura3));
+      }
+      if (formulaTxt) {
+        if (extra.length === 0) return `${formulaTxt};`;
+        const serveParentesi = /[+\-*/]/.test(formulaTxt);
+        const base = serveParentesi ? `(${formulaTxt})` : formulaTxt;
+        return `${base} x ${extra.join(" x ")};`;
+      }
+      if (m1 != null && extra.length > 0) return `${fmt3(m1)} x ${extra.join(" x ")};`;
+      return `${fmt3(m1 ?? 0)};`;
+    };
+    const formatPdfDettaglioManufatto = (m) => {
+      const formulaTxt = String(m?.formula ?? "")
+        .trim()
+        .replaceAll("−", "-")
+        .replaceAll("×", "x");
+      if (formulaTxt) return `${formulaTxt};`;
+      return "n.;";
+    };
+    const formatPdfDettaglioCordoli = (m) => {
+      const formulaTxt = String(m?.formula ?? "")
+        .trim()
+        .replaceAll("−", "-")
+        .replaceAll("×", "x");
+      const n =
+        typeof m?.numero === "number" && Number.isFinite(m.numero) && m.numero > 0
+          ? m.numero
+          : 1;
+      if (formulaTxt) {
+        return n > 1 ? `${formulaTxt} x ${n};` : `${formulaTxt};`;
+      }
+      const m1 = typeof m?.misura1 === "number" && Number.isFinite(m.misura1) ? m.misura1 : 0;
+      return n > 1 ? `${fmt3(m1)} x ${n};` : `${fmt3(m1)};`;
+    };
+    const formatPdfDettaglioSolaioInterno = (m) => {
+      const d =
+        typeof m?.divisore === "number" && Number.isFinite(m.divisore) && m.divisore > 0
+          ? m.divisore
+          : 1;
+      let line = `${fmt3(m.misura1 ?? 1)} x ${fmt3(m.misura2 ?? 1)}`;
+      if (Math.abs(d - 1) > 0.0005) line += ` / ${fmt3(d)}`;
+      if (typeof m?.misura3 === "number" && Number.isFinite(m.misura3)) {
+        line += ` x ${fmt3(m.misura3)}`;
+      }
+      return `${line};`;
+    };
 
     const voicesGroups = buildVociGroupsByCapitolo(voci, archivioCapitoli).filter(
       (g) => g.voci.length > 0,
@@ -7419,19 +7570,40 @@ window.addEventListener("DOMContentLoaded", () => {
             /** Righe aperture da stampare dopo le misure e il Totale lordo. */
             const apertureDaStampare = [];
             righeStampa.forEach((m) => {
-              ensureSpace(detailLineH);
               const mmTipo = normalizzaTipoMisurazioneVoce(m.tipo);
               const misurazioneDaCamminamenti =
                 typeof m?.camminamentiSchedaId === "string" && m.camminamentiSchedaId.trim() !== "";
+              const misurazioneDaStrade =
+                typeof m?.stradeSchedaId === "string" && m.stradeSchedaId.trim() !== "";
               const misurazioneDaVani =
                 (typeof m?.vaniVanoId === "string" && m.vaniVanoId.trim() !== "") ||
                 (typeof m?.perimetraliSchedaId === "string" && m.perimetraliSchedaId.trim() !== "") ||
                 (typeof m?.elevazioneSchedaId === "string" && m.elevazioneSchedaId.trim() !== "") ||
                 (typeof m?.solaiInterniSchedaId === "string" && m.solaiInterniSchedaId.trim() !== "") ||
-                    (typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "");
+                (typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "");
+              const tipoOgPdf = String(m?.tipoOggetto ?? "").trim().toUpperCase();
+              const isSolaioInternoPdf =
+                tipoOgPdf === "SOLAIO_INTERNO" ||
+                tipoOgPdf === "SOLAIO_TRAVE" ||
+                tipoOgPdf === "PAVIMENTO" ||
+                tipoOgPdf === "SOFFITTO";
               const detailLine =
                 mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA
-                  ? misurazioneDaCamminamenti
+                  ? misurazioneDaStrade
+                    ? tipoOgPdf === "STRADA_MANUFATTO"
+                      ? formatPdfDettaglioManufatto(m)
+                      : tipoOgPdf === "STRADA_CORDOLI" ||
+                          tipoOgPdf === "STRADA_SEGNALETICA" ||
+                          tipoOgPdf === "STRADA_FOGNA" ||
+                          tipoOgPdf === "STRADA_LUCE_PUBBLICA" ||
+                          tipoOgPdf === "STRADA_LUCE_PRIVATA" ||
+                          tipoOgPdf === "STRADA_GAS" ||
+                          tipoOgPdf === "STRADA_ACQUA"
+                        ? formatPdfDettaglioCordoli(m)
+                        : formatPdfDettaglioStrada(m)
+                    : isSolaioInternoPdf
+                    ? formatPdfDettaglioSolaioInterno(m)
+                    : misurazioneDaCamminamenti
                     ? `${fmt3(m.misura1 ?? 1)} x ${fmt3(m.misura2 ?? 1)} x ${fmt3(m.misura3 ?? 0)};`
                     : misurazioneDaVani && usaMlPerAperturePdf
                       ? `${fmt3(m.misura1 ?? 1)};`
@@ -7443,13 +7615,24 @@ window.addEventListener("DOMContentLoaded", () => {
                           )};`
                         : `${fmt3(m.misura1 ?? 1)} x ${fmt3(m.misura2 ?? 1)} x ${fmt3(m.misura3 ?? 1)};`
                   : `${m.formula || "-"};`;
-              drawText(leftTextX, y + 3.8, detailLine, false, detailFontSize);
-              drawText(partiUgualiX, y + 3.8, String(m.numero), false, detailFontSize);
               const rv = Number(m.risultato || 0);
               let detrazioneRigaAperture = 0;
-              drawTextRight(resultRightX, y + 3.8, fmtRis(rv), false, detailFontSize);
-              drawText(signX, y + 3.8, m.segno ? "-" : "+", false, detailFontSize);
-              y += detailLineH;
+              const formulaLines = misurazioneDaStrade
+                ? doc.splitTextToSize(
+                    normalizePdfText(detailLine),
+                    Math.max(20, partiUgualiX - leftTextX - 4),
+                  )
+                : [detailLine];
+              formulaLines.forEach((line, lineIdx) => {
+                ensureSpace(detailLineH);
+                drawText(leftTextX, y + 3.8, line, false, detailFontSize);
+                if (lineIdx === 0) {
+                  drawText(partiUgualiX, y + 3.8, String(m.numero), false, detailFontSize);
+                  drawTextRight(resultRightX, y + 3.8, fmtRis(rv), false, detailFontSize);
+                  drawText(signX, y + 3.8, m.segno ? "-" : "+", false, detailFontSize);
+                }
+                y += detailLineH;
+              });
               if (mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA) {
                 const misura2Val =
                   typeof m.stratoAltezza === "number" && Number.isFinite(m.stratoAltezza)
@@ -8076,70 +8259,27 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function pulisciStorageModuliSpeciali() {
-    const keys = [
-      "computo_metrico_vani_registrati",
-      "computo_metrico_vani_misurazione",
-      "computo_metrico_camminamenti_registrati",
-      "computo_metrico_perimetrali_registrati",
-      "computo_metrico_elevazione_registrati",
-      "computo_metrico_solai_interni_registrati",
-      "computo_metrico_solai_inclinati_registrati",
-    ];
-    for (const key of keys) {
+  function aggiornaPulsantiUndoComputo() {
+    const disabled = !canUndoComputo();
+    document.querySelectorAll(".js-undo-computo").forEach((btn) => {
+      btn.disabled = disabled;
+    });
+  }
+
+  function chiudiDialogApertiUndo() {
+    document.querySelectorAll("dialog[open]").forEach((dlg) => {
       try {
-        localStorage.removeItem(key);
+        dlg.close();
       } catch {
         /* ignore */
       }
-    }
+    });
   }
 
-  /** Chiude il computo corrente e riparte da zero (dopo conferma utente). */
-  function iniziaNuovoComputoVuoto() {
-    dismissVaniIfOpen();
-    dismissPerimetraliIfOpen();
-    dismissElevazioneIfOpen();
-    dismissSolaiInterniIfOpen();
-    dismissSolaiInclinatiIfOpen();
-    dismissCamminamentiIfOpen();
+  function ricaricaComputoDopoUndo() {
     if (voceFocusId !== null) exitVoceFocusMode();
-
-    piani = [];
-    stratiMurElevazione = [];
-    apertureElevazione = [];
-    scaviEsterni = [];
-    corselliEsterni = [];
-    scivoliEsterni = [];
-    camminamentiEsterni = [];
-    misurazioniVarie = [];
-    voci = [];
-    apertureMaster = [];
-    archivioPianiMisura = [];
-    archivioCapitoli = [];
-    editingCapitoloId = null;
-    capitoliCollapsed.clear();
-    vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
-    davanzaliSbordiByKey = {};
-    soglieSbordiByKey = {};
-    falsiTelaiLegnoAggiunteByKey = {};
-    falsiTelaiAlluminioAggiunteByKey = {};
-    ifcDataCache = null;
-    provaBimWallsBackup = null;
-    bimSelectedElementCache = null;
-    voceMmAperturaDraftByKey.clear();
-    vociMmCollapsed.clear();
-
-    pianoIdCounter = 1;
-    stratoMurIdCounter = 1;
-    aperturaElevIdCounter = 1;
-    scavoIdCounter = 1;
-    corselloIdCounter = 1;
-    scivoloIdCounter = 1;
-    camminamentiIdCounter = 1;
-    misurazioniIdCounter = 1;
-    voceIdCounter = 1;
-    apertureMasterIdCounter = 1;
+    chiudiDialogApertiUndo();
+    resetVoceForm();
 
     editingPianoId = null;
     editingStratoMurId = null;
@@ -8155,25 +8295,177 @@ window.addEventListener("DOMContentLoaded", () => {
     pendingDeleteVoceMm = { idVoce: null, index: null };
     apertureMasterEditingId = null;
     apertureMasterPendingDeleteId = null;
-    compilazionePianoId = null;
     voceMmDialogContext = { idVoce: null, index: null };
     voceMmUseAperturaContext = { idVoce: null, mmIndex: null };
     pendingEditVoceMmApertura = { idVoce: null, mmIndex: null, idAperturaMaster: "" };
+    voceMmAperturaDraftByKey.clear();
+    provaBimWallsBackup = null;
 
-    pulisciStorageModuliSpeciali();
+    loadPiani();
+    loadMurDati();
+    loadArchivioPianiMisuraFromStorage();
+    loadArchivioCapitoliFromStorage();
+    loadVociUnitaOptions();
+    loadDavanzaliSbordi();
+    loadSoglieSbordi();
+    loadFalsiTelaiLegnoAggiunte();
+    loadFalsiTelaiAlluminioAggiunte();
+    loadApertureMaster();
+    syncVaniApertureLocalesForPicker(apertureElevazione, apertureMaster);
+    loadVoci();
+    syncArchivioPianiMisuraCompleto();
+    popolaDatalistArchivioPianiMisura(STORAGE_ARCHIVIO_PIANI_MISURA, "datalist-piani-misura-archivio");
+    popolaDatalistVocibrevi("datalist-voci-esterni-vari");
 
-    savePiani();
-    saveMurDati();
-    saveArchivioPianiMisuraToStorage();
-    saveArchivioCapitoliToStorage();
-    saveApertureMaster();
-    saveVoci();
-    saveVociUnitaOptions();
-    saveDavanzaliSbordi();
-    saveSoglieSbordi();
-    saveFalsiTelaiLegnoAggiunte();
-    saveFalsiTelaiAlluminioAggiunte();
-    saveIfcData();
+    const pianiValidIds = new Set(piani.map((item) => item.id));
+    if (compilazionePianoId !== null && !pianiValidIds.has(compilazionePianoId)) {
+      compilazionePianoId = null;
+    }
+
+    renderVociUnitaOptions();
+    setPianoFormMode();
+    setStratiFormMode();
+    setAperturaFormMode();
+    setScavoFormMode();
+    setCorselloFormMode();
+    setScivoloFormMode();
+    setCamminamentiFormMode();
+    setMisurazioniFormMode();
+    renderPiani();
+    renderMurielevazioni();
+    renderStrati();
+    renderAperture();
+    renderScavi();
+    renderCorselli();
+    renderScivoli();
+    renderCamminamenti();
+    renderMisurazioniVarie();
+    renderVoci();
+    aggiornaUndoButtonProvaBim();
+    updateMurPianoCompilazioneLabel(
+      idPianoCompilazioneEl,
+      riferimentoMurPianoEl,
+      compilazionePianoId,
+      piani,
+    );
+
+    document.dispatchEvent(new CustomEvent("computo-storage-ripristinato"));
+  }
+
+  function eseguiUndoComputo() {
+    if (!canUndoComputo()) return;
+    let ok = false;
+    runWithoutUndoCapture(() => {
+      ok = restoreUndoSnapshot();
+      if (ok) ricaricaComputoDopoUndo();
+    });
+    if (!ok) window.alert("Impossibile annullare l'ultima operazione.");
+    aggiornaPulsantiUndoComputo();
+  }
+
+  /** Cancella tutte le chiavi del computo (voci, misure, moduli VANI/STRADE/…). */
+  function pulisciTuttoStorageComputo() {
+    const prefix = "computo_metrico_";
+    const keys = [];
+    try {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) keys.push(k);
+      }
+      for (const key of keys) {
+        localStorage.removeItem(key);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Chiude il computo corrente e riparte da zero (dopo conferma utente). */
+  function iniziaNuovoComputoVuoto() {
+    dismissVaniIfOpen();
+    dismissPerimetraliIfOpen();
+    dismissElevazioneIfOpen();
+    dismissSolaiInterniIfOpen();
+    dismissSolaiInclinatiIfOpen();
+    dismissStradeIfOpen();
+    dismissCamminamentiIfOpen();
+    dismissScavoIfOpen();
+    if (voceFocusId !== null) exitVoceFocusMode();
+
+    runWithoutUndoCapture(() => {
+      piani = [];
+      stratiMurElevazione = [];
+      apertureElevazione = [];
+      scaviEsterni = [];
+      corselliEsterni = [];
+      scivoliEsterni = [];
+      camminamentiEsterni = [];
+      misurazioniVarie = [];
+      voci = [];
+      apertureMaster = [];
+      archivioPianiMisura = [];
+      archivioCapitoli = [];
+      editingCapitoloId = null;
+      capitoliCollapsed.clear();
+      vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
+      davanzaliSbordiByKey = {};
+      soglieSbordiByKey = {};
+      falsiTelaiLegnoAggiunteByKey = {};
+      falsiTelaiAlluminioAggiunteByKey = {};
+      ifcDataCache = null;
+      provaBimWallsBackup = null;
+      bimSelectedElementCache = null;
+      voceMmAperturaDraftByKey.clear();
+      vociMmCollapsed.clear();
+
+      pianoIdCounter = 1;
+      stratoMurIdCounter = 1;
+      aperturaElevIdCounter = 1;
+      scavoIdCounter = 1;
+      corselloIdCounter = 1;
+      scivoloIdCounter = 1;
+      camminamentiIdCounter = 1;
+      misurazioniIdCounter = 1;
+      voceIdCounter = 1;
+      apertureMasterIdCounter = 1;
+
+      editingPianoId = null;
+      editingStratoMurId = null;
+      editingAperturaElevId = null;
+      editingScavoId = null;
+      editingCorselloId = null;
+      editingScivoloId = null;
+      editingCamminamentiId = null;
+      editingMisurazioneId = null;
+      editingVoceId = null;
+      editingVoceSoloUnitaMisura = false;
+      pendingDeleteVoceId = null;
+      pendingDeleteVoceMm = { idVoce: null, index: null };
+      apertureMasterEditingId = null;
+      apertureMasterPendingDeleteId = null;
+      compilazionePianoId = null;
+      voceMmDialogContext = { idVoce: null, index: null };
+      voceMmUseAperturaContext = { idVoce: null, mmIndex: null };
+      pendingEditVoceMmApertura = { idVoce: null, mmIndex: null, idAperturaMaster: "" };
+
+      pulisciTuttoStorageComputo();
+
+      savePiani();
+      saveMurDati();
+      saveArchivioPianiMisuraToStorage();
+      saveArchivioCapitoliToStorage();
+      saveApertureMaster();
+      saveVoci();
+      saveVociUnitaOptions();
+      saveDavanzaliSbordi();
+      saveSoglieSbordi();
+      saveFalsiTelaiLegnoAggiunte();
+      saveFalsiTelaiAlluminioAggiunte();
+      saveIfcData();
+    });
+    clearUndoComputo();
+    aggiornaPulsantiUndoComputo();
+    if (vociCercaAbbrevInputEl) vociCercaAbbrevInputEl.value = "";
 
     setPianoFormMode();
     setStratiFormMode();
@@ -8197,11 +8489,11 @@ window.addEventListener("DOMContentLoaded", () => {
     renderVoci();
     renderBimSelectedElement(null);
     setBimStatus("Nessun modello IFC caricato.");
+    popolaDatalistVocibrevi("datalist-voci-esterni-vari");
 
     refreshComputoBaselineSnapshot();
     apriVistaVoci();
     document.dispatchEvent(new CustomEvent("computo-nuovo-iniziato"));
-    document.dispatchEvent(new CustomEvent("computo-voci-storage-externally-updated"));
   }
 
   async function richiediIniziaNuovoComputo() {
@@ -10706,6 +10998,30 @@ window.addEventListener("DOMContentLoaded", () => {
     window.location.href = "cercavoce.html?from=nuova-voce&v=9";
   });
 
+  initVoceUsaEsistente({
+    getVoci: () => voci,
+    getEditingId: () => editingVoceId,
+    getUnita: () => {
+      const id = editingVoceId;
+      const v = id != null ? voci.find((x) => x.idVoce === id) : null;
+      return (typeof v?.unitaMisura === "string" && v.unitaMisura.trim()) || voceUnitaMisuraEl?.value || "";
+    },
+    onMerged: ({ fromAbbrev, toAbbrev, fromId }) => {
+      if (retargetEsterniIdVoceInMemoria(fromAbbrev, fromId, toAbbrev)) {
+        saveMurDati();
+      }
+      loadVoci();
+      if (voceFocusId === fromId) exitVoceFocusMode();
+      normalizzaPosizioniVoci();
+      saveVoci();
+      syncEsterniVersoVoci();
+      popolaDatalistVocibrevi("datalist-voci-esterni-vari");
+      renderVoci();
+      resetVoceForm();
+      if (voceDialogEl?.open) voceDialogEl.close();
+    },
+  });
+
   voceDialogCancelEl.addEventListener("click", () => {
     resetVoceForm();
     voceDialogEl.close();
@@ -11205,6 +11521,25 @@ window.addEventListener("DOMContentLoaded", () => {
     if (event.key === "Escape" && voceFocusId !== null) {
       exitVoceFocusMode();
     }
+    const isUndoKey =
+      (event.ctrlKey || event.metaKey) &&
+      String(event.key || "").toLowerCase() === "z" &&
+      !event.shiftKey &&
+      !event.altKey;
+    if (!isUndoKey) return;
+    const t = event.target;
+    if (
+      t instanceof HTMLElement &&
+      (t.tagName === "INPUT" ||
+        t.tagName === "TEXTAREA" ||
+        t.tagName === "SELECT" ||
+        t.isContentEditable)
+    ) {
+      return;
+    }
+    if (!canUndoComputo()) return;
+    event.preventDefault();
+    eseguiUndoComputo();
   });
 
   vediVociButtonEl.addEventListener("click", () => {
@@ -11260,6 +11595,13 @@ window.addEventListener("DOMContentLoaded", () => {
       window.alert("Errore durante l’avvio del nuovo computo.");
     });
   });
+
+  const onUndoComputoClick = () => eseguiUndoComputo();
+  document.querySelectorAll(".js-undo-computo").forEach((btn) => {
+    btn.addEventListener("click", onUndoComputoClick);
+  });
+  setUndoComputoOnChange(aggiornaPulsantiUndoComputo);
+  aggiornaPulsantiUndoComputo();
 
   importaComputoButtonEl.addEventListener("click", () => {
     const fileInput = document.createElement("input");
@@ -12138,6 +12480,17 @@ window.addEventListener("DOMContentLoaded", () => {
   sidebarLeftActionsPrimariEl?.appendChild(vaniSidebarButtonEl);
   wireVaniUi();
 
+  const stradeSidebarButtonEl = document.createElement("button");
+  stradeSidebarButtonEl.id = "btn-strade-open";
+  stradeSidebarButtonEl.type = "button";
+  stradeSidebarButtonEl.className = "btn-action btn-secondary";
+  stradeSidebarButtonEl.textContent = "STRADE";
+  stradeSidebarButtonEl.title = "Ingombro, marciapiedi, aiuole, parcheggi, manufatti, cordoli, sede, segnaletica, fogna, luci, gas e acqua";
+  stradeSidebarButtonEl.addEventListener("click", () => {
+    openVistaStrade();
+  });
+  wireStradeUi();
+
   const camminamentiSidebarButtonEl = document.createElement("button");
   camminamentiSidebarButtonEl.id = "btn-camm-open";
   camminamentiSidebarButtonEl.type = "button";
@@ -12156,6 +12509,8 @@ window.addEventListener("DOMContentLoaded", () => {
   if (misureVarieSidebarButtonEl && sidebarLeftActionsPrimariEl) {
     sidebarLeftActionsPrimariEl.appendChild(misureVarieSidebarButtonEl);
   }
+  // STRADE subito sotto MISURE VARIE.
+  sidebarLeftActionsPrimariEl?.appendChild(stradeSidebarButtonEl);
 
   apertureMasterSidebarButtonEl.id = "btn-apri-archivio-aperture";
   apertureMasterSidebarButtonEl.type = "button";
@@ -12672,4 +13027,7 @@ window.addEventListener("DOMContentLoaded", () => {
   wireArchivioPianiMisuraComboInputs();
 
   refreshComputoBaselineSnapshot();
+  setUndoComputoOnChange(aggiornaPulsantiUndoComputo);
+  installUndoLocalStorageHook();
+  aggiornaPulsantiUndoComputo();
 });

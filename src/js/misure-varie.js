@@ -6,6 +6,7 @@ import { dismissCamminamentiIfOpen } from "./camminamenti-misurazione.js";
 import { dismissPerimetraliIfOpen } from "./perimetrali-misurazione.js";
 import { dismissSolaiInterniIfOpen } from "./solai-interni-misurazione.js";
 import { dismissSolaiInclinatiIfOpen } from "./solai-inclinati-misurazione.js";
+import { dismissStradeIfOpen } from "./strade-misurazione.js";
 import { dismissVaniIfOpen } from "./vani-misurazione.js";
 import { showVistaCompilazione } from "./modules/viewHelpers.js";
 
@@ -20,6 +21,7 @@ export function openVistaMisureVarie(opts = {}) {
   dismissSolaiInterniIfOpen();
   dismissSolaiInclinatiIfOpen();
   dismissCamminamentiIfOpen();
+  dismissStradeIfOpen();
 
   const vistaPianiEl = document.getElementById("vista-piani");
   const vistaCompilazioneEl = document.getElementById("vista-compilazione");

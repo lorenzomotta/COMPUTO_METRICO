@@ -6,7 +6,7 @@
  */
 
 import { STORAGE_VOCI_ARCHIVIO_KEY } from "./archivioVociVocibrevi.js";
-import { SUPERFICIE_LABELS, TIPI_SUPERFICIE_VANO } from "./vaniSuperficiLocale.js";
+import { SUPERFICIE_LABELS, TIPI_SUPERFICIE_VANO, parseDivisoreArea } from "./vaniSuperficiLocale.js";
 
 /** Stesso valore usato in `main.js` per le righe semiautomatiche. */
 const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
@@ -145,6 +145,9 @@ function creaRigaMisurazioneSemiautomaticaSuperficie({
   const specificaParts = [];
   if (nArea) specificaParts.push(`Area ${nArea}`);
   if (nStrato) specificaParts.push(`Strato ${nStrato}`);
+  const divisore = parseDivisoreArea(area);
+  if (divisore === 2) specificaParts.push("Triangolo");
+  else if (divisore !== 1) specificaParts.push(`÷${divisore}`);
   const specifica = specificaParts.join(" · ") || label;
   const misura1 = parseNonNegativeDecimal3OrNull(area?.lato1);
   const misura2 = parseNonNegativeDecimal3OrNull(area?.lato2);
@@ -157,18 +160,24 @@ function creaRigaMisurazioneSemiautomaticaSuperficie({
   const m2 = typeof misura2 === "number" && Number.isFinite(misura2) ? misura2 : 0;
   const raw =
     misura3 != null
-      ? Number((m1 * m2 * misura3 * numero).toFixed(3))
-      : Number((m1 * m2 * numero).toFixed(3));
+      ? Number(((m1 * m2 * misura3 * numero) / divisore).toFixed(3))
+      : Number(((m1 * m2 * numero) / divisore).toFixed(3));
   const risultato = segno ? -Math.abs(raw) : raw;
   const vid = typeof vaniVanoId === "string" ? vaniVanoId.trim() : "";
+  const l1Txt = String(m1).replace(".", ",");
+  const l2Txt = String(m2).replace(".", ",");
+  const formula =
+    divisore === 1
+      ? `${l1Txt} * ${l2Txt}`
+      : `(${l1Txt} * ${l2Txt}) / ${String(divisore).replace(".", ",")}`;
   return {
     tipo: VOCE_MM_TIPO_SEMIAUTOMATICA,
     piano,
     riferimento,
     tipoOggetto: String(tipo).toUpperCase(),
     specifica,
-    formula: "",
-    formulaValue: null,
+    formula,
+    formulaValue: Number(((m1 * m2) / divisore).toFixed(3)),
     misura1,
     misura2,
     misura3,
@@ -181,6 +190,7 @@ function creaRigaMisurazioneSemiautomaticaSuperficie({
     vaniVanoId: vid,
     stratoNumero: typeof strato?.n === "number" ? strato.n : null,
     areaNumero: typeof area?.n === "number" ? area.n : null,
+    divisore,
   };
 }
 

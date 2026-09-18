@@ -143,6 +143,10 @@ body {
   filter: brightness(1.06);
 }
 
+.sidebar-left .sidebar-actions--primari #btn-strade-open {
+  background: linear-gradient(135deg, #6b3a1e 0%, #a0522d 100%);
+}
+
 .sidebar-left .sidebar-actions--secondari {
   margin-top: 8px;
 }
@@ -294,6 +298,10 @@ body {
   margin-left: auto;
   align-self: flex-end;
   flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .voce-form-riga-uno .voce-btn-cerca {

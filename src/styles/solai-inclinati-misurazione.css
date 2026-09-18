@@ -65,7 +65,6 @@ body.solai-incl-fullscreen-active {
 }
 
 #vista-solai-inclinati .solai-sottrai-cell {
-  min-width: 11rem;
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -74,7 +73,7 @@ body.solai-incl-fullscreen-active {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 10px;
+  gap: 4px 8px;
 }
 
 #vista-solai-inclinati .solai-trave-flags {
@@ -88,7 +87,7 @@ body.solai-incl-fullscreen-active {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   cursor: pointer;
   color: rgba(16, 35, 63, 0.85);
 }
@@ -160,6 +159,104 @@ body.solai-incl-fullscreen-active {
   font-size: 0.7rem;
 }
 
+#vista-solai-inclinati .solai-incl-aree-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+#vista-solai-inclinati .solai-incl-aree-table th,
+#vista-solai-inclinati .solai-incl-aree-table td {
+  overflow: hidden;
+  vertical-align: middle;
+  padding: 3px 4px;
+}
+
+#vista-solai-inclinati .solai-incl-col-n {
+  width: 2.2rem;
+}
+
+#vista-solai-inclinati .solai-incl-col-rif {
+  width: 12.5rem;
+}
+
+#vista-solai-inclinati .solai-incl-col-tri {
+  width: 5.8rem;
+}
+
+#vista-solai-inclinati .solai-incl-col-num,
+#vista-solai-inclinati .solai-incl-col-div,
+#vista-solai-inclinati .solai-incl-col-mq {
+  width: 4.6rem;
+}
+
+#vista-solai-inclinati .solai-incl-col-canale {
+  width: 5.2rem;
+}
+
+#vista-solai-inclinati .solai-incl-col-sottrai {
+  width: auto;
+}
+
+#vista-solai-inclinati .solai-incl-col-act {
+  width: 2.4rem;
+}
+
+#vista-solai-inclinati .solai-incl-aree-table .solai-th-center,
+#vista-solai-inclinati .solai-incl-aree-table .solai-td-num,
+#vista-solai-inclinati .solai-incl-aree-table .solai-triangolo-cell {
+  text-align: center;
+}
+
+#vista-solai-inclinati .solai-incl-area-rif {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 3px 5px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  border-radius: 5px;
+  font-size: 0.82rem;
+  color: #10233f;
+}
+
+#vista-solai-inclinati .solai-incl-aree-table .solai-incl-gronda,
+#vista-solai-inclinati .solai-incl-aree-table .solai-incl-salita,
+#vista-solai-inclinati .solai-incl-aree-table .solai-incl-pendenza,
+#vista-solai-inclinati .solai-incl-aree-table .solai-area-divisore {
+  display: block;
+  width: 100%;
+  max-width: 4.4rem;
+  min-width: 0;
+  margin: 0 auto;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+#vista-solai-inclinati .solai-divisore-cell {
+  white-space: nowrap;
+}
+
+#vista-solai-inclinati .solai-triangolo-cell {
+  width: 5.8rem;
+  max-width: 5.8rem;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+#vista-solai-inclinati .solai-triangolo-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+#vista-solai-inclinati .solai-triangolo-label input {
+  margin: 0;
+}
+
 #vista-solai-inclinati .solai-incl-canale-cell {
   vertical-align: middle;
   white-space: nowrap;
@@ -168,13 +265,14 @@ body.solai-incl-fullscreen-active {
 #vista-solai-inclinati .solai-incl-canale-label {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 3px;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   cursor: pointer;
 }
 
 #vista-solai-inclinati .vani-sup-area-row td {
   vertical-align: middle;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  padding-top: 3px;
+  padding-bottom: 3px;
 }

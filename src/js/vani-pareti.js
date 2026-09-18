@@ -1426,6 +1426,7 @@ function onVaniFormRefreshStratiNetti(event) {
   if (
     el.classList.contains("vani-sup-area-lato1") ||
     el.classList.contains("vani-sup-area-lato2") ||
+    el.classList.contains("vani-sup-area-divisore") ||
     el.classList.contains("vani-sup-strato-spessore")
   ) {
     const block = el.closest(".vani-sup-block");
@@ -2280,6 +2281,25 @@ function onHostClick(event) {
 }
 
 function onHostChange(event) {
+  const cbTri = event.target.closest("input[type='checkbox'].vani-sup-area-triangolo");
+  if (cbTri instanceof HTMLInputElement) {
+    const row = cbTri.closest(".vani-sup-area-row");
+    const inpDiv = row?.querySelector(".vani-sup-area-divisore");
+    if (inpDiv instanceof HTMLInputElement) {
+      inpDiv.value = cbTri.checked ? "2" : "1";
+    }
+    const block = cbTri.closest(".vani-sup-block");
+    if (!(block instanceof HTMLElement)) return;
+    const lid = Number(block.dataset.localeId);
+    const tipo = String(block.dataset.tipoSuperficie ?? "").trim();
+    const hit = findLocale(lid);
+    if (!hit || !TIPI_SUPERFICIE_VANO.includes(/** @type {'pavimento'|'soffitto'} */ (tipo))) return;
+    assicuraSuperficiSuLocale(hit.locale);
+    syncSuperficieDaBlock(block, hit.locale[tipo]);
+    aggiornaCalcoliSuperficieBlock(block, hit.locale[tipo]);
+    return;
+  }
+
   const cbSegno = event.target.closest("input[type='checkbox'].vani-sup-area-segno");
   if (cbSegno instanceof HTMLInputElement) {
     const block = cbSegno.closest(".vani-sup-block");
@@ -2412,6 +2432,13 @@ export function initVaniParetiUi() {
 
   document.addEventListener("computo-nuovo-iniziato", () => {
     vaniRegistrati = [];
+    resetBozzaVuota();
+    const shell = document.getElementById("vista-vani");
+    if (shell && !shell.hidden) renderGerarchia();
+  });
+
+  document.addEventListener("computo-storage-ripristinato", () => {
+    caricaRegistratiDaStorage();
     resetBozzaVuota();
     const shell = document.getElementById("vista-vani");
     if (shell && !shell.hidden) renderGerarchia();

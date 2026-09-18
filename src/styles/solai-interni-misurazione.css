@@ -65,7 +65,7 @@ body.solai-fullscreen-active {
 }
 
 #vista-solai-interni .solai-sottrai-cell {
-  min-width: 11rem;
+  min-width: 16rem;
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -158,6 +158,70 @@ body.solai-fullscreen-active {
 #vista-solai-interni .solai-trave-mc-hint {
   color: rgba(16, 35, 63, 0.45);
   font-size: 0.7rem;
+}
+
+#vista-solai-interni .solai-aree-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+#vista-solai-interni .solai-col-n {
+  width: 2.4rem;
+}
+
+#vista-solai-interni .solai-col-rif {
+  width: 16%;
+}
+
+#vista-solai-interni .solai-col-tri {
+  width: 5.6rem;
+}
+
+#vista-solai-interni .solai-col-lato,
+#vista-solai-interni .solai-col-div,
+#vista-solai-interni .solai-col-mq {
+  width: 5.6rem;
+}
+
+#vista-solai-interni .solai-col-act {
+  width: 2.6rem;
+}
+
+#vista-solai-interni .solai-aree-table .solai-th-center,
+#vista-solai-interni .solai-aree-table .solai-td-num,
+#vista-solai-interni .solai-aree-table .solai-triangolo-cell {
+  text-align: center;
+}
+
+#vista-solai-interni .solai-aree-table .vani-sup-area-lato1,
+#vista-solai-interni .solai-aree-table .vani-sup-area-lato2,
+#vista-solai-interni .solai-aree-table .solai-area-divisore {
+  display: block;
+  width: 100%;
+  max-width: 5.2rem;
+  margin: 0 auto;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+#vista-solai-interni .solai-divisore-cell {
+  white-space: nowrap;
+}
+
+#vista-solai-interni .solai-triangolo-cell {
+  vertical-align: middle;
+}
+
+#vista-solai-interni .solai-triangolo-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  cursor: pointer;
+}
+
+#vista-solai-interni .solai-triangolo-label input {
+  margin: 0;
 }
 
 #vista-solai-interni .vani-sup-area-row td {

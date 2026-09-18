@@ -8,7 +8,10 @@
 @import url("./styles/solai-interni-misurazione.css");
 @import url("./styles/solai-inclinati-misurazione.css");
 @import url("./styles/camminamenti-misurazione.css");
+@import url("./styles/strade-misurazione.css");
 @import url("./styles/misure-varie.css");
 @import url("./styles/scavo.css");
 @import url("./styles/capitoli.css");
 @import url("./styles/aggiornamenti.css");
+@import url("./styles/voce-usa-esistente.css");
+@import url("./styles/undo-computo.css");

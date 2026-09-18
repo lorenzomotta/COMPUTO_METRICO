@@ -6,7 +6,7 @@
  */
 
 import { STORAGE_VOCI_ARCHIVIO_KEY } from "./archivioVociVocibrevi.js";
-import { areaHaTrave, mqDiAreaFalda } from "./solaiInclinatiSuperfici.js";
+import { areaHaTrave, mqDiAreaFalda, parseDivisoreAreaFalda } from "./solaiInclinatiSuperfici.js";
 import { testoFormulaFalda, parseDimFalda } from "./solaiInclinatiFalda.js";
 
 const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
@@ -59,15 +59,18 @@ function creaRigaSolaioInclinato({ pianoNome, descrizione, area, strato, schedaI
   const nStrato =
     typeof strato?.n === "number" && Number.isFinite(strato.n) ? String(strato.n) : "";
   const nArea = typeof area?.n === "number" && Number.isFinite(area.n) ? String(area.n) : "";
+  const divisore = parseDivisoreAreaFalda(area);
   const specificaParts = [];
   if (nArea) specificaParts.push(`Area ${nArea}`);
   if (nStrato) specificaParts.push(`Strato ${nStrato}`);
+  if (divisore === 2) specificaParts.push("Triangolo");
+  else if (divisore !== 1) specificaParts.push(`÷${divisore}`);
   const specifica = specificaParts.join(" · ") || "Solaio inclinato";
   const pendenza = parseNonNegativeDecimal3OrNull(area?.pendenza);
   const spessoreTxt = String(strato?.spessore ?? "").trim();
   const spessore = spessoreTxt === "" ? null : parseNonNegativeDecimal3OrNull(spessoreTxt);
   const mq = mqDiAreaFalda(area);
-  // In VOCI: misura1 = mq falda, misura2 = spessore (o 1) → stesso schema area/volume.
+  // In VOCI: misura1 = mq falda (già / divisore), misura2 = spessore (o 1) → stesso schema area/volume.
   const misura1 = mq;
   const misura2 = spessore != null ? spessore : 1;
   const misura3 = null;
@@ -77,10 +80,13 @@ function creaRigaSolaioInclinato({ pianoNome, descrizione, area, strato, schedaI
     spessore != null ? Number((mq * spessore * numero).toFixed(3)) : Number((mq * numero).toFixed(3));
   const risultato = segno ? -Math.abs(raw) : raw;
   const formulaBase = testoFormulaFalda(area?.gronda, area?.salita, area?.pendenza);
-  const formula =
-    spessore != null && formulaBase
-      ? `(${formulaBase} * ${Number(spessore).toFixed(3)})`
-      : formulaBase;
+  let formula = formulaBase;
+  if (formulaBase && divisore !== 1) {
+    formula = `((${formulaBase}) / ${String(divisore).replace(".", ",")})`;
+  }
+  if (spessore != null && formula) {
+    formula = `(${formula} * ${Number(spessore).toFixed(3)})`;
+  }
   const sid = typeof schedaId === "string" ? schedaId.trim() : "";
   const grondaVal = parseNonNegativeDecimal3OrNull(area?.gronda);
   const withCanale = attachCanale === true && area?.canale === true && grondaVal != null;
@@ -107,6 +113,7 @@ function creaRigaSolaioInclinato({ pianoNome, descrizione, area, strato, schedaI
     faldaGronda: grondaVal,
     faldaSalita: parseNonNegativeDecimal3OrNull(area?.salita),
     faldaPendenza: pendenza,
+    divisore,
   };
 }
 
@@ -124,20 +131,28 @@ function creaRigaTraveInclinato({ pianoNome, descrizione, area, schedaId }) {
     .filter(Boolean)
     .join(" · ");
   const nArea = typeof area?.n === "number" && Number.isFinite(area.n) ? String(area.n) : "";
-  const specifica = nArea ? `Area ${nArea} · ${labelTipiTrave(area)}` : labelTipiTrave(area);
+  const divisore = parseDivisoreAreaFalda(area);
+  const tipoLabel = labelTipiTrave(area);
+  const extraDiv = divisore === 2 ? "Triangolo" : divisore !== 1 ? `÷${divisore}` : "";
+  const specifica = [nArea ? `Area ${nArea}` : "", tipoLabel, extraDiv].filter(Boolean).join(" · ") || tipoLabel;
   const mq = mqDiAreaFalda(area);
   const misura3 = parseNonNegativeDecimal3OrNull(area?.altezzaTrave);
   const h = typeof misura3 === "number" ? misura3 : 0;
   const risultato = Number((mq * h).toFixed(3));
   const sid = typeof schedaId === "string" ? schedaId.trim() : "";
+  const formulaBase = testoFormulaFalda(area?.gronda, area?.salita, area?.pendenza);
+  let formula = formulaBase || "";
+  if (formulaBase && divisore !== 1) {
+    formula = `((${formulaBase}) / ${String(divisore).replace(".", ",")})`;
+  }
   return {
     tipo: VOCE_MM_TIPO_SEMIAUTOMATICA,
     piano,
     riferimento,
     tipoOggetto: TIPO_TRAVE,
     specifica,
-    formula: "",
-    formulaValue: null,
+    formula,
+    formulaValue: mq,
     misura1: mq,
     misura2: 1,
     misura3,
@@ -151,6 +166,7 @@ function creaRigaTraveInclinato({ pianoNome, descrizione, area, schedaId }) {
     areaNumero: typeof area?.n === "number" ? area.n : null,
     traveInSpessore: area?.traveInSpessore === true,
     traveInAltezza: area?.traveInAltezza === true,
+    divisore,
   };
 }
 

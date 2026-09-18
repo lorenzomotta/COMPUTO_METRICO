@@ -32,10 +32,19 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
+export function parseDivisoreArea(area) {
+  const txt = String(area?.divisore ?? "").trim();
+  if (txt === "") return area?.triangolo === true ? 2 : 1;
+  const n = Number(txt.replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return n;
+}
+
 export function mqDiArea(area) {
   const m1 = parseDim(area?.lato1) ?? 0;
   const m2 = parseDim(area?.lato2) ?? 0;
-  return Number((m1 * m2).toFixed(3));
+  const d = parseDivisoreArea(area);
+  return Number((m1 * m2 / d).toFixed(3));
 }
 
 export function mcTraveDiArea(area) {
@@ -76,6 +85,8 @@ export function emptyAreaSolai(nextId, n = 1) {
     riferimento: "",
     lato1: "",
     lato2: "",
+    divisore: "1",
+    triangolo: false,
     segno: false,
     traveInSpessore: false,
     traveInAltezza: false,
@@ -129,12 +140,19 @@ export function sanificaSuperficieSolai(raw, nextId) {
       const row = /** @type {Record<string, unknown>} */ (a);
       const id =
         typeof row.id === "number" && Number.isFinite(row.id) ? row.id : nextId();
-      return {
+      const mapped = {
         id,
         n: i + 1,
         riferimento: typeof row.riferimento === "string" ? row.riferimento : "",
         lato1: row.lato1 != null && row.lato1 !== "" ? String(row.lato1) : "",
         lato2: row.lato2 != null && row.lato2 !== "" ? String(row.lato2) : "",
+        divisore:
+          row.divisore != null && String(row.divisore).trim() !== ""
+            ? String(row.divisore)
+            : row.triangolo === true
+              ? "2"
+              : "1",
+        triangolo: row.triangolo === true,
         segno: row.segno === true,
         traveInSpessore: row.traveInSpessore === true,
         traveInAltezza: row.traveInAltezza === true,
@@ -142,6 +160,8 @@ export function sanificaSuperficieSolai(raw, nextId) {
           row.altezzaTrave != null && row.altezzaTrave !== "" ? String(row.altezzaTrave) : "",
         vocibreveTrave: typeof row.vocibreveTrave === "string" ? row.vocibreveTrave : "",
       };
+      mapped.triangolo = parseDivisoreArea(mapped) === 2;
+      return mapped;
     });
   }
 
@@ -172,18 +192,29 @@ export function cloneSuperficieSolaiPerSnapshot(superficie) {
   const strati = Array.isArray(src.strati) ? src.strati : [];
   return {
     note: typeof src.note === "string" ? src.note : "",
-    aree: aree.map((a, i) => ({
-      id: typeof a?.id === "number" ? a.id : 0,
-      n: typeof a?.n === "number" && Number.isFinite(a.n) ? a.n : i + 1,
-      riferimento: typeof a?.riferimento === "string" ? a.riferimento : "",
-      lato1: a?.lato1 != null && a.lato1 !== "" ? String(a.lato1) : "",
-      lato2: a?.lato2 != null && a.lato2 !== "" ? String(a.lato2) : "",
-      segno: a?.segno === true,
-      traveInSpessore: a?.traveInSpessore === true,
-      traveInAltezza: a?.traveInAltezza === true,
-      altezzaTrave: a?.altezzaTrave != null && a.altezzaTrave !== "" ? String(a.altezzaTrave) : "",
-      vocibreveTrave: typeof a?.vocibreveTrave === "string" ? a.vocibreveTrave : "",
-    })),
+    aree: aree.map((a, i) => {
+      const row = {
+        id: typeof a?.id === "number" ? a.id : 0,
+        n: typeof a?.n === "number" && Number.isFinite(a.n) ? a.n : i + 1,
+        riferimento: typeof a?.riferimento === "string" ? a.riferimento : "",
+        lato1: a?.lato1 != null && a.lato1 !== "" ? String(a.lato1) : "",
+        lato2: a?.lato2 != null && a.lato2 !== "" ? String(a.lato2) : "",
+        divisore:
+          a?.divisore != null && String(a.divisore).trim() !== ""
+            ? String(a.divisore)
+            : a?.triangolo === true
+              ? "2"
+              : "1",
+        triangolo: a?.triangolo === true,
+        segno: a?.segno === true,
+        traveInSpessore: a?.traveInSpessore === true,
+        traveInAltezza: a?.traveInAltezza === true,
+        altezzaTrave: a?.altezzaTrave != null && a.altezzaTrave !== "" ? String(a.altezzaTrave) : "",
+        vocibreveTrave: typeof a?.vocibreveTrave === "string" ? a.vocibreveTrave : "",
+      };
+      row.triangolo = parseDivisoreArea(row) === 2;
+      return row;
+    }),
     strati: strati.map((st, i) => ({
       id: typeof st?.id === "number" ? st.id : 0,
       n: typeof st?.n === "number" && Number.isFinite(st.n) ? st.n : i + 1,
@@ -210,6 +241,8 @@ function syncTraveUiRow(row, area, block) {
   detail.hidden = !showDetail;
   const tdMc = detail.querySelector('[data-role="trave-mc"]');
   if (tdMc) tdMc.textContent = showDetail ? fmtDim(mcTraveDiArea(area)) : "—";
+  const hint = detail.querySelector(".solai-trave-mc-hint");
+  if (hint) hint.textContent = parseDivisoreArea(area) === 1 ? "L1×L2×H" : "(L1×L2/div)×H";
 }
 
 function renderAreeTable(superficie, datalistId) {
@@ -225,8 +258,21 @@ function renderAreeTable(superficie, datalistId) {
   tableWrap.className = "vani-sup-table-wrap";
   const table = document.createElement("table");
   table.className = "vani-sup-aree-table solai-aree-table";
-  table.innerHTML = `<thead><tr>
-    <th>N°</th><th>Rif.</th><th>Lato 1</th><th>Lato 2</th><th>Mq</th><th>Sottrai / Travi</th><th></th>
+  table.innerHTML = `<colgroup>
+    <col class="solai-col-n"><col class="solai-col-rif"><col class="solai-col-tri">
+    <col class="solai-col-lato"><col class="solai-col-lato"><col class="solai-col-div">
+    <col class="solai-col-mq"><col class="solai-col-sottrai"><col class="solai-col-act">
+  </colgroup>
+  <thead><tr>
+    <th class="solai-th-center">N°</th>
+    <th>Rif.</th>
+    <th class="solai-th-center">Triangolo</th>
+    <th class="solai-th-center">Lato 1</th>
+    <th class="solai-th-center">Lato 2</th>
+    <th class="solai-th-center">Divisore</th>
+    <th class="solai-th-center">Mq</th>
+    <th>Sottrai / Travi</th>
+    <th></th>
   </tr></thead>`;
   const tbody = document.createElement("tbody");
   tbody.className = "vani-sup-aree-tbody";
@@ -251,7 +297,22 @@ function renderAreeTable(superficie, datalistId) {
     tdRif.appendChild(inpRif);
     tr.appendChild(tdRif);
 
+    const tdTri = document.createElement("td");
+    tdTri.className = "solai-triangolo-cell";
+    const lblTri = document.createElement("label");
+    lblTri.className = "solai-triangolo-label";
+    lblTri.title = "Area a triangolo: imposta il divisore a 2";
+    const chkTri = document.createElement("input");
+    chkTri.type = "checkbox";
+    chkTri.className = "solai-area-triangolo";
+    chkTri.setAttribute("aria-label", "Triangolo");
+    chkTri.checked = parseDivisoreArea(area) === 2;
+    lblTri.appendChild(chkTri);
+    tdTri.appendChild(lblTri);
+    tr.appendChild(tdTri);
+
     const tdL1 = document.createElement("td");
+    tdL1.className = "solai-td-num";
     const inpL1 = document.createElement("input");
     inpL1.type = "number";
     inpL1.className = "vani-sup-area-lato1 vani-in-num";
@@ -264,6 +325,7 @@ function renderAreeTable(superficie, datalistId) {
     tr.appendChild(tdL1);
 
     const tdL2 = document.createElement("td");
+    tdL2.className = "solai-td-num";
     const inpL2 = document.createElement("input");
     inpL2.type = "number";
     inpL2.className = "vani-sup-area-lato2 vani-in-num";
@@ -275,8 +337,23 @@ function renderAreeTable(superficie, datalistId) {
     tdL2.appendChild(inpL2);
     tr.appendChild(tdL2);
 
+    const tdDiv = document.createElement("td");
+    tdDiv.className = "solai-divisore-cell solai-td-num";
+    const inpDiv = document.createElement("input");
+    inpDiv.type = "number";
+    inpDiv.className = "solai-area-divisore vani-in-num";
+    inpDiv.step = "0.001";
+    inpDiv.min = "0.001";
+    inpDiv.placeholder = "1";
+    inpDiv.title = "Divide Lato 1 × Lato 2 (vuoto = 1)";
+    inpDiv.setAttribute("aria-label", "Divisore area");
+    inpDiv.value =
+      area.divisore != null && String(area.divisore).trim() !== "" ? String(area.divisore) : "1";
+    tdDiv.appendChild(inpDiv);
+    tr.appendChild(tdDiv);
+
     const tdMq = document.createElement("td");
-    tdMq.className = "vani-sup-calc";
+    tdMq.className = "vani-sup-calc solai-td-num";
     tdMq.dataset.role = "area-mq";
     tdMq.textContent = area.segno === true ? fmtTotaleNegativo(mq) : fmtDim(mq);
     tr.appendChild(tdMq);
@@ -310,7 +387,7 @@ function renderAreeTable(superficie, datalistId) {
     chkSp.className = "solai-trave-spessore";
     chkSp.checked = area.traveInSpessore === true;
     lblSp.appendChild(chkSp);
-    lblSp.append(" tr. spess.");
+    lblSp.append(" Trave in spessore");
     traveFlags.appendChild(lblSp);
 
     const lblAlt = document.createElement("label");
@@ -321,7 +398,7 @@ function renderAreeTable(superficie, datalistId) {
     chkAlt.className = "solai-trave-altezza-flag";
     chkAlt.checked = area.traveInAltezza === true;
     lblAlt.appendChild(chkAlt);
-    lblAlt.append(" tr. alt.");
+    lblAlt.append(" Trave in altezza");
     traveFlags.appendChild(lblAlt);
     rowCtrl.appendChild(traveFlags);
     tdSegno.appendChild(rowCtrl);
@@ -347,7 +424,7 @@ function renderAreeTable(superficie, datalistId) {
     detailTr.dataset.areaId = String(area.id);
     detailTr.hidden = !(area.segno === true && areaHaTrave(area));
     const detailTd = document.createElement("td");
-    detailTd.colSpan = 7;
+    detailTd.colSpan = 9;
     detailTd.className = "solai-trave-detail-cell";
 
     const campi = document.createElement("div");
@@ -387,7 +464,9 @@ function renderAreeTable(superficie, datalistId) {
       <strong class="vani-sup-calc" data-role="trave-mc">${
         areaHaTrave(area) ? fmtDim(mcTraveDiArea(area)) : "—"
       }</strong>
-      <span class="solai-trave-mc-hint">L1×L2×H</span>`;
+      <span class="solai-trave-mc-hint">${
+        parseDivisoreArea(area) === 1 ? "L1×L2×H" : "(L1×L2/div)×H"
+      }</span>`;
     campi.appendChild(mcWrap);
 
     detailTd.appendChild(campi);
@@ -401,17 +480,17 @@ function renderAreeTable(superficie, datalistId) {
   const tfoot = document.createElement("tfoot");
   tfoot.innerHTML = `
     <tr class="vani-sup-totale-row vani-sup-totale-row--pos">
-      <td colspan="4">Totale aree positive</td>
+      <td colspan="6">Totale aree positive</td>
       <td class="vani-sup-calc vani-sup-totale-mq-pos">${fmtDim(t.mqPos)}</td>
       <td colspan="2"></td>
     </tr>
     <tr class="vani-sup-totale-row vani-sup-totale-row--neg">
-      <td colspan="4">Totale aree negative</td>
+      <td colspan="6">Totale aree negative</td>
       <td class="vani-sup-calc vani-sup-totale-mq-neg">${fmtTotaleNegativo(t.mqNeg)}</td>
       <td colspan="2"></td>
     </tr>
     <tr class="vani-sup-totale-row vani-sup-totale-row--netto">
-      <td colspan="4">Mq netto (per gli strati)</td>
+      <td colspan="6">Mq netto (per gli strati)</td>
       <td class="vani-sup-calc vani-sup-totale-mq-netto">${fmtDim(t.mqNetto)}</td>
       <td colspan="2"></td>
     </tr>`;
@@ -533,7 +612,7 @@ export function renderSolaiSuperficiePanel({ superficie, datalistId = "solai-voc
   const hint = document.createElement("p");
   hint.className = "vani-sup-hint";
   hint.textContent =
-    "Aggiungi aree (Lato 1 × Lato 2). Con «sottrai» puoi spuntare Trave in spessore / Trave in altezza: compare Altezza trave e si calcolano i mc (L1 × L2 × H). Gli strati usano il mq netto.";
+    "Aggiungi aree: mq = (Lato 1 × Lato 2) / Divisore. La spunta «triangolo» mette il divisore a 2. Con «sottrai» puoi spuntare Trave in spessore / Trave in altezza: compare Altezza trave e si calcolano i mc. Gli strati usano il mq netto.";
 
   block.appendChild(head);
   block.appendChild(hint);
@@ -555,6 +634,8 @@ export function syncSolaiSuperficieDaBlock(block, superficie) {
     const rif = row.querySelector(".vani-sup-area-rif");
     const l1 = row.querySelector(".vani-sup-area-lato1");
     const l2 = row.querySelector(".vani-sup-area-lato2");
+    const div = row.querySelector(".solai-area-divisore");
+    const tri = row.querySelector(".solai-area-triangolo");
     const segno = row.querySelector(".vani-sup-area-segno");
     const traveSp = row.querySelector(".solai-trave-spessore");
     const traveAlt = row.querySelector(".solai-trave-altezza-flag");
@@ -564,6 +645,12 @@ export function syncSolaiSuperficieDaBlock(block, superficie) {
     if (rif instanceof HTMLInputElement) area.riferimento = rif.value;
     if (l1 instanceof HTMLInputElement) area.lato1 = l1.value;
     if (l2 instanceof HTMLInputElement) area.lato2 = l2.value;
+    if (div instanceof HTMLInputElement) {
+      area.divisore = div.value.trim() === "" ? "1" : div.value;
+    }
+    if (tri instanceof HTMLInputElement) area.triangolo = tri.checked;
+    if (parseDivisoreArea(area) === 2) area.triangolo = true;
+    else area.triangolo = false;
     if (segno instanceof HTMLInputElement) area.segno = segno.checked;
     if (traveSp instanceof HTMLInputElement) area.traveInSpessore = traveSp.checked;
     if (traveAlt instanceof HTMLInputElement) area.traveInAltezza = traveAlt.checked;
@@ -597,6 +684,8 @@ export function aggiornaCalcoliSolaiBlock(block, superficie) {
     const mq = mqDiArea(area);
     const tdMq = row.querySelector('[data-role="area-mq"]');
     if (tdMq) tdMq.textContent = area.segno === true ? fmtTotaleNegativo(mq) : fmtDim(mq);
+    const chkTri = row.querySelector(".solai-area-triangolo");
+    if (chkTri instanceof HTMLInputElement) chkTri.checked = parseDivisoreArea(area) === 2;
     syncTraveUiRow(row, area, block);
   });
 

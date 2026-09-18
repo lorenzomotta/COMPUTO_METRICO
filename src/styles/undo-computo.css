@@ -1,0 +1,7 @@
+/* Pulsante UNDO globale (barra destra e intestazioni moduli) */
+
+.js-undo-computo:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+}

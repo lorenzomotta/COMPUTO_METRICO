@@ -282,6 +282,21 @@ function applicaVoceBreveTraveAutomatica(area, flagAppenaAttivato) {
 function onHostChange(e) {
   const t = e.target;
   if (!(t instanceof HTMLElement)) return;
+
+  if (t.classList.contains("solai-area-triangolo")) {
+    const row = t.closest(".vani-sup-area-row");
+    const inpDiv = row?.querySelector(".solai-area-divisore");
+    if (inpDiv instanceof HTMLInputElement) {
+      inpDiv.value = t instanceof HTMLInputElement && t.checked ? "2" : "1";
+    }
+    const block = t.closest(".solai-sup-block");
+    if (block) {
+      syncSolaiSuperficieDaBlock(block, superficie);
+      aggiornaCalcoliSolaiBlock(block, superficie);
+    }
+    return;
+  }
+
   if (
     t.classList.contains("vani-sup-area-segno") ||
     t.classList.contains("solai-trave-spessore") ||
@@ -428,5 +443,21 @@ export function initSolaiInterniUi() {
   });
   document.getElementById("solai-conferma-elimina-conferma")?.addEventListener("click", () => {
     confermaElimina();
+  });
+
+  document.addEventListener("computo-nuovo-iniziato", () => {
+    registrati = [];
+    resetBozza();
+    const shell = document.getElementById("vista-solai-interni");
+    if (shell && !shell.hidden) refreshAll();
+    else renderSidebarLista();
+  });
+
+  document.addEventListener("computo-storage-ripristinato", () => {
+    loadRegistrati();
+    resetBozza();
+    const shell = document.getElementById("vista-solai-interni");
+    if (shell && !shell.hidden) refreshAll();
+    else renderSidebarLista();
   });
 }

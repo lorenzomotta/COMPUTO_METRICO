@@ -4,6 +4,7 @@ import { dismissPerimetraliIfOpen } from "../perimetrali-misurazione.js";
 import { dismissElevazioneIfOpen } from "../elevazione-misurazione.js";
 import { dismissSolaiInterniIfOpen } from "../solai-interni-misurazione.js";
 import { dismissSolaiInclinatiIfOpen } from "../solai-inclinati-misurazione.js";
+import { dismissStradeIfOpen } from "../strade-misurazione.js";
 
 function dismissOverlayMisurazioni() {
   dismissVaniIfOpen();
@@ -12,6 +13,7 @@ function dismissOverlayMisurazioni() {
   dismissElevazioneIfOpen();
   dismissSolaiInterniIfOpen();
   dismissSolaiInclinatiIfOpen();
+  dismissStradeIfOpen();
 }
 
 export function updateInterratoPanelSubtitle(targetEl, piano) {

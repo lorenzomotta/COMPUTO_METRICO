@@ -45,6 +45,12 @@
   color: #1a3358;
 }
 
+.camm-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .camm-body-layout {
   flex: 1;
   display: flex;
@@ -97,18 +103,46 @@
 
 .camm-sidebar-row {
   display: flex;
+  align-items: stretch;
   gap: 4px;
 }
 
 .camm-sidebar-item {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   text-align: left;
   padding: 6px 8px;
-  border: 1px solid #c5d4e8;
+  border: 1px solid rgba(16, 35, 63, 0.1);
   border-radius: 6px;
-  background: #f4f8fc;
+  background: rgba(16, 35, 63, 0.05);
+  color: #243652;
   cursor: pointer;
   font-size: 0.8rem;
+  line-height: 1.3;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.camm-sidebar-item:hover {
+  background: rgba(61, 90, 128, 0.12);
+  border-color: rgba(61, 90, 128, 0.28);
+}
+
+.camm-sidebar-item:focus-visible {
+  outline: 2px solid rgba(61, 90, 128, 0.45);
+  outline-offset: 1px;
+}
+
+.camm-sidebar-elimina {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  min-width: 2rem;
+  min-height: 0;
+  border-radius: 6px;
 }
 
 .camm-sidebar-empty {

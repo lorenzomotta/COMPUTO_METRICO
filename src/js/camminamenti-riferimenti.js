@@ -728,4 +728,14 @@ export function initCamminamentiUi() {
       renderSidebar();
     }
   });
+
+  document.addEventListener("computo-storage-ripristinato", () => {
+    caricaRegistrati();
+    resetBozzaVuota();
+    const shell = document.getElementById("vista-camminamenti");
+    if (shell && !shell.hidden) {
+      renderGerarchia();
+      renderSidebar();
+    }
+  });
 }

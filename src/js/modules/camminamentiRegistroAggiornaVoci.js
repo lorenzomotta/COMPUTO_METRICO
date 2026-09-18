@@ -1,11 +1,16 @@
 /**
- * Dopo «REGISTRA» in CAMMINAMENTI: per ogni voce con abbreviata = vocibreve strato,
- * aggiunge righe SEMIAUTOMATICA (tipoOggetto CAMMINAMENTO) con M1/M2/spessore e segno.
+ * Dopo «REGISTRA» in CAMMINAMENTI:
+ * - crea voci MANUALE se manca la voce breve dello strato;
+ * - scrive misurazioni SEMIAUTOMATICA (tipoOggetto CAMMINAMENTO) con M1/M2/spessore e segno;
+ * - se la voce esiste già, accoda le misure (sostituendo quelle della stessa scheda).
  */
 
 import { STORAGE_VOCI_ARCHIVIO_KEY } from "./archivioVociVocibrevi.js";
 
 const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
+const TIPOMISURA_VOCE_MANUALE = "MANUALE";
+const UNITA_MQ = "mq.";
+const UNITA_MC = "mc.";
 const TIPO_OGGETTO_CAMMINAMENTO = "CAMMINAMENTO";
 
 function abbrevKey(s) {
@@ -41,6 +46,21 @@ function calcolaRisultatoPerUnita(unitaRaw, misura1, misura2, misura3, segno) {
   else if (unitaNorm.includes("mc")) raw = Number((m1 * m2 * m3).toFixed(3));
   else raw = Number((m1 * m2 * m3).toFixed(3));
   return segno ? -Math.abs(raw) : raw;
+}
+
+function creaVoceManualeDaVocibreve({ idVoce, posizione, voceAbbreviata, unitaMisura }) {
+  const ab = String(voceAbbreviata ?? "").trim();
+  return {
+    idVoce,
+    posizione,
+    voceAbbreviata: ab,
+    unitaMisura: unitaMisura || UNITA_MQ,
+    prezzo: 0,
+    tipoMisura: TIPOMISURA_VOCE_MANUALE,
+    voce: ab,
+    note: "",
+    misurazioniManuali: [],
+  };
 }
 
 function isRigaSemiautoCamminamento(row) {
@@ -114,12 +134,18 @@ export function aggiornaVociDaSnapshotCamminamentoRegistrato(snapshot) {
   const pianoNome = typeof snapshot.pianoNome === "string" ? snapshot.pianoNome : "";
   const riferimenti = Array.isArray(snapshot.riferimenti) ? snapshot.riferimenti : [];
 
-  const abbrevsConStrato = new Set();
+  /** @type {Map<string, { label: string, unita: string }>} */
+  const abbrevsConStrato = new Map();
   for (const rif of riferimenti) {
     const strat = Array.isArray(rif.strati) ? rif.strati : [];
     for (const st of strat) {
       const vb = typeof st.vocibreve === "string" ? st.vocibreve.trim() : "";
-      if (vb) abbrevsConStrato.add(abbrevKey(vb));
+      if (!vb) continue;
+      const key = abbrevKey(vb);
+      if (!abbrevsConStrato.has(key)) {
+        const hasSp = String(st?.spessore ?? "").trim() !== "";
+        abbrevsConStrato.set(key, { label: vb, unita: hasSp ? UNITA_MC : UNITA_MQ });
+      }
     }
   }
   if (abbrevsConStrato.size === 0) return;
@@ -130,17 +156,55 @@ export function aggiornaVociDaSnapshotCamminamentoRegistrato(snapshot) {
   } catch {
     return;
   }
-  if (!raw) return;
 
   let voci;
-  try {
-    voci = JSON.parse(raw);
-  } catch {
-    return;
+  if (!raw) {
+    voci = [];
+  } else {
+    try {
+      voci = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (!Array.isArray(voci)) return;
   }
-  if (!Array.isArray(voci)) return;
 
   let changed = false;
+  const keysGiaPresenti = new Set();
+  for (const item of voci) {
+    if (item == null || typeof item !== "object") continue;
+    const ab = typeof item.voceAbbreviata === "string" ? item.voceAbbreviata.trim() : "";
+    if (ab) keysGiaPresenti.add(abbrevKey(ab));
+  }
+
+  let nextId =
+    voci.reduce((max, item) => {
+      const id = typeof item?.idVoce === "number" && Number.isFinite(item.idVoce) ? item.idVoce : 0;
+      return Math.max(max, id);
+    }, 0) + 1;
+  let nextPos =
+    voci.reduce((max, item) => {
+      const p =
+        typeof item?.posizione === "number" && Number.isFinite(item.posizione) ? item.posizione : 0;
+      return Math.max(max, p);
+    }, 0) + 1;
+
+  for (const [key, meta] of abbrevsConStrato) {
+    if (keysGiaPresenti.has(key)) continue;
+    voci.push(
+      creaVoceManualeDaVocibreve({
+        idVoce: nextId,
+        posizione: nextPos,
+        voceAbbreviata: meta.label,
+        unitaMisura: meta.unita,
+      }),
+    );
+    keysGiaPresenti.add(key);
+    nextId += 1;
+    nextPos += 1;
+    changed = true;
+  }
+
   for (const item of voci) {
     if (item == null || typeof item !== "object") continue;
     const ab = typeof item.voceAbbreviata === "string" ? item.voceAbbreviata.trim() : "";

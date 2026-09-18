@@ -282,6 +282,21 @@ function applicaVoceBreveTraveAutomatica(area, flagAppenaAttivato) {
 function onHostChange(e) {
   const t = e.target;
   if (!(t instanceof HTMLElement)) return;
+
+  if (t.classList.contains("solai-area-triangolo")) {
+    const row = t.closest(".vani-sup-area-row");
+    const inpDiv = row?.querySelector(".solai-area-divisore");
+    if (inpDiv instanceof HTMLInputElement) {
+      inpDiv.value = t instanceof HTMLInputElement && t.checked ? "2" : "1";
+    }
+    const block = t.closest(".solai-incl-sup-block");
+    if (block) {
+      syncSolaiInclinatiDaBlock(block, superficie);
+      aggiornaCalcoliSolaiInclinatiBlock(block, superficie);
+    }
+    return;
+  }
+
   const block = t.closest(".solai-incl-sup-block");
   if (block && t.classList.contains("solai-incl-canale")) {
     syncSolaiInclinatiDaBlock(block, superficie);
@@ -433,5 +448,21 @@ export function initSolaiInclinatiUi() {
   });
   document.getElementById("solai-incl-conferma-elimina-conferma")?.addEventListener("click", () => {
     confermaElimina();
+  });
+
+  document.addEventListener("computo-nuovo-iniziato", () => {
+    registrati = [];
+    resetBozza();
+    const shell = document.getElementById("vista-solai-inclinati");
+    if (shell && !shell.hidden) refreshAll();
+    else renderSidebarLista();
+  });
+
+  document.addEventListener("computo-storage-ripristinato", () => {
+    loadRegistrati();
+    resetBozza();
+    const shell = document.getElementById("vista-solai-inclinati");
+    if (shell && !shell.hidden) refreshAll();
+    else renderSidebarLista();
   });
 }

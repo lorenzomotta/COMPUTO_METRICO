@@ -996,6 +996,13 @@ export function initPerimetraliParetiUi() {
     renderGerarchia();
   });
 
+  document.addEventListener("computo-storage-ripristinato", () => {
+    loadRegistrati();
+    resetBozza();
+    renderSidebarLista();
+    renderGerarchia();
+  });
+
   document.getElementById("perim-misurazione-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
   });

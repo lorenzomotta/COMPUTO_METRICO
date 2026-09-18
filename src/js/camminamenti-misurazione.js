@@ -53,6 +53,11 @@ export function openVistaCamminamenti() {
     solaiInclShell.hidden = true;
     document.body.classList.remove("solai-incl-fullscreen-active");
   }
+  const stradeShell = document.getElementById("vista-strade");
+  if (stradeShell) {
+    stradeShell.hidden = true;
+    document.body.classList.remove("strade-fullscreen-active");
+  }
   for (const id of MAIN_VIEW_IDS) {
     const el = document.getElementById(id);
     if (el) el.hidden = true;

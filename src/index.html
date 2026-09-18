@@ -938,6 +938,15 @@
         <aside class="sidebar sidebar-right" aria-label="Strumenti computo">
           <div class="sidebar-card">
             <div class="sidebar-actions">
+              <button
+                id="btn-undo-computo"
+                type="button"
+                class="btn-action btn-secondary js-undo-computo"
+                disabled
+                title="Annulla l'ultima modifica salvata (Ctrl+Z)"
+              >
+                UNDO
+              </button>
               <button id="btn-inizia-computo" type="button" class="btn-action btn-inizia-computo">
                 INIZIA COMPUTO
               </button>
@@ -968,8 +977,9 @@
           <h3 id="voce-dialog-title">NUOVA VOCE</h3>
           <p id="voce-dialog-solo-unita-hint" class="voce-dialog-solo-unita-hint" hidden>
             Voce automatica o semiautomatica: puoi associare il testo VOCE (anche con CERCA VOCE), il
-            PREZZO e l'unità di misura. Le misurazioni restano gestite dagli strumenti (VANI,
-            PERIMETRALI, aperture…).
+            PREZZO e l'unità di misura. Con <strong>USA VOCE ESISTENTE</strong> puoi spostare queste
+            misurazioni su una voce già presente nel computo (stessa unità). Le misurazioni restano
+            gestite dagli strumenti (VANI, PERIMETRALI, aperture…).
           </p>
           <div class="piano-form voce-form">
             <div class="voce-form-riga-uno">
@@ -1002,6 +1012,9 @@
                 <button type="button" id="voce-btn-cerca" class="btn-action btn-secondary voce-btn-cerca">
                   CERCA VOCE
                 </button>
+                <button type="button" id="voce-btn-usa-esistente" class="btn-action btn-secondary voce-btn-cerca">
+                  USA VOCE ESISTENTE
+                </button>
               </div>
             </div>
             <div class="field">
@@ -1028,6 +1041,37 @@
           <div class="formula-dialog-actions">
             <button id="voce-dialog-cancel" type="button" class="btn-action btn-delete">Annulla</button>
             <button id="voce-dialog-save" type="submit" class="btn-action btn-secondary">Salva voce</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="voce-usa-esistente-dialog" class="formula-dialog voce-usa-esistente-dialog">
+        <form id="voce-usa-esistente-form" method="dialog">
+          <h3>USA VOCE ESISTENTE</h3>
+          <p class="voce-usa-esistente-hint">
+            Scegli una voce già presente nel computo. Vengono mostrate solo le voci con la
+            <strong>stessa unità di misura</strong>. Le misurazioni passeranno lì e questa voce
+            verrà rimossa.
+          </p>
+          <p id="voce-usa-esistente-unita" class="voce-usa-esistente-unita"></p>
+          <input
+            id="voce-usa-esistente-filtro"
+            type="search"
+            placeholder="Cerca per abbreviazione o testo..."
+            autocomplete="off"
+            aria-label="Cerca voce"
+          />
+          <div id="voce-usa-esistente-lista" class="voce-usa-esistente-lista" role="listbox"></div>
+          <p id="voce-usa-esistente-vuoto" class="voce-usa-esistente-vuoto" hidden>
+            Nessuna voce con questa unità di misura.
+          </p>
+          <div class="formula-dialog-actions">
+            <button id="voce-usa-esistente-cancel" type="button" class="btn-action btn-delete">
+              Annulla
+            </button>
+            <button id="voce-usa-esistente-ok" type="submit" class="btn-action btn-secondary" disabled>
+              Usa questa voce
+            </button>
           </div>
         </form>
       </dialog>
@@ -1255,6 +1299,14 @@
               >
                 <span aria-hidden="true">?</span>
               </button>
+              <button
+                type="button"
+                class="btn-action btn-secondary js-undo-computo"
+                disabled
+                title="Annulla l'ultima modifica salvata (Ctrl+Z)"
+              >
+                UNDO
+              </button>
               <button type="button" id="btn-vani-chiudi" class="btn-action btn-back">
                 Chiudi
               </button>
@@ -1279,7 +1331,9 @@
             </p>
             <p class="vani-help-inline__p vani-help-inline__p--muted">
               Sotto Piano/Locale trovi tre schede: <strong>Pareti</strong>, <strong>Pavimento</strong> e <strong>Soffitto</strong>.
-              Per aggiungere aree e strati di pavimento/soffitto usa i pulsanti nella <strong>sidebar</strong> (gruppi Pavimenti / Soffitti). Il segno <strong>−</strong> sottrae quell’area.
+              Per aggiungere aree e strati di pavimento/soffitto usa i pulsanti nella <strong>sidebar</strong> (gruppi Pavimenti / Soffitti).
+              mq = (Lato 1 × Lato 2) / <strong>Divisore</strong>; la spunta <strong>triangolo</strong> mette il divisore a 2.
+              Il segno <strong>−</strong> sottrae quell’area.
               Il <strong>mq netto</strong> (somma delle aree) viene usato da tutti gli <strong>strati</strong> (ciascuno con il suo spessore). Niente elevazione né aperture.
             </p>
             <p class="vani-help-inline__p vani-help-inline__p--muted">
@@ -1488,6 +1542,14 @@
                 aria-label="Apri o chiudi la guida rapida PERIMETRALI"
               >
                 <span aria-hidden="true">?</span>
+              </button>
+              <button
+                type="button"
+                class="btn-action btn-secondary js-undo-computo"
+                disabled
+                title="Annulla l'ultima modifica salvata (Ctrl+Z)"
+              >
+                UNDO
               </button>
               <button type="button" id="btn-perim-chiudi" class="btn-action btn-back">
                 Chiudi
@@ -1715,6 +1777,14 @@
                 aria-label="Apri o chiudi la guida rapida ELEVAZIONE"
               >
                 <span aria-hidden="true">?</span>
+              </button>
+              <button
+                type="button"
+                class="btn-action btn-secondary js-undo-computo"
+                disabled
+                title="Annulla l'ultima modifica salvata (Ctrl+Z)"
+              >
+                UNDO
               </button>
               <button type="button" id="btn-elev-chiudi" class="btn-action btn-back">
                 Chiudi
@@ -1945,6 +2015,14 @@
               >
                 <span aria-hidden="true">?</span>
               </button>
+              <button
+                type="button"
+                class="btn-action btn-secondary js-undo-computo"
+                disabled
+                title="Annulla l'ultima modifica salvata (Ctrl+Z)"
+              >
+                UNDO
+              </button>
               <button type="button" id="btn-solai-chiudi" class="btn-action btn-back">
                 Chiudi
               </button>
@@ -1959,10 +2037,12 @@
             hidden
           >
             <p class="vani-help-inline__p">
-              Compila <strong>piano</strong> e una <strong>descrizione</strong>, poi le aree del solaio
-              (Lato 1 × Lato 2). Con <strong>sottrai</strong> puoi spuntare
+              Compila <strong>piano</strong> e una <strong>descrizione</strong>, poi le aree del solaio:
+              mq = (Lato 1 × Lato 2) / <strong>Divisore</strong>.
+              La spunta <strong>triangolo</strong> mette il divisore a 2.
+              Con <strong>sottrai</strong> puoi spuntare
               <strong>Trave in spessore</strong> e/o <strong>Trave in altezza</strong>: compare
-              <strong>Altezza trave</strong> e si calcolano i <strong>mc</strong> (L1 × L2 × H).
+              <strong>Altezza trave</strong> e si calcolano i <strong>mc</strong>.
               Gli strati usano il mq netto (come i pavimenti in VANI).
             </p>
             <p class="vani-help-inline__p vani-help-inline__p--muted">
@@ -2042,6 +2122,14 @@
               >
                 <span aria-hidden="true">?</span>
               </button>
+              <button
+                type="button"
+                class="btn-action btn-secondary js-undo-computo"
+                disabled
+                title="Annulla l'ultima modifica salvata (Ctrl+Z)"
+              >
+                UNDO
+              </button>
               <button type="button" id="btn-solai-incl-chiudi" class="btn-action btn-back">
                 Chiudi
               </button>
@@ -2058,7 +2146,9 @@
             <p class="vani-help-inline__p">
               Compila <strong>piano</strong> e <strong>descrizione</strong>. Ogni area usa la
               <strong>formula falda</strong> (come in misurazioni):
-              <strong>Gronda × (Salita × √(1+(Pendenza%/100)²))</strong>.
+              <strong>Gronda × (Salita × √(1+(Pendenza%/100)²))</strong>,
+              poi / <strong>Divisore</strong>.
+              La spunta <strong>triangolo</strong> mette il divisore a 2.
               Spunta <strong>CANALE</strong> per portare la gronda in archivio CANALI.
               Con <strong>sottrai</strong> puoi aggiungere travi (mc = mq falda × H).
             </p>
@@ -2128,6 +2218,14 @@
           <header class="camm-header">
             <h1 class="camm-header-title">Misurazione CAMMINAMENTI</h1>
             <div class="camm-header-actions">
+              <button
+                type="button"
+                class="btn-action btn-secondary js-undo-computo"
+                disabled
+                title="Annulla l'ultima modifica salvata (Ctrl+Z)"
+              >
+                UNDO
+              </button>
               <button type="button" id="btn-camm-chiudi" class="btn-action btn-back">Chiudi</button>
             </div>
           </header>
@@ -2159,6 +2257,136 @@
                       Annulla
                     </button>
                     <button type="button" id="camm-conferma-elimina-conferma" class="btn-action btn-delete">
+                      Elimina
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="vista-strade"
+        class="vista-strade-overlay"
+        hidden
+        aria-label="Misurazione STRADE"
+      >
+        <div class="vani-shell">
+          <header class="vani-header">
+            <h1 class="vani-header-title">Misurazione STRADE</h1>
+            <div class="vani-header-actions">
+              <button
+                type="button"
+                id="btn-strade-help-toggle"
+                class="vani-btn-help"
+                aria-expanded="false"
+                aria-controls="strade-help-inline"
+                title="Guida rapida"
+                aria-label="Apri o chiudi la guida rapida STRADE"
+              >
+                <span aria-hidden="true">?</span>
+              </button>
+              <button
+                type="button"
+                class="btn-action btn-secondary js-undo-computo"
+                disabled
+                title="Annulla l'ultima modifica salvata (Ctrl+Z)"
+              >
+                UNDO
+              </button>
+              <button type="button" id="btn-strade-chiudi" class="btn-action btn-back">
+                Chiudi
+              </button>
+            </div>
+          </header>
+
+          <div
+            id="strade-help-inline"
+            class="vani-help-inline"
+            role="region"
+            aria-label="Guida rapida Misurazione STRADE"
+            hidden
+          >
+            <p class="vani-help-inline__p">
+              Compila <strong>piano</strong> e il nome della <strong>strada / tratto</strong>.
+              Poi usa le schede: <strong>Ingombro</strong>, <strong>Marciapiedi</strong>,
+              <strong>Aiuole</strong>, <strong>Parcheggi</strong>, <strong>Manufatti</strong>,
+              <strong>Cordoli</strong>, <strong>Sede stradale</strong>, <strong>Segnaletica</strong>,
+              <strong>Fogna</strong>, <strong>Luce pubblica</strong>, <strong>Luce privata</strong>,
+              <strong>Gas</strong> e <strong>Acqua</strong>.
+              I tre pulsanti a destra (<strong>Aggiungi area</strong>, <strong>strato</strong>,
+              <strong>sottrazione</strong>) valgono per la scheda che hai selezionato.
+              Le zone con aree hanno una <strong>formula</strong> e un
+              <strong>moltiplicatore</strong> (default 1) e i loro <strong>strati</strong>
+              (voce + eventuale spessore).
+            </p>
+            <p class="vani-help-inline__p vani-help-inline__p--muted">
+              Il segno <strong>sottrai</strong> sulle aree toglie quella superficie da tutta la zona.
+              L’icona <strong>due fogli</strong> duplica un’area (stessa formula e moltiplicatore) così puoi modificarla.
+              Su ogni strato puoi aggiungere altre <strong>aree da sottrarre</strong>: valgono solo per quello strato.
+              Nei <strong>Manufatti</strong> scegli il tipo (Chiusino, Caditoia, Pozzetto, Palo Luce).
+              Il campo <strong>N° pezzi</strong> è la quantità a numero che va nelle VOCI.
+              Se compili anche una formula (area di un pezzo), quella superficie × pezzi
+              viene tolta dalla Sede stradale.
+              Nei <strong>Cordoli</strong> la formula è la <strong>lunghezza</strong> e la quantità nelle VOCI
+              è a <strong>metro lineare (ml.)</strong>: non vengono sottratti dalla Sede.
+              Nella <strong>Segnaletica</strong>, <strong>Fogna</strong>, <strong>Luce pubblica</strong>,
+              <strong>Luce privata</strong>, <strong>Gas</strong> e <strong>Acqua</strong>
+              tu metti la <strong>formula</strong> (es. 2 oppure 1,2×3);
+              l’<strong>unità di misura</strong> (n., ml., mq., a corpo…) la decide la <strong>voce</strong>
+              dello strato nelle VOCI. Non vengono sottratte dalla Sede.
+              La <strong>Sede stradale</strong> calcola da sola l’area:
+              Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti) per ogni stesso riferimento.
+              Lì puoi solo aggiungere strati: il primo è già «SEDE STRADALE».
+              Premi <strong>REGISTRA STRADA</strong> per salvare e aggiornare le VOCI.
+            </p>
+          </div>
+
+          <div class="vani-body-layout">
+            <aside class="vani-sidebar" aria-label="Elenco strade">
+              <div class="vani-sidebar-head">
+                <h2 class="vani-sidebar-title">Strade</h2>
+                <button type="button" id="btn-strade-registra" class="btn-action btn-secondary vani-btn-registra">
+                  REGISTRA STRADA
+                </button>
+              </div>
+              <p id="strade-registra-feedback" class="vani-registra-feedback" role="status" aria-live="polite"></p>
+
+              <nav id="strade-sidebar-azioni" class="vani-sidebar-azioni" aria-label="Azioni rapide strade">
+                <div class="vani-sidebar-azioni-group is-active">
+                  <span class="vani-sidebar-azioni-label" id="strade-sidebar-azioni-label">Ingombro</span>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-area">
+                    Aggiungi area
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-strato">
+                    Aggiungi strato
+                  </button>
+                  <button type="button" class="btn-action btn-secondary vani-sidebar-azione" data-sidebar-azione="aggiungi-sottrazione">
+                    Aggiungi sottrazione
+                  </button>
+                </div>
+              </nav>
+
+              <ul id="strade-sidebar-list" class="vani-sidebar-list"></ul>
+            </aside>
+
+            <div class="vani-main-column">
+              <form id="strade-misurazione-form" class="vani-form card-like vani-form-vano" autocomplete="off">
+                <datalist id="strade-vocibrevi-datalist"></datalist>
+                <div id="strade-gerarchia-host" class="vani-gerarchia-host"></div>
+              </form>
+
+              <dialog id="strade-conferma-elimina-dialog" class="formula-dialog vani-conferma-elimina-dialog" aria-modal="true">
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3>CONFERMA ELIMINAZIONE</h3>
+                  <p id="strade-conferma-elimina-msg" class="vani-conferma-elimina-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="strade-conferma-elimina-annulla" class="btn-action btn-secondary">
+                      Annulla
+                    </button>
+                    <button type="button" id="strade-conferma-elimina-conferma" class="btn-action btn-delete">
                       Elimina
                     </button>
                   </div>

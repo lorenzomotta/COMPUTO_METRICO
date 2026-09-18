@@ -6,7 +6,7 @@
  */
 
 import { STORAGE_VOCI_ARCHIVIO_KEY } from "./archivioVociVocibrevi.js";
-import { areaHaTrave } from "./solaiInterniSuperfici.js";
+import { areaHaTrave, parseDivisoreArea } from "./solaiInterniSuperfici.js";
 
 const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
 const TIPOMISURA_VOCE_MANUALE = "MANUALE";
@@ -64,9 +64,12 @@ function creaRigaSolaio({ pianoNome, descrizione, area, strato, schedaId }) {
   const nStrato =
     typeof strato?.n === "number" && Number.isFinite(strato.n) ? String(strato.n) : "";
   const nArea = typeof area?.n === "number" && Number.isFinite(area.n) ? String(area.n) : "";
+  const divisore = parseDivisoreArea(area);
   const specificaParts = [];
   if (nArea) specificaParts.push(`Area ${nArea}`);
   if (nStrato) specificaParts.push(`Strato ${nStrato}`);
+  if (divisore === 2) specificaParts.push("Triangolo");
+  else if (divisore !== 1) specificaParts.push(`÷${divisore}`);
   const specifica = specificaParts.join(" · ") || "Solaio interno";
   const misura1 = parseNonNegativeDecimal3OrNull(area?.lato1);
   const misura2 = parseNonNegativeDecimal3OrNull(area?.lato2);
@@ -78,18 +81,22 @@ function creaRigaSolaio({ pianoNome, descrizione, area, strato, schedaId }) {
   const m2 = typeof misura2 === "number" ? misura2 : 0;
   const raw =
     misura3 != null
-      ? Number((m1 * m2 * misura3 * numero).toFixed(3))
-      : Number((m1 * m2 * numero).toFixed(3));
+      ? Number(((m1 * m2 * misura3 * numero) / divisore).toFixed(3))
+      : Number(((m1 * m2 * numero) / divisore).toFixed(3));
   const risultato = segno ? -Math.abs(raw) : raw;
   const sid = typeof schedaId === "string" ? schedaId.trim() : "";
+  const l1Txt = String(m1).replace(".", ",");
+  const l2Txt = String(m2).replace(".", ",");
+  const formula =
+    divisore === 1 ? `${l1Txt} * ${l2Txt}` : `(${l1Txt} * ${l2Txt}) / ${String(divisore).replace(".", ",")}`;
   return {
     tipo: VOCE_MM_TIPO_SEMIAUTOMATICA,
     piano,
     riferimento,
     tipoOggetto: TIPO_SOLAIO,
     specifica,
-    formula: "",
-    formulaValue: null,
+    formula,
+    formulaValue: Number(((m1 * m2) / divisore).toFixed(3)),
     misura1,
     misura2,
     misura3,
@@ -102,6 +109,7 @@ function creaRigaSolaio({ pianoNome, descrizione, area, strato, schedaId }) {
     solaiInterniSchedaId: sid,
     stratoNumero: typeof strato?.n === "number" ? strato.n : null,
     areaNumero: typeof area?.n === "number" ? area.n : null,
+    divisore,
   };
 }
 
@@ -118,7 +126,10 @@ function creaRigaTrave({ pianoNome, descrizione, area, schedaId }) {
   const rifArea = typeof area?.riferimento === "string" ? area.riferimento.trim() : "";
   const riferimento = ["Solaio", desc, rifArea, labelTipiTrave(area)].filter(Boolean).join(" · ");
   const nArea = typeof area?.n === "number" && Number.isFinite(area.n) ? String(area.n) : "";
-  const specifica = nArea ? `Area ${nArea} · ${labelTipiTrave(area)}` : labelTipiTrave(area);
+  const divisore = parseDivisoreArea(area);
+  const tipoLabel = labelTipiTrave(area);
+  const extraDiv = divisore === 2 ? "Triangolo" : divisore !== 1 ? `÷${divisore}` : "";
+  const specifica = [nArea ? `Area ${nArea}` : "", tipoLabel, extraDiv].filter(Boolean).join(" · ") || tipoLabel;
   const misura1 = parseNonNegativeDecimal3OrNull(area?.lato1);
   const misura2 = parseNonNegativeDecimal3OrNull(area?.lato2);
   const misura3 = parseNonNegativeDecimal3OrNull(area?.altezzaTrave);
@@ -126,16 +137,22 @@ function creaRigaTrave({ pianoNome, descrizione, area, schedaId }) {
   const m1 = typeof misura1 === "number" ? misura1 : 0;
   const m2 = typeof misura2 === "number" ? misura2 : 0;
   const m3 = typeof misura3 === "number" ? misura3 : 0;
-  const risultato = Number((m1 * m2 * m3 * numero).toFixed(3));
+  const risultato = Number(((m1 * m2 * m3 * numero) / divisore).toFixed(3));
   const sid = typeof schedaId === "string" ? schedaId.trim() : "";
+  const l1Txt = String(m1).replace(".", ",");
+  const l2Txt = String(m2).replace(".", ",");
+  const formula =
+    divisore === 1
+      ? `${l1Txt} * ${l2Txt}`
+      : `(${l1Txt} * ${l2Txt}) / ${String(divisore).replace(".", ",")}`;
   return {
     tipo: VOCE_MM_TIPO_SEMIAUTOMATICA,
     piano,
     riferimento,
     tipoOggetto: TIPO_TRAVE,
     specifica,
-    formula: "",
-    formulaValue: null,
+    formula,
+    formulaValue: Number(((m1 * m2) / divisore).toFixed(3)),
     misura1,
     misura2,
     misura3,
@@ -149,6 +166,7 @@ function creaRigaTrave({ pianoNome, descrizione, area, schedaId }) {
     areaNumero: typeof area?.n === "number" ? area.n : null,
     traveInSpessore: area?.traveInSpessore === true,
     traveInAltezza: area?.traveInAltezza === true,
+    divisore,
   };
 }
 
