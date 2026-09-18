@@ -267,17 +267,17 @@ function raccogliRighePerVoce(snapshot, voceKey) {
  * @param {{ id: string, pianoNome: string, descrizione?: string, ingombro?: object, marciapiedi?: object, aiuole?: object, parcheggi?: object, manufatti?: object, cordoli?: object, segnaletica?: object, fogna?: object, lucePubblica?: object, lucePrivata?: object, gas?: object, acqua?: object, sedeStradale?: object }} snapshot
  */
 export function aggiornaVociDaSnapshotStrade(snapshot) {
-  if (!snapshot || typeof snapshot !== "object") return;
+  if (!snapshot || typeof snapshot !== "object") return { righe: 0, vociAggiornate: 0 };
   const schedaId =
     snapshot.id != null && String(snapshot.id).trim() !== "" ? String(snapshot.id).trim() : "";
   const abbrevs = raccogliAbbrevDaScheda(snapshot);
-  if (abbrevs.size === 0) return;
+  if (abbrevs.size === 0) return { righe: 0, vociAggiornate: 0 };
 
   let raw;
   try {
     raw = localStorage.getItem(STORAGE_VOCI_ARCHIVIO_KEY);
   } catch {
-    return;
+    return { righe: 0, vociAggiornate: 0 };
   }
 
   let voci;
@@ -287,12 +287,13 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
     try {
       voci = JSON.parse(raw);
     } catch {
-      return;
+      return { righe: 0, vociAggiornate: 0 };
     }
-    if (!Array.isArray(voci)) return;
+    if (!Array.isArray(voci)) return { righe: 0, vociAggiornate: 0 };
   }
 
   let changed = false;
+  let righeScritte = 0;
   const keysGiaPresenti = new Set();
   for (const item of voci) {
     if (item == null || typeof item !== "object") continue;
@@ -358,6 +359,7 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
       }
     }
     const nuoveRigheMm = raccogliRighePerVoce(snapshot, abbrevKey(ab));
+    righeScritte += nuoveRigheMm.length;
     const mmCorrenti = Array.isArray(item.misurazioniManuali) ? item.misurazioniManuali : [];
     const mmSenzaQuestaScheda = mmCorrenti.filter((old) => {
       if (!isRigaSemiautoStrade(old)) return true;
@@ -372,13 +374,14 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
     }
   }
 
-  if (!changed) return;
+  if (!changed) return { righe: righeScritte, vociAggiornate: abbrevs.size };
   try {
     localStorage.setItem(STORAGE_VOCI_ARCHIVIO_KEY, JSON.stringify(voci));
     document.dispatchEvent(new CustomEvent("computo-voci-storage-externally-updated"));
   } catch {
-    /* ignore */
+    return { righe: 0, vociAggiornate: 0 };
   }
+  return { righe: righeScritte, vociAggiornate: abbrevs.size };
 }
 
 export function rimuoviRigheMisurazioniPerSchedaStrade(schedaId) {

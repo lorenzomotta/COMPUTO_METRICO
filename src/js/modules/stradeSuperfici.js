@@ -171,7 +171,14 @@ function escapeHtml(s) {
 export function evalFormulaArea(raw) {
   const txt = String(raw ?? "").trim();
   if (!txt) return null;
-  const normalized = txt.replaceAll(",", ".");
+  const normalized = txt
+    .replaceAll(",", ".")
+    .replaceAll("×", "*")
+    .replaceAll("⋅", "*")
+    .replaceAll("·", "*")
+    .replaceAll("−", "-")
+    .replaceAll("–", "-")
+    .replaceAll("—", "-");
   if (!/^[0-9+\-*/().\s]+$/.test(normalized)) return null;
   try {
     const result = Function(`"use strict"; return (${normalized});`)();
@@ -588,6 +595,55 @@ export function cloneSchedaPerSnapshot(scheda) {
 
 export function zonaHaVoceStrato(zona) {
   return (zona?.strati || []).some((st) => String(st?.vocibreve || "").trim());
+}
+
+/** True se la zona ha almeno un’area/misura utile da mandare in VOCI. */
+export function zonaHaMisuraCompilata(tipo, zona, schedaCompleta) {
+  if (isZonaSedeStradale(tipo)) {
+    return areeVirtualiSede(schedaCompleta).length > 0;
+  }
+  const aree = Array.isArray(zona?.aree) ? zona.aree : [];
+  if (isZonaManufatti(tipo)) {
+    return aree.some(
+      (a) =>
+        Boolean(String(a?.formula ?? "").trim()) ||
+        Boolean(String(a?.tipoManufatto ?? "").trim()),
+    );
+  }
+  return aree.some((a) => {
+    if (typeof a?.mqFisso === "number" && Number.isFinite(a.mqFisso) && a.mqFisso !== 0) {
+      return true;
+    }
+    const f = String(a?.formula ?? "").trim();
+    return Boolean(f) && evalFormulaArea(f) != null;
+  });
+}
+
+/**
+ * Serve una voce sullo strato della zona che ha le misure
+ * (la sola «SEDE STRADALE» precompilata non basta se non ci sono mq sede).
+ */
+export function schedaStradeHaDatiRegistrabili(schedaCompleta) {
+  if (!schedaCompleta || typeof schedaCompleta !== "object") return false;
+  for (const tipo of TIPI_ZONA_STRADA) {
+    const zona = schedaCompleta[tipo];
+    if (!zonaHaMisuraCompilata(tipo, zona, schedaCompleta)) continue;
+    if (zonaHaVoceStrato(zona)) return true;
+  }
+  return false;
+}
+
+/** Zone con misure ma senza voce sullo strato (per messaggio d’errore). */
+export function elencoZoneMisuraSenzaVoce(schedaCompleta) {
+  const out = [];
+  if (!schedaCompleta || typeof schedaCompleta !== "object") return out;
+  for (const tipo of TIPI_ZONA_STRADA) {
+    const zona = schedaCompleta[tipo];
+    if (!zonaHaMisuraCompilata(tipo, zona, schedaCompleta)) continue;
+    if (zonaHaVoceStrato(zona)) continue;
+    out.push(ZONA_LABELS[tipo] || tipo);
+  }
+  return out;
 }
 
 export function maxIdNelloScheda(scheda) {

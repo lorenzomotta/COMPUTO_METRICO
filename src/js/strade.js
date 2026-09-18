@@ -29,7 +29,8 @@ import {
   renderZonaStradaPanel,
   syncZonaDaBlock,
   aggiornaCalcoliZonaBlock,
-  zonaHaVoceStrato,
+  schedaStradeHaDatiRegistrabili,
+  elencoZoneMisuraSenzaVoce,
   maxIdNelloScheda,
   isZonaSedeStradale,
   isZonaCordoli,
@@ -85,15 +86,17 @@ function saveRegistrati() {
   }
 }
 
-function mostraFeedback(msg) {
+function mostraFeedback(msg, isErr = false) {
   const el = document.getElementById("strade-registra-feedback");
   if (!el) return;
   el.textContent = msg || "";
+  el.classList.toggle("vani-registra-feedback--err", Boolean(isErr) && Boolean(msg));
   window.clearTimeout(feedbackTimer);
   if (msg) {
     feedbackTimer = window.setTimeout(() => {
       el.textContent = "";
-    }, 3500);
+      el.classList.remove("vani-registra-feedback--err");
+    }, isErr ? 6000 : 3500);
   }
 }
 
@@ -115,7 +118,11 @@ function syncBozzaDaDom() {
   if (block instanceof HTMLElement) {
     const tipo = String(block.dataset.tipoZona || "");
     if (TIPI_ZONA_STRADA.includes(/** @type {typeof TIPI_ZONA_STRADA[number]} */ (tipo))) {
-      syncZonaDaBlock(block, scheda[tipo]);
+      // Assicura che la zona esista (schede vecchie / tipi nuovi).
+      if (!scheda[tipo]) {
+        scheda = { ...scheda, ...sanificaSchedaStrade(scheda, () => nextId++) };
+      }
+      if (scheda[tipo]) syncZonaDaBlock(block, scheda[tipo]);
     }
   }
 }
@@ -252,28 +259,52 @@ function refreshAll() {
 }
 
 function onRegistra() {
-  syncBozzaDaDom();
-  const snap = creaSnapshotRegistrato();
-  if (!snap.pianoNome) {
-    mostraFeedback("Indica il piano.");
-    document.querySelector("#vista-strade .strade-piano-nome")?.focus();
-    return;
-  }
-  const haVoce = TIPI_ZONA_STRADA.some((tipo) => zonaHaVoceStrato(snap[tipo]));
-  if (!haVoce) {
-    mostraFeedback("Inserisci almeno una voce su uno strato.");
-    return;
-  }
+  try {
+    syncBozzaDaDom();
+    const snap = creaSnapshotRegistrato();
+    if (!snap.pianoNome) {
+      mostraFeedback("Indica il piano (campo in alto a sinistra).", true);
+      document.querySelector("#vista-strade .strade-piano-nome")?.focus();
+      return;
+    }
 
-  const idx = registrati.findIndex((r) => r.id === snap.id);
-  if (idx >= 0) registrati[idx] = snap;
-  else registrati.push(snap);
-  saveRegistrati();
-  tryEnsurePianoInArchivio(snap.pianoNome, ARCHIVIO_PIANI_MISURA_STORAGE_KEY);
-  aggiornaVociDaSnapshotStrade(snap);
-  schedaBozzaCollegataId = snap.id;
-  mostraFeedback("Strada registrata. VOCI aggiornate.");
-  renderSidebarLista();
+    const senzaVoce = elencoZoneMisuraSenzaVoce(snap);
+    if (senzaVoce.length > 0) {
+      mostraFeedback(
+        `Manca la Voce sullo strato di: ${senzaVoce.join(", ")}. Scrivila sotto «Strati» e riprova.`,
+        true,
+      );
+      return;
+    }
+
+    if (!schedaStradeHaDatiRegistrabili(snap)) {
+      mostraFeedback(
+        "Compila almeno una Formula valida e la Voce sullo strato, poi premi di nuovo REGISTRA STRADA.",
+        true,
+      );
+      return;
+    }
+
+    const idx = registrati.findIndex((r) => r.id === snap.id);
+    if (idx >= 0) registrati[idx] = snap;
+    else registrati.push(snap);
+    saveRegistrati();
+    tryEnsurePianoInArchivio(snap.pianoNome, ARCHIVIO_PIANI_MISURA_STORAGE_KEY);
+    const esito = aggiornaVociDaSnapshotStrade(snap) || { righe: 0 };
+    schedaBozzaCollegataId = snap.id;
+    renderSidebarLista();
+    if (!esito.righe) {
+      mostraFeedback(
+        "Scheda salvata a sinistra, ma nessuna misura in VOCI. Controlla Formula (es. 12*3) e Voce sullo strato.",
+        true,
+      );
+      return;
+    }
+    mostraFeedback(`Strada registrata. ${esito.righe} misure aggiornate in VOCI.`);
+  } catch (err) {
+    console.error("[STRADE] REGISTRA fallita", err);
+    mostraFeedback("Errore in registrazione. Riapri STRADE e riprova.", true);
+  }
 }
 
 function chiediElimina(id) {
@@ -468,6 +499,11 @@ export function initStradeUi() {
   loadRegistrati();
 
   document.getElementById("btn-strade-registra")?.addEventListener("click", () => {
+    onRegistra();
+  });
+
+  document.getElementById("strade-misurazione-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
     onRegistra();
   });
 
