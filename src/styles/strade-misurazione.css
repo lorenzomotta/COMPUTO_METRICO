@@ -205,7 +205,29 @@
 }
 
 #vista-strade .strade-col-tipo {
-  width: 9.2rem;
+  width: 15rem;
+}
+
+#vista-strade .strade-aree-table--manufatti .strade-col-rif,
+#vista-strade .strade-aree-table--cordoli .strade-col-rif,
+#vista-strade .strade-aree-table--varie .strade-col-rif,
+#vista-strade .strade-aree-table--segnaletica .strade-col-rif {
+  width: 7.5rem;
+}
+
+#vista-strade .strade-aree-table--manufatti .strade-col-formula,
+#vista-strade .strade-aree-table--cordoli .strade-col-formula,
+#vista-strade .strade-aree-table--varie .strade-col-formula,
+#vista-strade .strade-aree-table--segnaletica .strade-col-formula {
+  width: 9rem;
+}
+
+#vista-strade .strade-col-lar {
+  width: 5.2rem;
+}
+
+#vista-strade .strade-tipo-cell {
+  overflow: hidden;
 }
 
 #vista-strade .strade-col-formula {
@@ -342,9 +364,50 @@
   margin: 0 0 10px;
 }
 
-.strade-area-tipo-manufatto {
-  min-width: 8.5rem;
-  max-width: 11rem;
+.strade-nuovo-tipo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.strade-nuovo-tipo-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1a3358;
+}
+
+.strade-nuovo-tipo-nome {
+  min-width: 10rem;
+  padding: 4px 8px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  border-radius: 5px;
+  font-size: 0.82rem;
+  color: #10233f;
+}
+
+.strade-area-larghezza {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 3px 4px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  border-radius: 5px;
+  font-size: 0.82rem;
+  color: #10233f;
+  text-align: center;
+}
+
+.strade-area-tipo-manufatto,
+.strade-area-tipo-cordolo,
+.strade-area-tipo-segnaletica,
+.strade-area-tipo-varie {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: 28px;
   padding: 3px 4px;
   font-size: 0.82rem;

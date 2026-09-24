@@ -1,5 +1,5 @@
 /**
- * STRADE — UI (superfici, sede, segnaletica, fogna, luci, gas, acqua).
+ * STRADE — UI (superfici, sede, segnaletica, fogna, allacci fogna, luci, gas, acqua).
  */
 
 import {
@@ -33,8 +33,15 @@ import {
   elencoZoneMisuraSenzaVoce,
   maxIdNelloScheda,
   isZonaSedeStradale,
+  isZonaManufatti,
   isZonaCordoli,
+  isZonaSegnaletica,
+  isZonaVarie,
   isZonaFormulaUnitaVoce,
+  aggiungiTipoManufatto,
+  aggiungiTipoCordolo,
+  aggiungiTipoSegnaletica,
+  aggiungiTipoVarie,
   totaliSedeStradale,
 } from "./modules/stradeSuperfici.js";
 
@@ -44,7 +51,7 @@ const DATALIST_VOCI = "strade-vocibrevi-datalist";
 let nextId = 1;
 let pianoNome = "";
 let descrizione = "";
-/** @type {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'sedeStradale'} */
+/** @type {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'} */
 let schedaAttiva = "ingombro";
 let scheda = emptySchedaStrade(() => nextId++);
 /** @type {{ id: string, pianoNome: string, descrizione: string }[]} */
@@ -184,10 +191,20 @@ function aggiornaSidebarAzioniAttive() {
   const nomeZona = ZONA_LABELS[schedaAttiva] || schedaAttiva;
   if (label) label.textContent = nomeZona;
   const sede = isZonaSedeStradale(schedaAttiva);
+  const manufatti = isZonaManufatti(schedaAttiva);
+  const cordoli = isZonaCordoli(schedaAttiva);
+  const segnaletica = isZonaSegnaletica(schedaAttiva);
+  const varie = isZonaVarie(schedaAttiva);
+  const senzaStrati = manufatti || cordoli || segnaletica || varie;
   nav.querySelectorAll("button.vani-sidebar-azione").forEach((btn) => {
     if (!(btn instanceof HTMLButtonElement)) return;
     const azione = btn.getAttribute("data-sidebar-azione");
-    const disabilita = sede && (azione === "aggiungi-area" || azione === "aggiungi-sottrazione");
+    const disabilita =
+      (sede && (azione === "aggiungi-area" || azione === "aggiungi-sottrazione")) ||
+      (manufatti && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
+      (cordoli && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
+      (segnaletica && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
+      (varie && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione"));
     btn.disabled = disabilita;
     btn.setAttribute("aria-disabled", String(disabilita));
     if (azione === "aggiungi-area") {
@@ -199,11 +216,27 @@ function aggiornaSidebarAzioniAttive() {
             ? `Aggiunge un calcolo in ${nomeZona}`
             : `Aggiunge un’area in ${nomeZona}`;
     } else if (azione === "aggiungi-strato") {
-      btn.title = `Aggiunge uno strato in ${nomeZona}`;
+      btn.title = senzaStrati
+        ? manufatti
+          ? "Nei Manufatti la voce è il tipo, non lo strato"
+          : cordoli
+            ? "Nei Cordoli la voce è il tipo, non lo strato"
+            : segnaletica
+              ? "Nella Segnaletica la voce è il tipo, non lo strato"
+              : "In Varie la voce è il tipo, non lo strato"
+        : `Aggiunge uno strato in ${nomeZona}`;
     } else if (azione === "aggiungi-sottrazione") {
       btn.title = sede
         ? "Nella Sede stradale non si aggiungono sottrazioni per strato"
-        : `Aggiunge una sottrazione sull’ultimo strato di ${nomeZona}`;
+        : senzaStrati
+          ? manufatti
+            ? "Nei Manufatti non ci sono strati"
+            : cordoli
+              ? "Nei Cordoli non ci sono strati"
+              : segnaletica
+                ? "Nella Segnaletica non ci sono strati"
+                : "In Varie non ci sono strati"
+          : `Aggiunge una sottrazione sull’ultimo strato di ${nomeZona}`;
     }
   });
 }
@@ -255,7 +288,7 @@ function renderForm() {
   top.className = "vani-top-row strade-top-row";
   top.innerHTML = `
     <label class="field">
-      <span>Piano</span>
+      <span>Piano (facoltativo)</span>
       <input type="text" class="strade-piano-nome" list="datalist-piani-misura-archivio" autocomplete="off" value="${escapeHtml(pianoNome)}" placeholder="es. Esterni, Piano terra" />
     </label>
     <label class="field">
@@ -284,16 +317,20 @@ function onRegistra() {
   try {
     syncBozzaDaDom();
     const snap = creaSnapshotRegistrato();
-    if (!snap.pianoNome) {
-      mostraFeedback("Indica il piano (campo in alto a sinistra).", true);
-      document.querySelector("#vista-strade .strade-piano-nome")?.focus();
-      return;
-    }
 
     const senzaVoce = elencoZoneMisuraSenzaVoce(snap);
     if (senzaVoce.length > 0) {
+      const soloTipo = senzaVoce.every(
+        (nome) =>
+          nome.startsWith("Manufatti") ||
+          nome.startsWith("Cordoli") ||
+          nome.startsWith("Segnaletica") ||
+          nome.startsWith("Varie"),
+      );
       mostraFeedback(
-        `Manca la Voce sullo strato di: ${senzaVoce.join(", ")}. Scrivila sotto «Strati» e riprova.`,
+        soloTipo
+          ? "Scegli il tipo su ogni riga di Manufatti, Cordoli, Segnaletica e Varie che vuoi mandare in VOCI."
+          : `Manca la Voce sullo strato di: ${senzaVoce.join(", ")}. Scrivila sotto «Strati» e riprova.`,
         true,
       );
       return;
@@ -311,7 +348,9 @@ function onRegistra() {
     if (idx >= 0) registrati[idx] = snap;
     else registrati.push(snap);
     saveRegistrati();
-    tryEnsurePianoInArchivio(snap.pianoNome, ARCHIVIO_PIANI_MISURA_STORAGE_KEY);
+    if (snap.pianoNome) {
+      tryEnsurePianoInArchivio(snap.pianoNome, ARCHIVIO_PIANI_MISURA_STORAGE_KEY);
+    }
     const esito = aggiornaVociDaSnapshotStrade(snap) || { righe: 0 };
     schedaBozzaCollegataId = snap.id;
     renderSidebarLista();
@@ -384,6 +423,34 @@ function onHostClick(e) {
   const btn = e.target instanceof Element ? e.target.closest("button[data-action]") : null;
   if (!btn) return;
   const action = btn.getAttribute("data-action");
+
+  if (
+    action === "aggiungi-tipo-manufatto" ||
+    action === "aggiungi-tipo-cordolo" ||
+    action === "aggiungi-tipo-segnaletica" ||
+    action === "aggiungi-tipo-varie"
+  ) {
+    syncBozzaDaDom();
+    const inp = btn.parentElement?.querySelector(".strade-nuovo-tipo-nome");
+    const nome = inp instanceof HTMLInputElement ? inp.value : "";
+    const esito =
+      action === "aggiungi-tipo-cordolo"
+        ? aggiungiTipoCordolo(nome)
+        : action === "aggiungi-tipo-segnaletica"
+          ? aggiungiTipoSegnaletica(nome)
+          : action === "aggiungi-tipo-varie"
+            ? aggiungiTipoVarie(nome)
+            : aggiungiTipoManufatto(nome);
+    if (!esito.ok) {
+      mostraFeedback(esito.errore, true);
+      return;
+    }
+    renderForm();
+    mostraFeedback(
+      esito.giaPresente ? `Il tipo «${esito.nome}» c’è già nell’elenco.` : `Tipo «${esito.nome}» aggiunto. Ora puoi sceglierlo.`,
+    );
+    return;
+  }
 
   if (action === "seleziona-scheda-strada") {
     const tipo = String(btn.getAttribute("data-scheda") || "");
@@ -474,13 +541,14 @@ function onSidebarAzioniClick(e) {
     return;
   }
   if (azione === "aggiungi-strato") {
+    if (isZonaManufatti(tipo) || isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return;
     zona.strati.push(emptyStratoStrada(() => nextId++, zona.strati.length + 1));
     rinumeraStratiZona(zona);
     renderForm();
     return;
   }
   if (azione === "aggiungi-sottrazione") {
-    if (isZonaSedeStradale(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return;
     const st = zona.strati[zona.strati.length - 1];
     if (!st) return;
     if (!Array.isArray(st.sottrazioni)) st.sottrazioni = [];
@@ -536,6 +604,13 @@ export function initStradeUi() {
   host?.addEventListener("input", onHostInput);
   host?.addEventListener("change", onHostChange);
   host?.addEventListener("click", onHostClick);
+  host?.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement) || !t.classList.contains("strade-nuovo-tipo-nome")) return;
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    t.parentElement?.querySelector("button[data-action='aggiungi-tipo-manufatto'], button[data-action='aggiungi-tipo-cordolo'], button[data-action='aggiungi-tipo-segnaletica'], button[data-action='aggiungi-tipo-varie']")?.click();
+  });
   host?.addEventListener(
     "blur",
     (e) => {

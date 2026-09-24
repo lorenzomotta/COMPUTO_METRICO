@@ -6,9 +6,10 @@
  *   per ogni sottrazione di quello strato;
  * - sede stradale: aree automatiche Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti)
  *   per stesso riferimento (niente sottrazioni per-strato; Cordoli esclusi);
- * - manufatti: quantità in VOCI = moltiplicatore (conteggio a numero, unità n.);
- * - cordoli: quantità in VOCI a metro lineare (formula = lunghezza, unità ml.);
- * - segnaletica / fogna / luci / gas / acqua: formula × moltiplicatore;
+ * - manufatti: una voce per ogni tipo (non per strato); quantità = N° pezzi, unità n.;
+ * - cordoli: una voce per ogni tipo di cordolo (non per strato); quantità in ml (formula = lunghezza);
+ * - segnaletica: una voce per ogni tipo; quantità = formula, oppure formula × larghezza (mq) se la larghezza c’è;
+ * - segnaletica / fogna / allacci fogna / luci / gas / acqua / telefonica: formula × moltiplicatore;
  *   unità presa dalla voce dello strato (non forzata).
  */
 
@@ -22,8 +23,15 @@ import {
   isZonaSedeStradale,
   isZonaManufatti,
   isZonaCordoli,
+  isZonaSegnaletica,
+  isZonaVarie,
   isZonaFormulaUnitaVoce,
   areeVirtualiSede,
+  normalizzaTipoManufatto,
+  normalizzaTipoCordolo,
+  normalizzaTipoSegnaletica,
+  normalizzaTipoVarie,
+  larghezzaArea,
 } from "./stradeSuperfici.js";
 
 const VOCE_MM_TIPO_SEMIAUTOMATICA = "SEMIAUTOMATICA";
@@ -101,14 +109,24 @@ function creaRigaArea({
   if (nArea) specificaParts.push(`Area ${nArea}`);
   if (nStrato) specificaParts.push(`Strato ${nStrato}`);
   const tipoMan = typeof area?.tipoManufatto === "string" ? area.tipoManufatto.trim() : "";
+  const tipoCor = typeof area?.tipoCordolo === "string" ? area.tipoCordolo.trim() : "";
+  const tipoSeg = typeof area?.tipoSegnaletica === "string" ? area.tipoSegnaletica.trim() : "";
+  const tipoVar = typeof area?.tipoVarie === "string" ? area.tipoVarie.trim() : "";
   if (tipoMan) specificaParts.push(tipoMan);
+  if (tipoCor) specificaParts.push(tipoCor);
+  if (tipoSeg) specificaParts.push(tipoSeg);
+  if (tipoVar) specificaParts.push(tipoVar);
   if (formulaTxt) specificaParts.push(formulaTxt);
+  const isSegnaletica = isZonaSegnaletica(tipoZona);
+  const lar = isSegnaletica ? larghezzaArea(area) : null;
+  if (lar != null) specificaParts.push(`larg. ${lar}`);
   if (!isZonaManufatti(tipoZona) && mol !== 1) specificaParts.push(`×${mol}`);
   if (specificaExtra) specificaParts.push(specificaExtra);
   const specifica = specificaParts.join(" · ") || label;
   const isManufatti = isZonaManufatti(tipoZona);
   const isCordoli = isZonaCordoli(tipoZona);
-  const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipoZona);
+  const isVarie = isZonaVarie(tipoZona);
+  const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipoZona) && !isSegnaletica;
   const hasMqFisso = typeof area?.mqFisso === "number" && Number.isFinite(area.mqFisso);
   const formulaVal = hasMqFisso ? Number(Math.abs(area.mqFisso).toFixed(3)) : evalFormulaArea(formulaTxt);
   let misura1;
@@ -124,7 +142,18 @@ function creaRigaArea({
       misura1 = Number((Number.isFinite(mol) && mol >= 0 ? mol : 1).toFixed(3));
       numero = 1;
     }
-  } else if (isCordoli || isFormulaUnitaVoce) {
+  } else if (isSegnaletica) {
+    const base = formulaVal == null ? 0 : Number(formulaVal.toFixed(3));
+    const q = lar == null ? base : Number((base * lar).toFixed(3));
+    if (Number.isInteger(mol) && mol >= 0) {
+      misura1 = q;
+      numero = mol;
+    } else {
+      misura1 = Number((q * (Number.isFinite(mol) && mol >= 0 ? mol : 1)).toFixed(3));
+      numero = 1;
+    }
+    misura2 = lar;
+  } else if (isCordoli || isFormulaUnitaVoce || isVarie) {
     // Formula × moltiplicatore; niente spessore. Unità: ml (cordoli) o dalla voce (impianti).
     const base = formulaVal == null ? 0 : Number(formulaVal.toFixed(3));
     if (Number.isInteger(mol) && mol >= 0) {
@@ -179,6 +208,45 @@ function raccogliAbbrevDaScheda(snapshot) {
   const abbrevs = new Map();
   for (const tipo of TIPI_ZONA_STRADA) {
     const zona = snapshot?.[tipo];
+    if (isZonaManufatti(tipo)) {
+      for (const area of zona?.aree || []) {
+        const nome = normalizzaTipoManufatto(area?.tipoManufatto);
+        if (!nome) continue;
+        const key = abbrevKey(nome);
+        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_N });
+      }
+      continue;
+    }
+    if (isZonaCordoli(tipo)) {
+      for (const area of zona?.aree || []) {
+        const nome = normalizzaTipoCordolo(area?.tipoCordolo);
+        if (!nome) continue;
+        const key = abbrevKey(nome);
+        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_ML });
+      }
+      continue;
+    }
+    if (isZonaSegnaletica(tipo)) {
+      for (const area of zona?.aree || []) {
+        const nome = normalizzaTipoSegnaletica(area?.tipoSegnaletica);
+        if (!nome) continue;
+        const key = abbrevKey(nome);
+        const conLar = larghezzaArea(area) != null;
+        const prev = abbrevs.get(key);
+        if (!prev) abbrevs.set(key, { label: nome, unita: conLar ? UNITA_MQ : UNITA_DA_VOCE });
+        else if (conLar) prev.unita = UNITA_MQ;
+      }
+      continue;
+    }
+    if (isZonaVarie(tipo)) {
+      for (const area of zona?.aree || []) {
+        const nome = normalizzaTipoVarie(area?.tipoVarie);
+        if (!nome) continue;
+        const key = abbrevKey(nome);
+        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_DA_VOCE });
+      }
+      continue;
+    }
     for (const st of zona?.strati || []) {
       const vb = typeof st?.vocibreve === "string" ? st.vocibreve.trim() : "";
       if (!vb) continue;
@@ -211,6 +279,92 @@ function raccogliRighePerVoce(snapshot, voceKey) {
   for (const tipo of TIPI_ZONA_STRADA) {
     const zona = snapshot?.[tipo];
     const aree = isZonaSedeStradale(tipo) ? areeVirtualiSede(snapshot) : Array.isArray(zona?.aree) ? zona.aree : [];
+    if (isZonaManufatti(tipo)) {
+      for (const area of aree) {
+        const nome = normalizzaTipoManufatto(area?.tipoManufatto);
+        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        const dedupeKey = ["area", tipo, nome, String(area?.id ?? "")].join("|");
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        righe.push(
+          creaRigaArea({
+            pianoNome,
+            descrizione,
+            tipoZona: tipo,
+            area,
+            strato: null,
+            schedaId,
+          }),
+        );
+      }
+      continue;
+    }
+    if (isZonaCordoli(tipo)) {
+      for (const area of aree) {
+        const nome = normalizzaTipoCordolo(area?.tipoCordolo);
+        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        const formulaTxt = String(area?.formula ?? "").trim();
+        if (!formulaTxt || evalFormulaArea(formulaTxt) == null) continue;
+        const dedupeKey = ["area", tipo, nome, String(area?.id ?? "")].join("|");
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        righe.push(
+          creaRigaArea({
+            pianoNome,
+            descrizione,
+            tipoZona: tipo,
+            area,
+            strato: null,
+            schedaId,
+          }),
+        );
+      }
+      continue;
+    }
+    if (isZonaVarie(tipo)) {
+      for (const area of aree) {
+        const nome = normalizzaTipoVarie(area?.tipoVarie);
+        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        const formulaTxt = String(area?.formula ?? "").trim();
+        if (!formulaTxt || evalFormulaArea(formulaTxt) == null) continue;
+        const dedupeKey = ["area", tipo, nome, String(area?.id ?? "")].join("|");
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        righe.push(
+          creaRigaArea({
+            pianoNome,
+            descrizione,
+            tipoZona: tipo,
+            area,
+            strato: null,
+            schedaId,
+          }),
+        );
+      }
+      continue;
+    }
+    if (isZonaSegnaletica(tipo)) {
+      for (const area of aree) {
+        const nome = normalizzaTipoSegnaletica(area?.tipoSegnaletica);
+        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        const formulaTxt = String(area?.formula ?? "").trim();
+        if (!formulaTxt || evalFormulaArea(formulaTxt) == null) continue;
+        const dedupeKey = ["area", tipo, nome, String(area?.id ?? "")].join("|");
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        righe.push(
+          creaRigaArea({
+            pianoNome,
+            descrizione,
+            tipoZona: tipo,
+            area,
+            strato: null,
+            schedaId,
+          }),
+        );
+      }
+      continue;
+    }
     const strati = Array.isArray(zona?.strati) ? zona.strati : [];
     for (const st of strati) {
       const vb = typeof st?.vocibreve === "string" ? st.vocibreve.trim() : "";
@@ -264,7 +418,7 @@ function raccogliRighePerVoce(snapshot, voceKey) {
 }
 
 /**
- * @param {{ id: string, pianoNome: string, descrizione?: string, ingombro?: object, marciapiedi?: object, aiuole?: object, parcheggi?: object, manufatti?: object, cordoli?: object, segnaletica?: object, fogna?: object, lucePubblica?: object, lucePrivata?: object, gas?: object, acqua?: object, sedeStradale?: object }} snapshot
+ * @param {{ id: string, pianoNome: string, descrizione?: string, ingombro?: object, marciapiedi?: object, aiuole?: object, parcheggi?: object, manufatti?: object, cordoli?: object, segnaletica?: object, fogna?: object, allacciFogna?: object, lucePubblica?: object, lucePrivata?: object, gas?: object, acqua?: object, telefonica?: object, sedeStradale?: object }} snapshot
  */
 export function aggiornaVociDaSnapshotStrade(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return { righe: 0, vociAggiornate: 0 };
@@ -313,9 +467,28 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
       return Math.max(max, p);
     }, 0) + 1;
 
+  for (const item of voci) {
+    if (item == null || typeof item !== "object") continue;
+    const mm = Array.isArray(item.misurazioniManuali) ? item.misurazioniManuali : [];
+    const filtrati = mm.filter((row) => {
+      if (!isRigaSemiautoStrade(row)) return true;
+      if (String(row?.tipoOggetto ?? "").trim().toUpperCase() !== "STRADA_MANUFATTO" &&
+          String(row?.tipoOggetto ?? "").trim().toUpperCase() !== "STRADA_CORDOLI" &&
+          String(row?.tipoOggetto ?? "").trim().toUpperCase() !== "STRADA_SEGNALETICA" &&
+          String(row?.tipoOggetto ?? "").trim().toUpperCase() !== "STRADA_VARIE") return true;
+      if (!schedaId) return true;
+      const oldSid = typeof row.stradeSchedaId === "string" ? row.stradeSchedaId.trim() : "";
+      return oldSid !== schedaId;
+    });
+    if (filtrati.length !== mm.length) {
+      item.misurazioniManuali = filtrati;
+      changed = true;
+    }
+  }
+
   for (const [key, meta] of abbrevs) {
     if (keysGiaPresenti.has(key)) continue;
-    // Segnaletica / Fogna / Luci / Gas / Acqua: se la voce non esiste ancora, la creiamo
+    // Segnaletica / Fogna / Allacci fogna / Luci / Gas / Acqua: se la voce non esiste ancora, la creiamo
     // senza forzare l’unità (l’utente la sceglie in VOCI; se esiste già, si usa quella).
     const unitaNuova = meta.unita == null ? "" : meta.unita;
     voci.push(
@@ -355,6 +528,15 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
         .replace(/\s+/g, "");
       if (u === "mq." || u === "mq" || u === "mc." || u === "mc" || u === "n." || u === "n") {
         item.unitaMisura = UNITA_ML;
+        changed = true;
+      }
+    } else if (meta?.unita === UNITA_MQ) {
+      const u = String(item.unitaMisura || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "");
+      if (u === "" || u === "ml." || u === "ml" || u === "n." || u === "n" || u === "mc." || u === "mc") {
+        item.unitaMisura = UNITA_MQ;
         changed = true;
       }
     }

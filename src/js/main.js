@@ -2476,7 +2476,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const tipoOg = String(tipoOggetto ?? "")
       .trim()
       .toUpperCase();
-    if (tipoOg === "STRADA_MANUFATTO" || tipoOg === "STRADA_CORDOLI" || tipoOg === "STRADA_SEGNALETICA" || tipoOg === "STRADA_FOGNA" || tipoOg === "STRADA_LUCE_PUBBLICA" || tipoOg === "STRADA_LUCE_PRIVATA" || tipoOg === "STRADA_GAS" || tipoOg === "STRADA_ACQUA") {
+    if (tipoOg === "STRADA_MANUFATTO" || tipoOg === "STRADA_CORDOLI" || tipoOg === "STRADA_SEGNALETICA" || tipoOg === "STRADA_FOGNA" || tipoOg === "STRADA_ALLACCI_FOGNA" || tipoOg === "STRADA_LUCE_PUBBLICA" || tipoOg === "STRADA_LUCE_PRIVATA" || tipoOg === "STRADA_GAS" || tipoOg === "STRADA_ACQUA" || tipoOg === "STRADA_TELEFONICA" || tipoOg === "STRADA_VARIE") {
       const m1 = mmFactorOrOne(misura1);
       const raw = Number((m1 * numero).toFixed(3));
       return segno ? -Math.abs(raw) : raw;
@@ -7602,6 +7602,20 @@ window.addEventListener("DOMContentLoaded", () => {
       const m1 = typeof m?.misura1 === "number" && Number.isFinite(m.misura1) ? m.misura1 : 0;
       return n > 1 ? `${fmt3(m1)} x ${n};` : `${fmt3(m1)};`;
     };
+    const formatPdfDettaglioSegnaletica = (m) => {
+      const formulaTxt = String(m?.formula ?? "")
+        .trim()
+        .replaceAll("−", "-")
+        .replaceAll("×", "x");
+      const n =
+        typeof m?.numero === "number" && Number.isFinite(m.numero) && m.numero > 0
+          ? m.numero
+          : 1;
+      const lar = typeof m?.misura2 === "number" && Number.isFinite(m.misura2) ? m.misura2 : null;
+      let core = formulaTxt || fmt3(m?.misura1 ?? 0);
+      if (lar != null) core = `${core} x ${fmt3(lar)}`;
+      return n > 1 ? `${core} x ${n};` : `${core};`;
+    };
     const formatPdfDettaglioSolaioInterno = (m) => {
       const d =
         typeof m?.divisore === "number" && Number.isFinite(m.divisore) && m.divisore > 0
@@ -7663,8 +7677,22 @@ window.addEventListener("DOMContentLoaded", () => {
         grouped.forEach((rifMap, piano) => {
           let sumPianoLordo = 0;
           let sumPianoAperture = 0;
-          ensureSpace(detailLineH);
-          drawWrappedDescLine(`PIANO: ${piano}`);
+          let nRigheGruppo = 0;
+          let soloStrade = true;
+          rifMap.forEach((rowsGruppo) => {
+            for (const rowGruppo of rowsGruppo) {
+              nRigheGruppo += 1;
+              const daStrade =
+                typeof rowGruppo?.stradeSchedaId === "string" &&
+                rowGruppo.stradeSchedaId.trim() !== "";
+              if (!daStrade) soloStrade = false;
+            }
+          });
+          const nascondiPianoStrade = nRigheGruppo > 0 && soloStrade;
+          if (!nascondiPianoStrade) {
+            ensureSpace(detailLineH);
+            drawWrappedDescLine(`PIANO: ${piano}`);
+          }
           rifMap.forEach((rows, rif) => {
             let sumRifLordo = 0;
             let sumRifAperture = 0;
@@ -7702,13 +7730,17 @@ window.addEventListener("DOMContentLoaded", () => {
                   ? misurazioneDaStrade
                     ? tipoOgPdf === "STRADA_MANUFATTO"
                       ? formatPdfDettaglioManufatto(m)
-                      : tipoOgPdf === "STRADA_CORDOLI" ||
-                          tipoOgPdf === "STRADA_SEGNALETICA" ||
+                      : tipoOgPdf === "STRADA_SEGNALETICA"
+                        ? formatPdfDettaglioSegnaletica(m)
+                        : tipoOgPdf === "STRADA_CORDOLI" ||
                           tipoOgPdf === "STRADA_FOGNA" ||
+                          tipoOgPdf === "STRADA_ALLACCI_FOGNA" ||
                           tipoOgPdf === "STRADA_LUCE_PUBBLICA" ||
                           tipoOgPdf === "STRADA_LUCE_PRIVATA" ||
                           tipoOgPdf === "STRADA_GAS" ||
-                          tipoOgPdf === "STRADA_ACQUA"
+                          tipoOgPdf === "STRADA_ACQUA" ||
+                          tipoOgPdf === "STRADA_TELEFONICA" ||
+                          tipoOgPdf === "STRADA_VARIE"
                         ? formatPdfDettaglioCordoli(m)
                         : formatPdfDettaglioStrada(m)
                     : isSolaioInternoPdf
@@ -7859,8 +7891,10 @@ window.addEventListener("DOMContentLoaded", () => {
               drawWrappedDescLine(`Totale ${rif}`, fmtRis(sumRifNetto));
             }
           });
-          const sumPianoNetto = sumPianoLordo - sumPianoAperture;
-          drawWrappedDescLine(`Totale ${piano}`, fmtRis(sumPianoNetto));
+          if (!nascondiPianoStrade) {
+            const sumPianoNetto = sumPianoLordo - sumPianoAperture;
+            drawWrappedDescLine(`Totale ${piano}`, fmtRis(sumPianoNetto));
+          }
         });
 
         const sumMm = mm.reduce((acc, m) => acc + Number(m.risultato || 0), 0);
@@ -12646,7 +12680,7 @@ window.addEventListener("DOMContentLoaded", () => {
   stradeSidebarButtonEl.type = "button";
   stradeSidebarButtonEl.className = "btn-action btn-secondary";
   stradeSidebarButtonEl.textContent = "STRADE";
-  stradeSidebarButtonEl.title = "Ingombro, marciapiedi, aiuole, parcheggi, manufatti, cordoli, sede, segnaletica, fogna, luci, gas e acqua";
+  stradeSidebarButtonEl.title = "Ingombro, marciapiedi, aiuole, parcheggi, manufatti, cordoli, sede, segnaletica, fogna, allacci fogna, luci, gas, acqua, telefonica e varie";
   stradeSidebarButtonEl.addEventListener("click", () => {
     openVistaStrade();
   });

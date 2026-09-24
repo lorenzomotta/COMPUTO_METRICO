@@ -2,16 +2,16 @@
  * STRADE — zone di superficie, sede, poi impianti (segnaletica → acqua).
  * Le zone manuali hanno aree (formula × moltiplicatore, con «sottrai») e strati.
  * Cordoli: quantità a metro lineare (formula = lunghezza).
- * Zone formula/unità-voce (Segnaletica, Fogna, Luci, Gas, Acqua):
+ * Zone formula/unità-voce (Segnaletica, Fogna, Allacci fogna, Luci, Gas, Acqua):
  *   formula × moltiplicatore; unità presa dalla voce dello strato.
  * Sede stradale: aree automatiche
  * Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti con area)
  * a parità di riferimento; si possono solo aggiungere strati.
- * Ordine schede: … Cordoli → Sede → Segnaletica → Fogna → Luce pubblica →
- * Luce privata → Gas → Acqua.
+ * Ordine schede: … Cordoli → Sede → Segnaletica → Fogna → Allacci fogna →
+ * Luce pubblica → Luce privata → Gas → Acqua.
  */
 
-/** @typedef {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'sedeStradale'} TipoZonaStrada */
+/** @typedef {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'} TipoZonaStrada */
 
 export const TIPI_ZONA_MANUALE = /** @type {const} */ ([
   "ingombro",
@@ -22,33 +22,41 @@ export const TIPI_ZONA_MANUALE = /** @type {const} */ ([
   "cordoli",
   "segnaletica",
   "fogna",
+  "allacciFogna",
   "lucePubblica",
   "lucePrivata",
   "gas",
   "acqua",
+  "telefonica",
+  "varie",
 ]);
 
 export const TIPO_MANUFATTI = "manufatti";
 export const TIPO_CORDOLI = "cordoli";
 export const TIPO_SEGNALETICA = "segnaletica";
 export const TIPO_FOGNA = "fogna";
+export const TIPO_ALLACCI_FOGNA = "allacciFogna";
 export const TIPO_LUCE_PUBBLICA = "lucePubblica";
 export const TIPO_LUCE_PRIVATA = "lucePrivata";
 export const TIPO_GAS = "gas";
 export const TIPO_ACQUA = "acqua";
+export const TIPO_TELEFONICA = "telefonica";
+export const TIPO_VARIE = "varie";
 export const TIPO_SEDE_STRADALE = "sedeStradale";
 
 /** Zone con formula × mol; unità dalla voce; fuori dal calcolo Sede. */
 export const TIPI_ZONA_FORMULA_UNITA_VOCE = /** @type {const} */ ([
   TIPO_SEGNALETICA,
   TIPO_FOGNA,
+  TIPO_ALLACCI_FOGNA,
   TIPO_LUCE_PUBBLICA,
   TIPO_LUCE_PRIVATA,
   TIPO_GAS,
   TIPO_ACQUA,
+  TIPO_TELEFONICA,
 ]);
 
-/** Ordine schede UI: superfici → Sede → impianti (ultima Acqua). */
+/** Ordine schede UI: superfici → Sede → impianti → Varie. */
 export const TIPI_ZONA_STRADA = /** @type {const} */ ([
   "ingombro",
   "marciapiedi",
@@ -58,16 +66,31 @@ export const TIPI_ZONA_STRADA = /** @type {const} */ ([
   "cordoli",
   TIPO_SEDE_STRADALE,
   ...TIPI_ZONA_FORMULA_UNITA_VOCE,
+  TIPO_VARIE,
 ]);
 
 export const VOCE_SEDE_STRADALE = "SEDE STRADALE";
 
-export const TIPI_MANUFATTO = /** @type {const} */ ([
+export const TIPI_MANUFATTO_BASE = /** @type {const} */ ([
   "Chiusino",
   "Caditoia",
   "Pozzetto",
+  "Pozzetto Ispezione",
+  "Pozzetto Palo",
+  "Pozzetto Chiusura Rete",
   "Palo Luce",
+  "Punto Irrigazione",
 ]);
+
+/** Elenco di partenza. I tipi aggiunti in Misurazione STRADE stanno in localStorage. */
+export const TIPI_MANUFATTO = TIPI_MANUFATTO_BASE;
+
+const STORAGE_TIPI_MANUFATTO_EXTRA = "computo_metrico_strade_tipi_manufatto";
+
+/** Tipi di cordolo di partenza. Gli altri li aggiunge l’utente in Misurazione STRADE. */
+export const TIPI_CORDOLO_BASE = /** @type {const} */ (["Retto", "Curvo"]);
+
+const STORAGE_TIPI_CORDOLO_EXTRA = "computo_metrico_strade_tipi_cordolo";
 
 export const FORMULA_SEDE_STRADALE =
   "Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti)";
@@ -81,10 +104,13 @@ export const ZONA_LABELS = {
   cordoli: "Cordoli",
   segnaletica: "Segnaletica",
   fogna: "Fogna",
+  allacciFogna: "Allacci fogna",
   lucePubblica: "Luce pubblica",
   lucePrivata: "Luce privata",
   gas: "Gas",
   acqua: "Acqua",
+  telefonica: "Telefonica",
+  varie: "Varie",
   sedeStradale: "Sede stradale",
 };
 
@@ -98,10 +124,13 @@ export const ZONA_TIPO_OGGETTO = {
   cordoli: "STRADA_CORDOLI",
   segnaletica: "STRADA_SEGNALETICA",
   fogna: "STRADA_FOGNA",
+  allacciFogna: "STRADA_ALLACCI_FOGNA",
   lucePubblica: "STRADA_LUCE_PUBBLICA",
   lucePrivata: "STRADA_LUCE_PRIVATA",
   gas: "STRADA_GAS",
   acqua: "STRADA_ACQUA",
+  telefonica: "STRADA_TELEFONICA",
+  varie: "STRADA_VARIE",
   sedeStradale: "STRADA_SEDE",
 };
 
@@ -121,7 +150,11 @@ export function isZonaSegnaletica(tipo) {
   return tipo === TIPO_SEGNALETICA;
 }
 
-/** Segnaletica, Fogna, Luci, Gas, Acqua. */
+export function isZonaVarie(tipo) {
+  return tipo === TIPO_VARIE;
+}
+
+/** Segnaletica, Fogna, Allacci fogna, Luci, Gas, Acqua, Telefonica. */
 export function isZonaFormulaUnitaVoce(tipo) {
   return TIPI_ZONA_FORMULA_UNITA_VOCE.includes(
     /** @type {typeof TIPI_ZONA_FORMULA_UNITA_VOCE[number]} */ (tipo),
@@ -130,12 +163,286 @@ export function isZonaFormulaUnitaVoce(tipo) {
 
 /** Cordoli / impianti: non sottraggono mq dalla Sede; niente spessore → volume. */
 export function isZonaEsclusaDaSede(tipo) {
-  return isZonaCordoli(tipo) || isZonaFormulaUnitaVoce(tipo);
+  return isZonaCordoli(tipo) || isZonaFormulaUnitaVoce(tipo) || isZonaVarie(tipo);
+}
+
+function chiaveTipoManufatto(raw) {
+  return String(raw ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("it-IT");
+}
+
+function loadTipiManufattoExtra() {
+  try {
+    const raw = localStorage.getItem(STORAGE_TIPI_MANUFATTO_EXTRA);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTipiManufattoExtra(nomi) {
+  try {
+    localStorage.setItem(STORAGE_TIPI_MANUFATTO_EXTRA, JSON.stringify(nomi));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Tipi di base più quelli aggiunti dall’utente. */
+export function elencoTipiManufatto() {
+  const out = [...TIPI_MANUFATTO_BASE];
+  const seen = new Set(out.map((x) => chiaveTipoManufatto(x)));
+  for (const extra of loadTipiManufattoExtra()) {
+    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
+    const key = chiaveTipoManufatto(nome);
+    if (!nome || seen.has(key)) continue;
+    seen.add(key);
+    out.push(nome);
+  }
+  return out;
+}
+
+/**
+ * Aggiunge un tipo all’elenco (se non c’è già).
+ * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
+ */
+export function aggiungiTipoManufatto(raw) {
+  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return { ok: false, nome: "", errore: "Scrivi il nome del nuovo tipo.", giaPresente: false };
+  if (nome.length > 60) {
+    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
+  }
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiManufatto().find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
+  const extra = loadTipiManufattoExtra();
+  extra.push(nome);
+  saveTipiManufattoExtra(extra);
+  return { ok: true, nome, errore: "", giaPresente: false };
 }
 
 export function normalizzaTipoManufatto(raw) {
-  const t = String(raw ?? "").trim();
-  return TIPI_MANUFATTO.includes(/** @type {typeof TIPI_MANUFATTO[number]} */ (t)) ? t : "";
+  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return "";
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiManufatto().find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return noto;
+  const aggiunto = aggiungiTipoManufatto(nome);
+  return aggiunto.ok ? aggiunto.nome : "";
+}
+
+function loadTipiCordoloExtra() {
+  try {
+    const raw = localStorage.getItem(STORAGE_TIPI_CORDOLO_EXTRA);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTipiCordoloExtra(nomi) {
+  try {
+    localStorage.setItem(STORAGE_TIPI_CORDOLO_EXTRA, JSON.stringify(nomi));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Retto, Curvo, più i tipi aggiunti dall’utente. */
+export function elencoTipiCordolo() {
+  const out = [...TIPI_CORDOLO_BASE];
+  const seen = new Set(out.map((x) => chiaveTipoManufatto(x)));
+  for (const extra of loadTipiCordoloExtra()) {
+    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
+    const key = chiaveTipoManufatto(nome);
+    if (!nome || seen.has(key)) continue;
+    seen.add(key);
+    out.push(nome);
+  }
+  return out;
+}
+
+/**
+ * Aggiunge un tipo di cordolo all’elenco (se non c’è già).
+ * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
+ */
+export function aggiungiTipoCordolo(raw) {
+  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return { ok: false, nome: "", errore: "Scrivi il nome del nuovo tipo di cordolo.", giaPresente: false };
+  if (nome.length > 60) {
+    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
+  }
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiCordolo().find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
+  const extra = loadTipiCordoloExtra();
+  extra.push(nome);
+  saveTipiCordoloExtra(extra);
+  return { ok: true, nome, errore: "", giaPresente: false };
+}
+
+export function normalizzaTipoCordolo(raw) {
+  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return "";
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiCordolo().find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return noto;
+  const aggiunto = aggiungiTipoCordolo(nome);
+  return aggiunto.ok ? aggiunto.nome : "";
+}
+
+export const TIPI_SEGNALETICA_BASE = /** @type {const} */ ([
+  "Bianca continua",
+  "Bianca tratteggiata",
+  "Gialla continua",
+  "Gialla tratteggiata",
+  "Stop",
+  "Attraversamento",
+  "Zebre",
+]);
+
+const STORAGE_TIPI_SEGNALETICA_EXTRA = "computo_metrico_strade_tipi_segnaletica";
+
+function loadTipiSegnaleticaExtra() {
+  try {
+    const raw = localStorage.getItem(STORAGE_TIPI_SEGNALETICA_EXTRA);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTipiSegnaleticaExtra(nomi) {
+  try {
+    localStorage.setItem(STORAGE_TIPI_SEGNALETICA_EXTRA, JSON.stringify(nomi));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function elencoTipiSegnaletica() {
+  const out = [...TIPI_SEGNALETICA_BASE];
+  const seen = new Set(out.map((x) => chiaveTipoManufatto(x)));
+  for (const extra of loadTipiSegnaleticaExtra()) {
+    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
+    const key = chiaveTipoManufatto(nome);
+    if (!nome || seen.has(key)) continue;
+    seen.add(key);
+    out.push(nome);
+  }
+  return out;
+}
+
+/**
+ * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
+ */
+export function aggiungiTipoSegnaletica(raw) {
+  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return { ok: false, nome: "", errore: "Scrivi il nome del nuovo tipo di segnaletica.", giaPresente: false };
+  if (nome.length > 60) {
+    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
+  }
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiSegnaletica().find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
+  const extra = loadTipiSegnaleticaExtra();
+  extra.push(nome);
+  saveTipiSegnaleticaExtra(extra);
+  return { ok: true, nome, errore: "", giaPresente: false };
+}
+
+export function normalizzaTipoSegnaletica(raw) {
+  let nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (chiaveTipoManufatto(nome) === chiaveTipoManufatto("Striscia bianca continua")) {
+    nome = "Bianca continua";
+  }
+  if (!nome) return "";
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiSegnaletica().find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return noto;
+  const aggiunto = aggiungiTipoSegnaletica(nome);
+  return aggiunto.ok ? aggiunto.nome : "";
+}
+
+export const TIPI_VARIE_BASE = /** @type {const} */ (["Reinterro"]);
+
+const STORAGE_TIPI_VARIE_EXTRA = "computo_metrico_strade_tipi_varie";
+
+function loadTipiVarieExtra() {
+  try {
+    const raw = localStorage.getItem(STORAGE_TIPI_VARIE_EXTRA);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTipiVarieExtra(nomi) {
+  try {
+    localStorage.setItem(STORAGE_TIPI_VARIE_EXTRA, JSON.stringify(nomi));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function elencoTipiVarie() {
+  const out = [...TIPI_VARIE_BASE];
+  const seen = new Set(out.map((x) => chiaveTipoManufatto(x)));
+  for (const extra of loadTipiVarieExtra()) {
+    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
+    const key = chiaveTipoManufatto(nome);
+    if (!nome || seen.has(key)) continue;
+    seen.add(key);
+    out.push(nome);
+  }
+  return out;
+}
+
+/**
+ * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
+ */
+export function aggiungiTipoVarie(raw) {
+  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return { ok: false, nome: "", errore: "Scrivi il nome del nuovo tipo.", giaPresente: false };
+  if (nome.length > 60) {
+    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
+  }
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiVarie().find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
+  const extra = loadTipiVarieExtra();
+  extra.push(nome);
+  saveTipiVarieExtra(extra);
+  return { ok: true, nome, errore: "", giaPresente: false };
+}
+
+export function normalizzaTipoVarie(raw) {
+  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return "";
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiVarie().find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return noto;
+  const aggiunto = aggiungiTipoVarie(nome);
+  return aggiunto.ok ? aggiunto.nome : "";
+}
+
+/** Larghezza vuota = nulla (la quantità resta la formula). Numero ≥ 0 = metri, e la quantità diventa mq. */
+export function larghezzaArea(area) {
+  const txt = String(area?.larghezza ?? "").trim();
+  if (txt === "") return null;
+  const n = Number(txt.replace(",", "."));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Number(n.toFixed(3));
 }
 
 function parseDim(raw) {
@@ -219,12 +526,14 @@ function formulaArea(area) {
   return formulaDaLatiLegacy(area?.lato1, area?.lato2);
 }
 
-/** Mq = risultato formula × moltiplicatore. Formula vuota o non valida → 0. */
+/** Risultato = formula × moltiplicatore. Se c’è la larghezza, si moltiplica anche quella (mq). */
 export function mqDiArea(area) {
   const val = evalFormulaArea(formulaArea(area));
   if (val == null) return 0;
   const mol = parseMoltiplicatoreArea(area?.moltiplicatore);
-  return Number((val * mol).toFixed(3));
+  const lar = larghezzaArea(area);
+  const base = lar == null ? val : val * lar;
+  return Number((base * mol).toFixed(3));
 }
 
 export function formulaAreaValida(area) {
@@ -368,6 +677,10 @@ export function emptyAreaStrada(nextId, n = 1) {
     moltiplicatore: "1",
     segno: false,
     tipoManufatto: "",
+    tipoCordolo: "",
+    tipoSegnaletica: "",
+    tipoVarie: "",
+    larghezza: "",
   };
 }
 
@@ -391,6 +704,10 @@ export function duplicaAreaStrada(area, nextId, n) {
     moltiplicatore: testoMoltiplicatore(src.moltiplicatore),
     segno: src.segno === true,
     tipoManufatto: normalizzaTipoManufatto(src.tipoManufatto),
+    tipoCordolo: normalizzaTipoCordolo(src.tipoCordolo),
+    tipoSegnaletica: normalizzaTipoSegnaletica(src.tipoSegnaletica),
+    tipoVarie: normalizzaTipoVarie(src.tipoVarie),
+    larghezza: typeof src.larghezza === "string" ? src.larghezza : src.larghezza != null ? String(src.larghezza) : "",
   };
 }
 
@@ -436,10 +753,13 @@ export function emptySchedaStrade(nextId) {
     cordoli: emptyZonaStrada(nextId),
     segnaletica: emptyZonaStrada(nextId),
     fogna: emptyZonaStrada(nextId),
+    allacciFogna: emptyZonaStrada(nextId),
     lucePubblica: emptyZonaStrada(nextId),
     lucePrivata: emptyZonaStrada(nextId),
     gas: emptyZonaStrada(nextId),
     acqua: emptyZonaStrada(nextId),
+    telefonica: emptyZonaStrada(nextId),
+    varie: emptyZonaStrada(nextId),
     sedeStradale: emptyZonaSedeStradale(nextId),
   };
 }
@@ -476,6 +796,10 @@ function sanificaArea(row, nextId, n) {
     moltiplicatore: testoMoltiplicatore(src.moltiplicatore),
     segno: src.segno === true,
     tipoManufatto: normalizzaTipoManufatto(src.tipoManufatto),
+    tipoCordolo: normalizzaTipoCordolo(src.tipoCordolo),
+    tipoSegnaletica: normalizzaTipoSegnaletica(src.tipoSegnaletica),
+    tipoVarie: normalizzaTipoVarie(src.tipoVarie),
+    larghezza: typeof src.larghezza === "string" ? src.larghezza : src.larghezza != null ? String(src.larghezza) : "",
   };
 }
 
@@ -568,6 +892,10 @@ export function cloneZonaPerSnapshot(zona) {
       moltiplicatore: testoMoltiplicatore(a?.moltiplicatore),
       segno: a?.segno === true,
       tipoManufatto: normalizzaTipoManufatto(a?.tipoManufatto),
+      tipoCordolo: normalizzaTipoCordolo(a?.tipoCordolo),
+      tipoSegnaletica: normalizzaTipoSegnaletica(a?.tipoSegnaletica),
+      tipoVarie: normalizzaTipoVarie(a?.tipoVarie),
+      larghezza: typeof a?.larghezza === "string" ? a.larghezza : a?.larghezza != null ? String(a.larghezza) : "",
     })),
     strati: strati.map((st, i) => ({
       id: typeof st?.id === "number" ? st.id : 0,
@@ -610,6 +938,27 @@ export function zonaHaMisuraCompilata(tipo, zona, schedaCompleta) {
         Boolean(String(a?.tipoManufatto ?? "").trim()),
     );
   }
+  if (isZonaCordoli(tipo)) {
+    return aree.some(
+      (a) =>
+        (Boolean(String(a?.formula ?? "").trim()) && evalFormulaArea(String(a?.formula ?? "")) != null) ||
+        Boolean(String(a?.tipoCordolo ?? "").trim()),
+    );
+  }
+  if (isZonaSegnaletica(tipo)) {
+    return aree.some(
+      (a) =>
+        (Boolean(String(a?.formula ?? "").trim()) && evalFormulaArea(String(a?.formula ?? "")) != null) ||
+        Boolean(String(a?.tipoSegnaletica ?? "").trim()),
+    );
+  }
+  if (isZonaVarie(tipo)) {
+    return aree.some(
+      (a) =>
+        (Boolean(String(a?.formula ?? "").trim()) && evalFormulaArea(String(a?.formula ?? "")) != null) ||
+        Boolean(String(a?.tipoVarie ?? "").trim()),
+    );
+  }
   return aree.some((a) => {
     if (typeof a?.mqFisso === "number" && Number.isFinite(a.mqFisso) && a.mqFisso !== 0) {
       return true;
@@ -623,11 +972,43 @@ export function zonaHaMisuraCompilata(tipo, zona, schedaCompleta) {
  * Serve una voce sullo strato della zona che ha le misure
  * (la sola «SEDE STRADALE» precompilata non basta se non ci sono mq sede).
  */
+export function zonaManufattiHaTipo(zona) {
+  return (zona?.aree || []).some((a) => Boolean(normalizzaTipoManufatto(a?.tipoManufatto)));
+}
+
+export function zonaCordoliHaTipo(zona) {
+  return (zona?.aree || []).some((a) => Boolean(normalizzaTipoCordolo(a?.tipoCordolo)));
+}
+
+export function zonaSegnaleticaHaTipo(zona) {
+  return (zona?.aree || []).some((a) => Boolean(normalizzaTipoSegnaletica(a?.tipoSegnaletica)));
+}
+
+export function zonaVarieHaTipo(zona) {
+  return (zona?.aree || []).some((a) => Boolean(normalizzaTipoVarie(a?.tipoVarie)));
+}
+
 export function schedaStradeHaDatiRegistrabili(schedaCompleta) {
   if (!schedaCompleta || typeof schedaCompleta !== "object") return false;
   for (const tipo of TIPI_ZONA_STRADA) {
     const zona = schedaCompleta[tipo];
     if (!zonaHaMisuraCompilata(tipo, zona, schedaCompleta)) continue;
+    if (isZonaManufatti(tipo)) {
+      if (zonaManufattiHaTipo(zona)) return true;
+      continue;
+    }
+    if (isZonaCordoli(tipo)) {
+      if (zonaCordoliHaTipo(zona)) return true;
+      continue;
+    }
+    if (isZonaSegnaletica(tipo)) {
+      if (zonaSegnaleticaHaTipo(zona)) return true;
+      continue;
+    }
+    if (isZonaVarie(tipo)) {
+      if (zonaVarieHaTipo(zona)) return true;
+      continue;
+    }
     if (zonaHaVoceStrato(zona)) return true;
   }
   return false;
@@ -640,6 +1021,22 @@ export function elencoZoneMisuraSenzaVoce(schedaCompleta) {
   for (const tipo of TIPI_ZONA_STRADA) {
     const zona = schedaCompleta[tipo];
     if (!zonaHaMisuraCompilata(tipo, zona, schedaCompleta)) continue;
+    if (isZonaManufatti(tipo)) {
+      if (!zonaManufattiHaTipo(zona)) out.push("Manufatti (scegli il tipo)");
+      continue;
+    }
+    if (isZonaCordoli(tipo)) {
+      if (!zonaCordoliHaTipo(zona)) out.push("Cordoli (scegli il tipo)");
+      continue;
+    }
+    if (isZonaSegnaletica(tipo)) {
+      if (!zonaSegnaleticaHaTipo(zona)) out.push("Segnaletica (scegli il tipo)");
+      continue;
+    }
+    if (isZonaVarie(tipo)) {
+      if (!zonaVarieHaTipo(zona)) out.push("Varie (scegli il tipo)");
+      continue;
+    }
     if (zonaHaVoceStrato(zona)) continue;
     out.push(ZONA_LABELS[tipo] || tipo);
   }
@@ -671,7 +1068,7 @@ function appendCellettaMq(tr, mqText, err, role) {
   tr.appendChild(tdMq);
 }
 
-function appendFormulaEMoltiplicatore(tr, item, classPrefix, ariaBase, { pezzi = false, lineare = false } = {}) {
+function appendFormulaEMoltiplicatore(tr, item, classPrefix, ariaBase, { pezzi = false, lineare = false, primaMoltiplicatore = null } = {}) {
   const tdF = document.createElement("td");
   tdF.className = "strade-formula-cell";
   const inpF = document.createElement("input");
@@ -687,6 +1084,7 @@ function appendFormulaEMoltiplicatore(tr, item, classPrefix, ariaBase, { pezzi =
   inpF.value = formulaArea(item);
   tdF.appendChild(inpF);
   tr.appendChild(tdF);
+  if (typeof primaMoltiplicatore === "function") primaMoltiplicatore(tr);
 
   const tdM = document.createElement("td");
   tdM.className = "strade-mol-cell";
@@ -719,8 +1117,86 @@ function testoMqRiga(item, comeNegativo) {
   };
 }
 
+function appendTipoCordolo(tr, area) {
+  const td = document.createElement("td");
+  td.className = "strade-tipo-cell";
+  const sel = document.createElement("select");
+  sel.className = "strade-area-tipo-cordolo";
+  sel.setAttribute("aria-label", "Tipo cordolo");
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "— scegli —";
+  sel.appendChild(empty);
+  for (const t of elencoTipiCordolo()) {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    sel.appendChild(opt);
+  }
+  sel.value = normalizzaTipoCordolo(area?.tipoCordolo);
+  td.appendChild(sel);
+  tr.appendChild(td);
+}
+
+function appendTipoSegnaletica(tr, area) {
+  const td = document.createElement("td");
+  td.className = "strade-tipo-cell";
+  const sel = document.createElement("select");
+  sel.className = "strade-area-tipo-segnaletica";
+  sel.setAttribute("aria-label", "Tipo segnaletica");
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "— scegli —";
+  sel.appendChild(empty);
+  for (const t of elencoTipiSegnaletica()) {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    sel.appendChild(opt);
+  }
+  sel.value = normalizzaTipoSegnaletica(area?.tipoSegnaletica);
+  td.appendChild(sel);
+  tr.appendChild(td);
+}
+
+function appendTipoVarie(tr, area) {
+  const td = document.createElement("td");
+  td.className = "strade-tipo-cell";
+  const sel = document.createElement("select");
+  sel.className = "strade-area-tipo-varie";
+  sel.setAttribute("aria-label", "Tipo varie");
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "— scegli —";
+  sel.appendChild(empty);
+  for (const t of elencoTipiVarie()) {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    sel.appendChild(opt);
+  }
+  sel.value = normalizzaTipoVarie(area?.tipoVarie);
+  td.appendChild(sel);
+  tr.appendChild(td);
+}
+
+function appendLarghezza(tr, area) {
+  const td = document.createElement("td");
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "strade-area-larghezza";
+  inp.placeholder = "vuota";
+  inp.setAttribute("aria-label", "Larghezza in metri, lascia vuoto se non serve");
+  inp.title = "Larghezza in metri. Lasciala vuota se la quantità non è in mq.";
+  inp.autocomplete = "off";
+  inp.value = typeof area?.larghezza === "string" ? area.larghezza : area?.larghezza != null ? String(area.larghezza) : "";
+  td.appendChild(inp);
+  tr.appendChild(td);
+}
+
 function appendTipoManufatto(tr, area) {
   const td = document.createElement("td");
+  td.className = "strade-tipo-cell";
   const sel = document.createElement("select");
   sel.className = "strade-area-tipo-manufatto";
   sel.setAttribute("aria-label", "Tipo manufatto");
@@ -728,7 +1204,7 @@ function appendTipoManufatto(tr, area) {
   empty.value = "";
   empty.textContent = "— scegli —";
   sel.appendChild(empty);
-  for (const t of TIPI_MANUFATTO) {
+  for (const t of elencoTipiManufatto()) {
     const opt = document.createElement("option");
     opt.value = t;
     opt.textContent = t;
@@ -744,9 +1220,11 @@ function renderAreeTable(tipo, zona) {
   wrap.className = "vani-sup-section";
   const isManufatti = isZonaManufatti(tipo);
   const isCordoli = isZonaCordoli(tipo);
-  const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipo);
-  const unitaCol = isCordoli ? "Ml" : isFormulaUnitaVoce ? "Ris." : "Mq";
-  const titoloSezione = isCordoli ? "Lunghezze" : isFormulaUnitaVoce ? "Calcoli" : "Aree";
+  const isSegnaletica = isZonaSegnaletica(tipo);
+  const isVarie = isZonaVarie(tipo);
+  const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipo) && !isSegnaletica;
+  const unitaCol = isCordoli ? "Ml" : isFormulaUnitaVoce || isVarie ? "Ris." : "Mq";
+  const titoloSezione = isCordoli ? "Lunghezze" : isFormulaUnitaVoce || isVarie ? "Calcoli" : "Aree";
 
   const head = document.createElement("div");
   head.className = "vani-sup-section-head";
@@ -756,7 +1234,16 @@ function renderAreeTable(tipo, zona) {
   const tableWrap = document.createElement("div");
   tableWrap.className = "vani-sup-table-wrap";
   const table = document.createElement("table");
-  table.className = "vani-sup-aree-table";
+  table.className = isManufatti
+    ? "vani-sup-aree-table strade-aree-table--manufatti"
+    : isCordoli
+      ? "vani-sup-aree-table strade-aree-table--cordoli"
+      : isSegnaletica
+        ? "vani-sup-aree-table strade-aree-table--segnaletica"
+        : isVarie
+          ? "vani-sup-aree-table strade-aree-table--varie"
+          : "vani-sup-aree-table";
+  const conTipo = isManufatti || isCordoli || isSegnaletica || isVarie;
   table.innerHTML = isManufatti
     ? `<colgroup>
     <col class="strade-col-n"><col class="strade-col-rif"><col class="strade-col-tipo">
@@ -766,7 +1253,34 @@ function renderAreeTable(tipo, zona) {
   <thead><tr>
     <th>N°</th><th>Rif.</th><th>Tipo manufatto</th><th>Formula</th><th>N° pezzi</th><th>Mq</th><th>Sottrai</th><th></th>
   </tr></thead>`
-    : `<colgroup>
+    : isCordoli
+      ? `<colgroup>
+    <col class="strade-col-n"><col class="strade-col-rif"><col class="strade-col-tipo">
+    <col class="strade-col-formula"><col class="strade-col-mol"><col class="strade-col-mq">
+    <col class="strade-col-sottrai"><col class="strade-col-act">
+  </colgroup>
+  <thead><tr>
+    <th>N°</th><th>Rif.</th><th>Tipo cordolo</th><th>Formula</th><th>×</th><th>Ml</th><th>Sottrai</th><th></th>
+  </tr></thead>`
+      : isSegnaletica
+        ? `<colgroup>
+    <col class="strade-col-n"><col class="strade-col-rif"><col class="strade-col-tipo">
+    <col class="strade-col-formula"><col class="strade-col-lar"><col class="strade-col-mol"><col class="strade-col-mq">
+    <col class="strade-col-sottrai"><col class="strade-col-act">
+  </colgroup>
+  <thead><tr>
+    <th>N°</th><th>Rif.</th><th>Tipo segnaletica</th><th>Formula</th><th>Larghezza</th><th>×</th><th>Ris.</th><th>Sottrai</th><th></th>
+  </tr></thead>`
+        : isVarie
+          ? `<colgroup>
+    <col class="strade-col-n"><col class="strade-col-rif"><col class="strade-col-tipo">
+    <col class="strade-col-formula"><col class="strade-col-mol"><col class="strade-col-mq">
+    <col class="strade-col-sottrai"><col class="strade-col-act">
+  </colgroup>
+  <thead><tr>
+    <th>N°</th><th>Rif.</th><th>Tipo varie</th><th>Formula</th><th>×</th><th>Ris.</th><th>Sottrai</th><th></th>
+  </tr></thead>`
+          : `<colgroup>
     <col class="strade-col-n"><col class="strade-col-rif">
     <col class="strade-col-formula"><col class="strade-col-mol"><col class="strade-col-mq">
     <col class="strade-col-sottrai"><col class="strade-col-act">
@@ -800,15 +1314,19 @@ function renderAreeTable(tipo, zona) {
     tr.appendChild(tdRif);
 
     if (isManufatti) appendTipoManufatto(tr, area);
+    if (isCordoli) appendTipoCordolo(tr, area);
+    if (isSegnaletica) appendTipoSegnaletica(tr, area);
+    if (isVarie) appendTipoVarie(tr, area);
 
     appendFormulaEMoltiplicatore(
       tr,
       area,
       "strade-area",
-      isCordoli ? "lunghezza" : isFormulaUnitaVoce ? "calcolo" : "area",
+      isCordoli ? "lunghezza" : isSegnaletica ? "segnaletica" : isVarie || isFormulaUnitaVoce ? "calcolo" : "area",
       {
         pezzi: isManufatti,
-        lineare: isCordoli || isFormulaUnitaVoce,
+        lineare: isCordoli || isSegnaletica || isVarie || isFormulaUnitaVoce,
+        primaMoltiplicatore: isSegnaletica ? () => appendLarghezza(tr, area) : null,
       },
     );
 
@@ -865,21 +1383,29 @@ function renderAreeTable(tipo, zona) {
   table.appendChild(tbody);
 
   const t = totaliAreeZona(zona);
-  const labelColspan = isManufatti ? 5 : 4;
+  const labelColspan = isSegnaletica ? 6 : conTipo ? 5 : 4;
   const labelPos = isCordoli
     ? "Totale lunghezze positive"
-    : isFormulaUnitaVoce
+    : isSegnaletica
+      ? "Totale positivo"
+      : isFormulaUnitaVoce || isVarie
       ? "Totale valori positivi"
       : "Totale aree positive";
   const labelNeg = isCordoli
     ? "Totale lunghezze negative"
-    : isFormulaUnitaVoce
+    : isSegnaletica
+      ? "Totale negativo"
+      : isFormulaUnitaVoce || isVarie
       ? "Totale valori negativi"
       : "Totale aree negative";
   const labelNetto = isCordoli
     ? "Ml netto zona (base per gli strati)"
-    : isFormulaUnitaVoce
+    : isSegnaletica
+      ? "Risultato netto (se c’è la larghezza è in mq)"
+      : isFormulaUnitaVoce
       ? "Risultato netto (base per gli strati; unità = voce)"
+      : isVarie
+        ? "Risultato netto (unità = voce del tipo)"
       : "Mq netto zona (base per gli strati)";
   const tfoot = document.createElement("tfoot");
   tfoot.innerHTML = `
@@ -901,7 +1427,95 @@ function renderAreeTable(tipo, zona) {
   table.appendChild(tfoot);
   tableWrap.appendChild(table);
   wrap.appendChild(tableWrap);
+  if (isManufatti) wrap.appendChild(renderNuovoTipoManufatto());
+  if (isCordoli) wrap.appendChild(renderNuovoTipoCordolo());
+  if (isSegnaletica) wrap.appendChild(renderNuovoTipoSegnaletica());
+  if (isVarie) wrap.appendChild(renderNuovoTipoVarie());
   return wrap;
+}
+
+function renderNuovoTipoVarie() {
+  const box = document.createElement("div");
+  box.className = "strade-nuovo-tipo";
+  const label = document.createElement("label");
+  label.className = "strade-nuovo-tipo-label";
+  label.textContent = "Nuovo tipo varie";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "strade-nuovo-tipo-nome";
+  inp.placeholder = "es. Trasporto";
+  inp.setAttribute("aria-label", "Nome del nuovo tipo varie");
+  inp.autocomplete = "off";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-action btn-secondary";
+  btn.dataset.action = "aggiungi-tipo-varie";
+  btn.textContent = "Aggiungi tipo";
+  box.append(label, inp, btn);
+  return box;
+}
+
+function renderNuovoTipoSegnaletica() {
+  const box = document.createElement("div");
+  box.className = "strade-nuovo-tipo";
+  const label = document.createElement("label");
+  label.className = "strade-nuovo-tipo-label";
+  label.textContent = "Nuovo tipo segnaletica";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "strade-nuovo-tipo-nome";
+  inp.placeholder = "es. Freccia";
+  inp.setAttribute("aria-label", "Nome del nuovo tipo di segnaletica");
+  inp.autocomplete = "off";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-action btn-secondary";
+  btn.dataset.action = "aggiungi-tipo-segnaletica";
+  btn.textContent = "Aggiungi tipo";
+  box.append(label, inp, btn);
+  return box;
+}
+
+function renderNuovoTipoCordolo() {
+  const box = document.createElement("div");
+  box.className = "strade-nuovo-tipo";
+  const label = document.createElement("label");
+  label.className = "strade-nuovo-tipo-label";
+  label.textContent = "Nuovo tipo cordolo";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "strade-nuovo-tipo-nome";
+  inp.placeholder = "es. Smusso";
+  inp.setAttribute("aria-label", "Nome del nuovo tipo di cordolo");
+  inp.autocomplete = "off";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-action btn-secondary";
+  btn.dataset.action = "aggiungi-tipo-cordolo";
+  btn.textContent = "Aggiungi tipo";
+  box.append(label, inp, btn);
+  return box;
+}
+
+function renderNuovoTipoManufatto() {
+  const box = document.createElement("div");
+  box.className = "strade-nuovo-tipo";
+  const label = document.createElement("label");
+  label.className = "strade-nuovo-tipo-label";
+  label.textContent = "Nuovo tipo";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "strade-nuovo-tipo-nome";
+  inp.placeholder = "es. Griglia";
+  inp.setAttribute("aria-label", "Nome del nuovo tipo di manufatto");
+  inp.autocomplete = "off";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-action btn-secondary";
+  btn.dataset.action = "aggiungi-tipo-manufatto";
+  btn.textContent = "Aggiungi tipo";
+  box.append(label, inp, btn);
+  return box;
 }
 
 function renderSottrazioniStrato(tipo, strato) {
@@ -1223,12 +1837,16 @@ export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }
   const hint = document.createElement("p");
   hint.className = "vani-sup-hint";
   hint.textContent = isSede
-    ? "Le aree si calcolano da sole: per ogni riferimento, Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti). I manufatti senza area non vengono sottratti. Cordoli e le schede impianti (Segnaletica, Fogna, Luci, Gas, Acqua) non entrano in questo calcolo. Qui puoi solo aggiungere strati. Il primo strato è già «SEDE STRADALE»."
+    ? "Le aree si calcolano da sole: per ogni riferimento, Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti). I manufatti senza area non vengono sottratti. Cordoli e le schede impianti (Segnaletica, Fogna, Allacci fogna, Luci, Gas, Acqua, Telefonica) non entrano in questo calcolo. Qui puoi solo aggiungere strati. Il primo strato è già «SEDE STRADALE»."
     : isZonaManufatti(tipo)
-      ? "Scegli il tipo (Chiusino, Caditoia, Pozzetto, Palo Luce). Il campo N° pezzi (moltiplicatore) è la quantità che va nelle VOCI, a numero. Se compili anche una formula, quell’area × pezzi viene sottratta dalla Sede stradale."
+      ? "Scegli il tipo, oppure aggiungine uno nuovo sotto la tabella. Ogni tipo diventa una voce nelle VOCI: lì scrivi la descrizione e il prezzo. Il campo N° pezzi è la quantità, a numero. Se compili anche una formula, quell’area × pezzi viene sottratta dalla Sede stradale."
       : isZonaCordoli(tipo)
-        ? "I Cordoli si misurano a metro lineare (ml). In Formula metti la lunghezza (es. 12,5 oppure 3+4,2). Il moltiplicatore ripete quel tratto. Nelle VOCI la quantità è in ml. I Cordoli non vengono sottratti dalla Sede stradale."
-        : isZonaFormulaUnitaVoce(tipo)
+        ? "Scegli il tipo di cordolo (Retto, Curvo, oppure aggiungine uno nuovo). Ogni tipo diventa una voce nelle VOCI: lì scrivi la descrizione e il prezzo. In Formula metti la lunghezza (es. 12,5 oppure 3+4,2): la quantità è in metri lineari (ml). I Cordoli non vengono sottratti dalla Sede stradale."
+        : isZonaSegnaletica(tipo)
+          ? "Scegli il tipo di segnaletica, oppure aggiungine uno nuovo. Ogni tipo diventa una voce nelle VOCI. In Formula metti la misura (es. 12,5). La larghezza puoi lasciarla vuota: la quantità resta quella della formula e l’unità la scegli in VOCI. Se scrivi la larghezza in metri, la quantità diventa mq (formula × larghezza). Non viene sottratta dalla Sede."
+          : isZonaVarie(tipo)
+            ? "Scegli il tipo (per ora Reinterro, oppure aggiungine uno nuovo). Ogni tipo diventa una voce nelle VOCI: lì scegli l’unità di misura e il prezzo. In Formula scrivi il calcolo (es. 12,5 oppure 2*3*0,4). Il risultato va in quella voce. Varie non entra nella Sede stradale."
+            : isZonaFormulaUnitaVoce(tipo)
           ? "In Formula scrivi il calcolo (es. 2 oppure 1,2*3). Il moltiplicatore ripete quel risultato. L’unità di misura (n., ml., mq., a corpo…) la decide la Voce dello strato nelle VOCI. Questa scheda non viene sottratta dalla Sede stradale."
           : "In Formula puoi scrivere un’espressione (es. 12,5 * 3,2 oppure (10+2)/2). Il moltiplicatore (default 1) ripete quel risultato: 4, 1,5, 10… quello che ti serve. Il segno «sottrai» toglie quell’area da tutta la zona. Ogni strato parte da quel mq netto: puoi togliere altre aree solo da quello strato.";
 
@@ -1244,7 +1862,9 @@ export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }
     );
   } else {
     block.appendChild(renderAreeTable(tipo, data));
-    block.appendChild(renderStratiCards(tipo, data, datalistId));
+    if (!isZonaManufatti(tipo) && !isZonaCordoli(tipo) && !isZonaSegnaletica(tipo) && !isZonaVarie(tipo)) {
+      block.appendChild(renderStratiCards(tipo, data, datalistId));
+    }
   }
   return block;
 }
@@ -1264,11 +1884,19 @@ export function syncZonaDaBlock(block, zona) {
     const mol = row.querySelector(".strade-area-moltiplicatore");
     const segno = row.querySelector(".vani-sup-area-segno");
     const tipoMan = row.querySelector(".strade-area-tipo-manufatto");
+    const tipoCor = row.querySelector(".strade-area-tipo-cordolo");
+    const tipoSeg = row.querySelector(".strade-area-tipo-segnaletica");
+    const tipoVar = row.querySelector(".strade-area-tipo-varie");
+    const lar = row.querySelector(".strade-area-larghezza");
     if (rif instanceof HTMLInputElement) area.riferimento = rif.value;
     if (formula instanceof HTMLInputElement) area.formula = formula.value;
     if (mol instanceof HTMLInputElement) area.moltiplicatore = mol.value;
     if (segno instanceof HTMLInputElement) area.segno = segno.checked;
     if (tipoMan instanceof HTMLSelectElement) area.tipoManufatto = normalizzaTipoManufatto(tipoMan.value);
+    if (tipoCor instanceof HTMLSelectElement) area.tipoCordolo = normalizzaTipoCordolo(tipoCor.value);
+    if (tipoSeg instanceof HTMLSelectElement) area.tipoSegnaletica = normalizzaTipoSegnaletica(tipoSeg.value);
+    if (tipoVar instanceof HTMLSelectElement) area.tipoVarie = normalizzaTipoVarie(tipoVar.value);
+    if (lar instanceof HTMLInputElement) area.larghezza = lar.value;
   });
 
   if (!Array.isArray(zona.strati)) zona.strati = [];

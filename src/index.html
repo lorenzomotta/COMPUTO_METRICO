@@ -2425,12 +2425,12 @@
             hidden
           >
             <p class="vani-help-inline__p">
-              Compila <strong>piano</strong> e il nome della <strong>strada / tratto</strong>.
+              Compila il nome della <strong>strada / tratto</strong>. Il <strong>piano</strong> è facoltativo e non compare nel PDF.
               Poi usa le schede: <strong>Ingombro</strong>, <strong>Marciapiedi</strong>,
               <strong>Aiuole</strong>, <strong>Parcheggi</strong>, <strong>Manufatti</strong>,
               <strong>Cordoli</strong>, <strong>Sede stradale</strong>, <strong>Segnaletica</strong>,
-              <strong>Fogna</strong>, <strong>Luce pubblica</strong>, <strong>Luce privata</strong>,
-              <strong>Gas</strong> e <strong>Acqua</strong>.
+              <strong>Fogna</strong>, <strong>Allacci fogna</strong>, <strong>Luce pubblica</strong>, <strong>Luce privata</strong>,
+              <strong>Gas</strong>, <strong>Acqua</strong>, <strong>Telefonica</strong> e <strong>Varie</strong>.
               I tre pulsanti a destra (<strong>Aggiungi area</strong>, <strong>strato</strong>,
               <strong>sottrazione</strong>) valgono per la scheda che hai selezionato.
               Le zone con aree hanno una <strong>formula</strong> e un
@@ -2441,14 +2441,32 @@
               Il segno <strong>sottrai</strong> sulle aree toglie quella superficie da tutta la zona.
               L’icona <strong>due fogli</strong> duplica un’area (stessa formula e moltiplicatore) così puoi modificarla.
               Su ogni strato puoi aggiungere altre <strong>aree da sottrarre</strong>: valgono solo per quello strato.
-              Nei <strong>Manufatti</strong> scegli il tipo (Chiusino, Caditoia, Pozzetto, Palo Luce).
+              Nei <strong>Manufatti</strong> scegli il tipo dall’elenco
+              (Chiusino, Caditoia, Pozzetto, Pozzetto Ispezione, Pozzetto Palo,
+              Pozzetto Chiusura Rete, Palo Luce, Punto Irrigazione)
+              oppure aggiungine uno nuovo. Ogni tipo diventa una <strong>voce</strong> a parte:
+              in VOCI ci scrivi la descrizione e il prezzo.
               Il campo <strong>N° pezzi</strong> è la quantità a numero che va nelle VOCI.
               Se compili anche una formula (area di un pezzo), quella superficie × pezzi
               viene tolta dalla Sede stradale.
-              Nei <strong>Cordoli</strong> la formula è la <strong>lunghezza</strong> e la quantità nelle VOCI
-              è a <strong>metro lineare (ml.)</strong>: non vengono sottratti dalla Sede.
-              Nella <strong>Segnaletica</strong>, <strong>Fogna</strong>, <strong>Luce pubblica</strong>,
-              <strong>Luce privata</strong>, <strong>Gas</strong> e <strong>Acqua</strong>
+              Nei <strong>Cordoli</strong> scegli il tipo
+              (<strong>Retto</strong>, <strong>Curvo</strong>, oppure aggiungine uno nuovo).
+              Ogni tipo diventa una <strong>voce</strong> a parte, in <strong>metri lineari (ml.)</strong>:
+              in VOCI ci scrivi la descrizione e il prezzo.
+              La formula è la lunghezza. I Cordoli non vengono sottratti dalla Sede.
+              Nella <strong>Segnaletica</strong> scegli il tipo
+              (Bianca continua, Bianca tratteggiata, Gialla continua, Gialla tratteggiata,
+              Stop, Attraversamento, Zebre, oppure aggiungine uno nuovo).
+              Ogni tipo diventa una <strong>voce</strong>.
+              La <strong>larghezza</strong> puoi lasciarla vuota: la quantità resta la formula
+              e l’unità la scegli in VOCI.
+              Se scrivi la larghezza in metri, la quantità diventa <strong>mq</strong>
+              (formula × larghezza).
+              In <strong>Varie</strong> scegli il tipo (<strong>Reinterro</strong>, oppure aggiungine uno nuovo).
+              Ogni tipo diventa una voce: in VOCI scegli l’unità e il prezzo.
+              La quantità è il risultato della <strong>formula</strong>.
+              Nella <strong>Fogna</strong>, <strong>Allacci fogna</strong>, <strong>Luce pubblica</strong>,
+              <strong>Luce privata</strong>, <strong>Gas</strong>, <strong>Acqua</strong> e <strong>Telefonica</strong>
               tu metti la <strong>formula</strong> (es. 2 oppure 1,2×3);
               l’<strong>unità di misura</strong> (n., ml., mq., a corpo…) la decide la <strong>voce</strong>
               dello strato nelle VOCI. Non vengono sottratte dalla Sede.
