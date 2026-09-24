@@ -977,9 +977,10 @@
           <h3 id="voce-dialog-title">NUOVA VOCE</h3>
           <p id="voce-dialog-solo-unita-hint" class="voce-dialog-solo-unita-hint" hidden>
             Voce automatica o semiautomatica: puoi associare il testo VOCE (anche con CERCA VOCE), il
-            PREZZO e l'unità di misura. Con <strong>USA VOCE ESISTENTE</strong> puoi spostare queste
-            misurazioni su una voce già presente nel computo (stessa unità). Le misurazioni restano
-            gestite dagli strumenti (VANI, PERIMETRALI, aperture…).
+            PREZZO e l'unità di misura. Con <strong>USA VOCE ESISTENTE</strong> scegli un testo esteso
+            già scritto nel computo: viene copiato qui, insieme al prezzo. La voce breve resta, così
+            più voci brevi possono usare lo stesso testo. Le misurazioni restano gestite dagli
+            strumenti (VANI, PERIMETRALI, aperture…).
           </p>
           <div class="piano-form voce-form">
             <div class="voce-form-riga-uno">
@@ -1104,28 +1105,28 @@
         <form id="voce-usa-esistente-form" method="dialog">
           <h3>USA VOCE ESISTENTE</h3>
           <p class="voce-usa-esistente-hint">
-            Scegli una voce già presente nel computo. Vengono mostrate solo le voci con la
-            <strong>stessa unità di misura</strong>. Le misurazioni passeranno lì e questa voce
-            verrà rimossa.
+            Scegli il <strong>testo esteso</strong> già scritto nel computo. Testo e prezzo vengono
+            copiati su questa voce breve. La voce breve non viene cancellata: più voci brevi possono
+            usare lo stesso testo. Poi premi Salva.
           </p>
           <p id="voce-usa-esistente-unita" class="voce-usa-esistente-unita"></p>
           <input
             id="voce-usa-esistente-filtro"
             type="search"
-            placeholder="Cerca per abbreviazione o testo..."
+            placeholder="Cerca nel testo della voce..."
             autocomplete="off"
             aria-label="Cerca voce"
           />
           <div id="voce-usa-esistente-lista" class="voce-usa-esistente-lista" role="listbox"></div>
           <p id="voce-usa-esistente-vuoto" class="voce-usa-esistente-vuoto" hidden>
-            Nessuna voce con questa unità di misura.
+            Nessuna voce estesa già scritta nel computo.
           </p>
           <div class="formula-dialog-actions">
             <button id="voce-usa-esistente-cancel" type="button" class="btn-action btn-delete">
               Annulla
             </button>
             <button id="voce-usa-esistente-ok" type="submit" class="btn-action btn-secondary" disabled>
-              Usa questa voce
+              Usa questo testo
             </button>
           </div>
         </form>

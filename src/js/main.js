@@ -93,7 +93,7 @@ import { openVistaScavo, wireScavoUi, dismissScavoIfOpen } from "./scavo.js";
 import { buildRivestimentiRowsFromStorage, buildRivestimentiElevazioneRowsFromStorage, buildRivestimentiPerimetraliRowsFromStorage, buildIntonacoRusticoRowsFromStorage, buildIntonacoRusticoEsternoRowsFromStorage, buildIntonacoCivileRowsFromStorage, buildIntonacoCivileEsternoRowsFromStorage, buildGessoRowsFromStorage, buildZoccoloRowsFromStorage } from "./modules/rivestimentiRiepilogo.js";
 import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
 import { syncEsterniMisurazioniNelleVoci } from "./modules/esterniVariSyncVoci.js";
-import { abbrevKey, initVoceUsaEsistente } from "./modules/voceUsaEsistente.js";
+import { initVoceUsaEsistente } from "./modules/voceUsaEsistente.js";
 import {
   canUndoComputo,
   clearUndoComputo,
@@ -4826,28 +4826,6 @@ window.addEventListener("DOMContentLoaded", () => {
       misurazioniVarie,
     });
     popolaDatalistVocibrevi("datalist-voci-esterni-vari");
-  }
-
-  function retargetEsterniIdVoceInMemoria(fromAbbrev, fromId, toAbbrev) {
-    const fromKey = abbrevKey(fromAbbrev);
-    const to = String(toAbbrev ?? "").trim();
-    if (!fromKey || !to) return false;
-    let changed = false;
-    const patch = (row) => {
-      if (!row) return;
-      const raw = String(row.idVoce ?? "").trim();
-      if (!raw) return;
-      if (abbrevKey(raw) === fromKey || raw === String(fromId)) {
-        row.idVoce = to;
-        changed = true;
-      }
-    };
-    scaviEsterni.forEach(patch);
-    corselliEsterni.forEach(patch);
-    scivoliEsterni.forEach(patch);
-    camminamentiEsterni.forEach(patch);
-    misurazioniVarie.forEach(patch);
-    return changed;
   }
 
   function openCompilazioneEsterniVariDaSidebar() {
@@ -11139,24 +11117,12 @@ window.addEventListener("DOMContentLoaded", () => {
   initVoceUsaEsistente({
     getVoci: () => voci,
     getEditingId: () => editingVoceId,
-    getUnita: () => {
-      const id = editingVoceId;
-      const v = id != null ? voci.find((x) => x.idVoce === id) : null;
-      return (typeof v?.unitaMisura === "string" && v.unitaMisura.trim()) || voceUnitaMisuraEl?.value || "";
-    },
-    onMerged: ({ fromAbbrev, toAbbrev, fromId }) => {
-      if (retargetEsterniIdVoceInMemoria(fromAbbrev, fromId, toAbbrev)) {
-        saveMurDati();
+    onScelta: ({ voce, prezzo }) => {
+      if (voceTestoEl) voceTestoEl.value = voce;
+      if (vocePrezzoEl && Number.isFinite(prezzo)) {
+        vocePrezzoEl.value = String(prezzo);
       }
-      loadVoci();
-      if (voceFocusId === fromId) exitVoceFocusMode();
-      normalizzaPosizioniVoci();
-      saveVoci();
-      syncEsterniVersoVoci();
-      popolaDatalistVocibrevi("datalist-voci-esterni-vari");
-      renderVoci();
-      resetVoceForm();
-      if (voceDialogEl?.open) voceDialogEl.close();
+      voceTestoEl?.focus();
     },
   });
 
