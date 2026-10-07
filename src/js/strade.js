@@ -489,7 +489,7 @@ function onHostClick(e) {
     renderForm();
     queueMicrotask(() => {
       const row = document.querySelector(`.vani-sup-area-row[data-area-id="${copia.id}"] .strade-area-formula`);
-      if (row instanceof HTMLInputElement) row.focus();
+      if (row instanceof HTMLInputElement || row instanceof HTMLTextAreaElement) row.focus();
     });
     return;
   }

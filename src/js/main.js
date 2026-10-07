@@ -320,6 +320,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const voceCapitoloNuovoNomeEl = document.querySelector("#voce-capitolo-nuovo-nome");
   const voceCapitoloNuovoAnnullaEl = document.querySelector("#voce-capitolo-nuovo-annulla");
   const voceAbbreviataEl = document.querySelector("#voce-abbreviata");
+  const voceRiferimentoEl = document.querySelector("#voce-riferimento");
   const voceUnitaMisuraEl = document.querySelector("#voce-unita-misura");
   const vocePrezzoEl = document.querySelector("#voce-prezzo");
   const voceUnitaAddButtonEl = document.querySelector("#voce-unita-add");
@@ -431,7 +432,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let camminamentiEsterni = [];
   /** @type {{ idMisurazione: number, idVoce: string, piano: string, riferimento: string, formula: string, formulaValue: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, percentuale?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[]} */
   let misurazioniVarie = [];
-  /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, canaleGronda?: boolean, grondaCanaleValore?: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, percentuale?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[] }[]} */
+  /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, riferimento?: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, canaleGronda?: boolean, grondaCanaleValore?: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, percentuale?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[] }[]} */
   let voci = [];
   /** @type {{ idAperturaMaster: string, piano: string, zona?: string, locale: string, largh: number, alt: number, percentuale: number, hDav: number, ante: number, tipologia: string, falso: string, scuro: string, inferiata: string, zanzariera: string, controdavanzale: string }[]} */
   let apertureMaster = [];
@@ -2885,6 +2886,7 @@ window.addEventListener("DOMContentLoaded", () => {
         posizione: item.posizione,
         capitoloId: normalizeCapitoloIdOnVoce(item?.capitoloId),
         voceAbbreviata: typeof item?.voceAbbreviata === "string" ? item.voceAbbreviata : "",
+        riferimento: typeof item?.riferimento === "string" ? item.riferimento : "",
         unitaMisura:
           typeof item?.unitaMisura === "string" && item.unitaMisura.trim() !== ""
             ? item.unitaMisura.trim()
@@ -5821,6 +5823,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (el) el.disabled = attiva;
     });
     if (vocePrezzoEl) vocePrezzoEl.disabled = false;
+    if (voceRiferimentoEl) voceRiferimentoEl.disabled = false;
     if (voceTestoEl) voceTestoEl.disabled = false;
     if (voceBtnCercaEl) voceBtnCercaEl.disabled = false;
     if (voceUnitaMisuraEl) voceUnitaMisuraEl.disabled = false;
@@ -5831,6 +5834,7 @@ window.addEventListener("DOMContentLoaded", () => {
     vocePosizioneEl.value = String(getPrimaPosizioneVoceDisponibile(""));
     popolaSelectCapitoliVoce("");
     voceAbbreviataEl.value = "";
+    if (voceRiferimentoEl) voceRiferimentoEl.value = "";
     renderVociUnitaOptions();
     if (vocePrezzoEl) vocePrezzoEl.value = fmt2(0);
     if (voceTipoMisuraEl) voceTipoMisuraEl.value = TIPOMISURA_VOCE_AUTOMATICA;
@@ -7674,7 +7678,7 @@ window.addEventListener("DOMContentLoaded", () => {
           rifMap.forEach((rows, rif) => {
             let sumRifLordo = 0;
             let sumRifAperture = 0;
-            drawWrappedDescLine(`RIFERIMENTO: ${rif}`);
+            drawWrappedDescLine(rif);
             const haCamminamenti = rows.some(
               (row) =>
                 typeof row?.camminamentiSchedaId === "string" &&
@@ -9755,6 +9759,7 @@ window.addEventListener("DOMContentLoaded", () => {
       posizione: item.posizione,
       capitoloId: typeof item?.capitoloId === "string" ? item.capitoloId.trim() : "",
       voceAbbreviata: typeof item?.voceAbbreviata === "string" ? item.voceAbbreviata : "",
+      riferimento: typeof item?.riferimento === "string" ? item.riferimento : "",
       unitaMisura:
         typeof item?.unitaMisura === "string" && item.unitaMisura.trim() !== ""
           ? item.unitaMisura.trim()
@@ -11100,6 +11105,7 @@ window.addEventListener("DOMContentLoaded", () => {
           idVoce: voceIdEl.value,
           posizione: vocePosizioneEl.value,
           abbreviata: voceAbbreviataEl.value,
+          riferimento: voceRiferimentoEl ? voceRiferimentoEl.value : "",
           unitaMisura: voceUnitaMisuraEl.value,
           prezzo: vocePrezzoEl ? vocePrezzoEl.value : "",
           tipoMisura: voceTipoMisuraEl ? voceTipoMisuraEl.value : "",
@@ -11185,6 +11191,7 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       const unitaMisura = voceUnitaMisuraEl.value.trim();
       const prezzo = parseNonNegativeDecimal2(vocePrezzoEl?.value ?? "");
+      const riferimento = voceRiferimentoEl ? voceRiferimentoEl.value.trim() : "";
       const voce = voceTestoEl.value.trim();
       if (!unitaMisura || !voce || prezzo === null) return;
       if (
@@ -11201,6 +11208,7 @@ window.addEventListener("DOMContentLoaded", () => {
               ...item,
               unitaMisura,
               prezzo,
+              riferimento,
               voce,
               capitoloId: normalizeCapitoloIdOnVoce(voceCapitoloEl?.value),
               misurazioniManuali: normalizzaMisurazioniManualiVoce(
@@ -11220,6 +11228,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const posizione = Number.parseInt(vocePosizioneEl.value, 10);
     const capitoloId = normalizeCapitoloIdOnVoce(voceCapitoloEl?.value);
     const voceAbbreviata = voceAbbreviataEl.value.trim();
+    const riferimento = voceRiferimentoEl ? voceRiferimentoEl.value.trim() : "";
     const unitaMisura = voceUnitaMisuraEl.value.trim();
     const prezzo = parseNonNegativeDecimal2(vocePrezzoEl?.value ?? "");
     const tipoMisura = normalizzaTipoMisuraVoce(voceTipoMisuraEl?.value);
@@ -11238,6 +11247,7 @@ window.addEventListener("DOMContentLoaded", () => {
         posizione: getPrimaPosizioneVoceDisponibile(capitoloId),
         capitoloId,
         voceAbbreviata,
+        riferimento,
         unitaMisura,
         prezzo,
         tipoMisura,
@@ -11253,6 +11263,7 @@ window.addEventListener("DOMContentLoaded", () => {
               ...item,
               capitoloId,
               voceAbbreviata,
+              riferimento,
               unitaMisura,
               prezzo,
               tipoMisura,
@@ -11545,6 +11556,7 @@ window.addEventListener("DOMContentLoaded", () => {
       vocePosizioneEl.value = String(row.posizione);
       popolaSelectCapitoliVoce(row.capitoloId || "");
       voceAbbreviataEl.value = row.voceAbbreviata || "";
+      if (voceRiferimentoEl) voceRiferimentoEl.value = row.riferimento || "";
       renderVociUnitaOptions(row.unitaMisura || "");
       if (vocePrezzoEl) vocePrezzoEl.value = fmt2(row.prezzo ?? 0);
       if (voceTipoMisuraEl) voceTipoMisuraEl.value = normalizzaTipoMisuraVoce(row.tipoMisura);
@@ -13168,6 +13180,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (draft.idVoce != null) voceIdEl.value = String(draft.idVoce);
       if (draft.posizione != null) vocePosizioneEl.value = String(draft.posizione);
       if (draft.abbreviata != null) voceAbbreviataEl.value = draft.abbreviata;
+      if (draft.riferimento != null && voceRiferimentoEl) voceRiferimentoEl.value = draft.riferimento;
       renderVociUnitaOptions(draft.unitaMisura || "");
       if (draft.prezzo != null && vocePrezzoEl) vocePrezzoEl.value = draft.prezzo;
       if (draft.tipoMisura != null && voceTipoMisuraEl) voceTipoMisuraEl.value = draft.tipoMisura;

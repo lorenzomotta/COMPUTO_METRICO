@@ -977,7 +977,7 @@
           <h3 id="voce-dialog-title">NUOVA VOCE</h3>
           <p id="voce-dialog-solo-unita-hint" class="voce-dialog-solo-unita-hint" hidden>
             Voce automatica o semiautomatica: puoi associare il testo VOCE (anche con CERCA VOCE), il
-            PREZZO e l'unità di misura. Con <strong>USA VOCE ESISTENTE</strong> scegli un testo esteso
+            PREZZO, il RIFERIMENTO e l'unità di misura. Con <strong>USA VOCE ESISTENTE</strong> scegli un testo esteso
             già scritto nel computo: viene copiato qui, insieme al prezzo. La voce breve resta, così
             più voci brevi possono usare lo stesso testo. Le misurazioni restano gestite dagli
             strumenti (VANI, PERIMETRALI, aperture…).
@@ -1020,22 +1020,23 @@
                 <input id="voce-prezzo" type="number" step="0.01" min="0" placeholder="0,00" required />
               </div>
             </div>
-            <div class="field">
-              <label for="voce-abbreviata">VOCE ABBREVIATA</label>
-              <input id="voce-abbreviata" type="text" placeholder="Testo breve (opzionale)" />
-            </div>
-            <div class="field">
-              <label for="voce-unita-misura">UNITA' MISURA</label>
-              <div class="voce-um-row">
+            <div class="voce-form-riga-meta">
+              <div class="field voce-field-compatta voce-field-abbreviata">
+                <label for="voce-abbreviata">VOCE ABBREVIATA</label>
+                <input id="voce-abbreviata" type="text" placeholder="Testo breve (opzionale)" />
+              </div>
+              <div class="field voce-field-compatta voce-field-um">
+                <label for="voce-unita-misura">UNITA' MISURA</label>
                 <select id="voce-unita-misura"></select>
-                <button
-                  id="voce-unita-add"
-                  type="button"
-                  class="btn-action btn-secondary"
-                  title="Aggiungi una nuova unità di misura"
-                >
-                  Aggiungi
-                </button>
+              </div>
+              <div class="field voce-field-compatta voce-field-rif">
+                <label for="voce-riferimento">RIFERIMENTO</label>
+                <input
+                  id="voce-riferimento"
+                  type="text"
+                  placeholder="Es: codice listino"
+                  autocomplete="off"
+                />
               </div>
             </div>
             <div class="field voce-field-full">

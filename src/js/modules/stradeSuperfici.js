@@ -1068,11 +1068,27 @@ function appendCellettaMq(tr, mqText, err, role) {
   tr.appendChild(tdMq);
 }
 
-function appendFormulaEMoltiplicatore(tr, item, classPrefix, ariaBase, { pezzi = false, lineare = false, primaMoltiplicatore = null } = {}) {
+/** Alza il riquadro della formula quando il testo va a capo o su più righe. */
+function adattaAltezzaFormula(el) {
+  if (!(el instanceof HTMLTextAreaElement)) return;
+  el.style.height = "auto";
+  const max = 160;
+  const next = Math.min(el.scrollHeight, max);
+  el.style.height = `${Math.max(next, 28)}px`;
+}
+
+function appendFormulaEMoltiplicatore(
+  tr,
+  item,
+  classPrefix,
+  ariaBase,
+  { pezzi = false, lineare = false, primaMoltiplicatore = null, multilinea = false } = {},
+) {
   const tdF = document.createElement("td");
   tdF.className = "strade-formula-cell";
-  const inpF = document.createElement("input");
-  inpF.type = "text";
+  const inpF = multilinea ? document.createElement("textarea") : document.createElement("input");
+  if (inpF instanceof HTMLTextAreaElement) inpF.rows = 1;
+  else inpF.type = "text";
   inpF.className = `${classPrefix}-formula`;
   inpF.placeholder = pezzi ? "opz. area 1 pezzo" : lineare ? "es. 12,5" : "es. 12,5 * 3,2";
   inpF.setAttribute(
@@ -1082,6 +1098,10 @@ function appendFormulaEMoltiplicatore(tr, item, classPrefix, ariaBase, { pezzi =
   inpF.autocomplete = "off";
   inpF.spellcheck = false;
   inpF.value = formulaArea(item);
+  if (inpF instanceof HTMLTextAreaElement) {
+    inpF.addEventListener("input", () => adattaAltezzaFormula(inpF));
+    queueMicrotask(() => adattaAltezzaFormula(inpF));
+  }
   tdF.appendChild(inpF);
   tr.appendChild(tdF);
   if (typeof primaMoltiplicatore === "function") primaMoltiplicatore(tr);
@@ -1326,6 +1346,7 @@ function renderAreeTable(tipo, zona) {
       {
         pezzi: isManufatti,
         lineare: isCordoli || isSegnaletica || isVarie || isFormulaUnitaVoce,
+        multilinea: conTipo,
         primaMoltiplicatore: isSegnaletica ? () => appendLarghezza(tr, area) : null,
       },
     );
@@ -1889,7 +1910,9 @@ export function syncZonaDaBlock(block, zona) {
     const tipoVar = row.querySelector(".strade-area-tipo-varie");
     const lar = row.querySelector(".strade-area-larghezza");
     if (rif instanceof HTMLInputElement) area.riferimento = rif.value;
-    if (formula instanceof HTMLInputElement) area.formula = formula.value;
+    if (formula instanceof HTMLInputElement || formula instanceof HTMLTextAreaElement) {
+      area.formula = formula.value;
+    }
     if (mol instanceof HTMLInputElement) area.moltiplicatore = mol.value;
     if (segno instanceof HTMLInputElement) area.segno = segno.checked;
     if (tipoMan instanceof HTMLSelectElement) area.tipoManufatto = normalizzaTipoManufatto(tipoMan.value);

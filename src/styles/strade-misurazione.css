@@ -208,18 +208,55 @@
   width: 15rem;
 }
 
+/* Lo spazio orizzontale libero va a Rif. e Formula, non alle colonne piccole. */
 #vista-strade .strade-aree-table--manufatti .strade-col-rif,
 #vista-strade .strade-aree-table--cordoli .strade-col-rif,
 #vista-strade .strade-aree-table--varie .strade-col-rif,
 #vista-strade .strade-aree-table--segnaletica .strade-col-rif {
-  width: 7.5rem;
+  width: 22%;
 }
 
 #vista-strade .strade-aree-table--manufatti .strade-col-formula,
 #vista-strade .strade-aree-table--cordoli .strade-col-formula,
 #vista-strade .strade-aree-table--varie .strade-col-formula,
 #vista-strade .strade-aree-table--segnaletica .strade-col-formula {
-  width: 9rem;
+  width: 36%;
+}
+
+#vista-strade .strade-aree-table--manufatti .strade-col-tipo,
+#vista-strade .strade-aree-table--cordoli .strade-col-tipo,
+#vista-strade .strade-aree-table--varie .strade-col-tipo,
+#vista-strade .strade-aree-table--segnaletica .strade-col-tipo {
+  width: 11rem;
+}
+
+#vista-strade .strade-aree-table--manufatti td,
+#vista-strade .strade-aree-table--cordoli td,
+#vista-strade .strade-aree-table--varie td,
+#vista-strade .strade-aree-table--segnaletica td {
+  vertical-align: top;
+}
+
+#vista-strade .strade-aree-table--manufatti .strade-formula-cell,
+#vista-strade .strade-aree-table--cordoli .strade-formula-cell,
+#vista-strade .strade-aree-table--varie .strade-formula-cell,
+#vista-strade .strade-aree-table--segnaletica .strade-formula-cell {
+  overflow: visible;
+}
+
+#vista-strade .strade-aree-table--manufatti .strade-area-formula,
+#vista-strade .strade-aree-table--cordoli .strade-area-formula,
+#vista-strade .strade-aree-table--varie .strade-area-formula,
+#vista-strade .strade-aree-table--segnaletica .strade-area-formula {
+  display: block;
+  resize: vertical;
+  min-height: 28px;
+  max-height: 10rem;
+  overflow-y: auto;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  font-family: inherit;
+  field-sizing: content;
 }
 
 #vista-strade .strade-col-lar {

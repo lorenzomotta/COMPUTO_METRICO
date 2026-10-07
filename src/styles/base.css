@@ -294,6 +294,46 @@ body {
   font-size: 0.8rem;
 }
 
+.voce-form-riga-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.voce-form-riga-meta .voce-field-compatta {
+  min-width: 0;
+  gap: 4px;
+}
+
+.voce-form-riga-meta .voce-field-compatta label {
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.voce-form-riga-meta .voce-field-abbreviata {
+  flex: 1.5 1 0;
+}
+
+.voce-form-riga-meta .voce-field-um {
+  flex: 0.8 1 7.2rem;
+  max-width: 11rem;
+}
+
+.voce-form-riga-meta .voce-field-rif {
+  flex: 1.1 1 0;
+}
+
+.voce-form-riga-meta #voce-abbreviata,
+.voce-form-riga-meta #voce-unita-misura,
+.voce-form-riga-meta #voce-riferimento {
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  font-size: 0.84rem;
+}
+
 .voce-testo-label-row {
   display: flex;
   align-items: center;
@@ -347,25 +387,6 @@ body {
 
 .voce-form .voce-field-full {
   grid-column: 1 / -1;
-}
-
-.voce-um-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: end;
-}
-
-.voce-um-row #voce-unita-misura {
-  width: 100%;
-  min-width: 0;
-}
-
-.voce-um-row .btn-action {
-  min-height: 34px;
-  padding: 7px 10px;
-  font-size: 0.8rem;
-  white-space: nowrap;
 }
 
 .voce-unita-nuovo-dialog {
