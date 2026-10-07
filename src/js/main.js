@@ -94,6 +94,7 @@ import { buildRivestimentiRowsFromStorage, buildRivestimentiElevazioneRowsFromSt
 import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
 import { syncEsterniMisurazioniNelleVoci } from "./modules/esterniVariSyncVoci.js";
 import { initVoceUsaEsistente } from "./modules/voceUsaEsistente.js";
+import { riferimentoPerAssociaVoceDaStrade } from "./modules/stradeRegistroAggiornaVoci.js";
 import {
   canUndoComputo,
   clearUndoComputo,
@@ -7710,18 +7711,18 @@ window.addEventListener("DOMContentLoaded", () => {
               const detailLine =
                 mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA
                   ? misurazioneDaStrade
-                    ? tipoOgPdf === "STRADA_MANUFATTO"
+                    ? tipoOgPdf === "STRADA_MANUFATTO" ||
+                      tipoOgPdf === "STRADA_FOGNA" ||
+                      tipoOgPdf === "STRADA_ALLACCI_FOGNA" ||
+                      tipoOgPdf === "STRADA_LUCE_PUBBLICA" ||
+                      tipoOgPdf === "STRADA_LUCE_PRIVATA" ||
+                      tipoOgPdf === "STRADA_GAS" ||
+                      tipoOgPdf === "STRADA_ACQUA" ||
+                      tipoOgPdf === "STRADA_TELEFONICA"
                       ? formatPdfDettaglioManufatto(m)
                       : tipoOgPdf === "STRADA_SEGNALETICA"
                         ? formatPdfDettaglioSegnaletica(m)
                         : tipoOgPdf === "STRADA_CORDOLI" ||
-                          tipoOgPdf === "STRADA_FOGNA" ||
-                          tipoOgPdf === "STRADA_ALLACCI_FOGNA" ||
-                          tipoOgPdf === "STRADA_LUCE_PUBBLICA" ||
-                          tipoOgPdf === "STRADA_LUCE_PRIVATA" ||
-                          tipoOgPdf === "STRADA_GAS" ||
-                          tipoOgPdf === "STRADA_ACQUA" ||
-                          tipoOgPdf === "STRADA_TELEFONICA" ||
                           tipoOgPdf === "STRADA_VARIE"
                         ? formatPdfDettaglioCordoli(m)
                         : formatPdfDettaglioStrada(m)
@@ -11556,7 +11557,7 @@ window.addEventListener("DOMContentLoaded", () => {
       vocePosizioneEl.value = String(row.posizione);
       popolaSelectCapitoliVoce(row.capitoloId || "");
       voceAbbreviataEl.value = row.voceAbbreviata || "";
-      if (voceRiferimentoEl) voceRiferimentoEl.value = row.riferimento || "";
+      if (voceRiferimentoEl) voceRiferimentoEl.value = riferimentoPerAssociaVoceDaStrade(row);
       renderVociUnitaOptions(row.unitaMisura || "");
       if (vocePrezzoEl) vocePrezzoEl.value = fmt2(row.prezzo ?? 0);
       if (voceTipoMisuraEl) voceTipoMisuraEl.value = normalizzaTipoMisuraVoce(row.tipoMisura);

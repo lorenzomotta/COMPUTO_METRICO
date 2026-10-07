@@ -6,11 +6,10 @@
  *   per ogni sottrazione di quello strato;
  * - sede stradale: aree automatiche Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti)
  *   per stesso riferimento (niente sottrazioni per-strato; Cordoli esclusi);
- * - manufatti: una voce per ogni tipo (non per strato); quantità = N° pezzi, unità n.;
+ * - manufatti, fogna, allacci fogna, luci, gas, acqua, telefonica:
+ *   una voce per ogni tipo (non per strato); quantità = N° pezzi, unità n.;
  * - cordoli: una voce per ogni tipo di cordolo (non per strato); quantità in ml (formula = lunghezza);
  * - segnaletica: una voce per ogni tipo; quantità = formula, oppure formula × larghezza (mq) se la larghezza c’è;
- * - segnaletica / fogna / allacci fogna / luci / gas / acqua / telefonica: formula × moltiplicatore;
- *   unità presa dalla voce dello strato (non forzata).
  */
 
 import { STORAGE_VOCI_ARCHIVIO_KEY } from "./archivioVociVocibrevi.js";
@@ -22,12 +21,14 @@ import {
   parseMoltiplicatoreArea,
   isZonaSedeStradale,
   isZonaManufatti,
+  isZonaComeManufatti,
   isZonaCordoli,
   isZonaSegnaletica,
   isZonaVarie,
   isZonaFormulaUnitaVoce,
   areeVirtualiSede,
   normalizzaTipoManufatto,
+  normalizzaTipoImpianto,
   normalizzaTipoCordolo,
   normalizzaTipoSegnaletica,
   normalizzaTipoVarie,
@@ -67,7 +68,7 @@ function isRigaSemiautoStrade(row) {
   return tipo === VOCE_MM_TIPO_SEMIAUTOMATICA && TIPI_OGGETTO.has(tipoOggetto);
 }
 
-function creaVoceManualeDaVocibreve({ idVoce, posizione, voceAbbreviata, unitaMisura }) {
+function creaVoceManualeDaVocibreve({ idVoce, posizione, voceAbbreviata, unitaMisura, riferimento }) {
   const ab = String(voceAbbreviata ?? "").trim();
   // Se unitaMisura è stringa (anche vuota), rispettala; altrimenti default mq.
   const unita =
@@ -76,6 +77,7 @@ function creaVoceManualeDaVocibreve({ idVoce, posizione, voceAbbreviata, unitaMi
     idVoce,
     posizione,
     voceAbbreviata: ab,
+    riferimento: typeof riferimento === "string" ? riferimento.trim() : "",
     unitaMisura: unita,
     prezzo: 0,
     tipoMisura: TIPOMISURA_VOCE_MANUALE,
@@ -108,22 +110,26 @@ function creaRigaArea({
   const specificaParts = [];
   if (nArea) specificaParts.push(`Area ${nArea}`);
   if (nStrato) specificaParts.push(`Strato ${nStrato}`);
-  const tipoMan = typeof area?.tipoManufatto === "string" ? area.tipoManufatto.trim() : "";
-  const tipoCor = typeof area?.tipoCordolo === "string" ? area.tipoCordolo.trim() : "";
-  const tipoSeg = typeof area?.tipoSegnaletica === "string" ? area.tipoSegnaletica.trim() : "";
-  const tipoVar = typeof area?.tipoVarie === "string" ? area.tipoVarie.trim() : "";
+  const tipoMan = normalizzaTipoManufatto(area?.tipoManufatto);
+  const tipoCor = normalizzaTipoCordolo(area?.tipoCordolo);
+  const tipoSeg = normalizzaTipoSegnaletica(area?.tipoSegnaletica);
+  const tipoVar = normalizzaTipoVarie(area?.tipoVarie);
+  const tipoImp = normalizzaTipoImpianto(tipoZona, area?.tipoImpianto);
   if (tipoMan) specificaParts.push(tipoMan);
   if (tipoCor) specificaParts.push(tipoCor);
   if (tipoSeg) specificaParts.push(tipoSeg);
   if (tipoVar) specificaParts.push(tipoVar);
+  if (tipoImp) specificaParts.push(tipoImp);
   if (formulaTxt) specificaParts.push(formulaTxt);
   const isSegnaletica = isZonaSegnaletica(tipoZona);
   const lar = isSegnaletica ? larghezzaArea(area) : null;
   if (lar != null) specificaParts.push(`larg. ${lar}`);
-  if (!isZonaManufatti(tipoZona) && mol !== 1) specificaParts.push(`×${mol}`);
+  const comeManufatti = isZonaManufatti(tipoZona) || isZonaComeManufatti(tipoZona);
+  if (!comeManufatti && mol !== 1) specificaParts.push(`×${mol}`);
   if (specificaExtra) specificaParts.push(specificaExtra);
   const specifica = specificaParts.join(" · ") || label;
   const isManufatti = isZonaManufatti(tipoZona);
+  const isComeManufatti = isZonaComeManufatti(tipoZona);
   const isCordoli = isZonaCordoli(tipoZona);
   const isVarie = isZonaVarie(tipoZona);
   const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipoZona) && !isSegnaletica;
@@ -133,7 +139,7 @@ function creaRigaArea({
   let misura2 = null;
   let misura3 = null;
   let numero = 1;
-  if (isManufatti) {
+  if (isManufatti || isComeManufatti) {
     // Quantità in VOCI = moltiplicatore (conteggio a numero).
     if (Number.isInteger(mol) && mol >= 0) {
       misura1 = 1;
@@ -217,6 +223,15 @@ function raccogliAbbrevDaScheda(snapshot) {
       }
       continue;
     }
+    if (isZonaComeManufatti(tipo)) {
+      for (const area of zona?.aree || []) {
+        const nome = normalizzaTipoImpianto(tipo, area?.tipoImpianto);
+        if (!nome) continue;
+        const key = abbrevKey(nome);
+        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_N });
+      }
+      continue;
+    }
     if (isZonaCordoli(tipo)) {
       for (const area of zona?.aree || []) {
         const nome = normalizzaTipoCordolo(area?.tipoCordolo);
@@ -282,6 +297,26 @@ function raccogliRighePerVoce(snapshot, voceKey) {
     if (isZonaManufatti(tipo)) {
       for (const area of aree) {
         const nome = normalizzaTipoManufatto(area?.tipoManufatto);
+        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        const dedupeKey = ["area", tipo, nome, String(area?.id ?? "")].join("|");
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        righe.push(
+          creaRigaArea({
+            pianoNome,
+            descrizione,
+            tipoZona: tipo,
+            area,
+            strato: null,
+            schedaId,
+          }),
+        );
+      }
+      continue;
+    }
+    if (isZonaComeManufatti(tipo)) {
+      for (const area of aree) {
+        const nome = normalizzaTipoImpianto(tipo, area?.tipoImpianto);
         if (!nome || abbrevKey(nome) !== voceKey) continue;
         const dedupeKey = ["area", tipo, nome, String(area?.id ?? "")].join("|");
         if (seen.has(dedupeKey)) continue;
@@ -417,6 +452,122 @@ function raccogliRighePerVoce(snapshot, voceKey) {
   return righe;
 }
 
+/** Testi della colonna Rif. delle aree che finiscono su questa voce. */
+function elencoRiferimentiPerVoce(snapshot, voceKey) {
+  const out = [];
+  const push = (raw) => {
+    const t = String(raw ?? "").trim();
+    if (t) out.push(t);
+  };
+  for (const tipo of TIPI_ZONA_STRADA) {
+    const zona = snapshot?.[tipo];
+    const aree = isZonaSedeStradale(tipo)
+      ? areeVirtualiSede(snapshot)
+      : Array.isArray(zona?.aree)
+        ? zona.aree
+        : [];
+    if (isZonaManufatti(tipo)) {
+      for (const area of aree) {
+        const nome = normalizzaTipoManufatto(area?.tipoManufatto);
+        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        push(area?.riferimento);
+      }
+      continue;
+    }
+    if (isZonaComeManufatti(tipo)) {
+      for (const area of aree) {
+        const nome = normalizzaTipoImpianto(tipo, area?.tipoImpianto);
+        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        push(area?.riferimento);
+      }
+      continue;
+    }
+    if (isZonaCordoli(tipo) || isZonaVarie(tipo) || isZonaSegnaletica(tipo)) {
+      for (const area of aree) {
+        const nome = isZonaCordoli(tipo)
+          ? normalizzaTipoCordolo(area?.tipoCordolo)
+          : isZonaVarie(tipo)
+            ? normalizzaTipoVarie(area?.tipoVarie)
+            : normalizzaTipoSegnaletica(area?.tipoSegnaletica);
+        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        const formulaTxt = String(area?.formula ?? "").trim();
+        if (!formulaTxt || evalFormulaArea(formulaTxt) == null) continue;
+        push(area?.riferimento);
+      }
+      continue;
+    }
+    const strati = Array.isArray(zona?.strati) ? zona.strati : [];
+    for (const st of strati) {
+      const vb = typeof st?.vocibreve === "string" ? st.vocibreve.trim() : "";
+      if (abbrevKey(vb) !== voceKey) continue;
+      for (const area of aree) {
+        const hasMqFisso = typeof area?.mqFisso === "number" && Number.isFinite(area.mqFisso);
+        const hasFormula = Boolean(String(area?.formula ?? "").trim());
+        if (!hasMqFisso && !hasFormula) continue;
+        if (hasMqFisso && area.mqFisso === 0) continue;
+        push(area?.riferimento);
+      }
+      if (isZonaSedeStradale(tipo)) continue;
+      for (const sott of st?.sottrazioni || []) {
+        if (!String(sott?.formula ?? "").trim()) continue;
+        push(sott?.riferimento);
+      }
+    }
+  }
+  return out;
+}
+
+function testoRiferimentiUnici(lista) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of lista) {
+    const t = String(raw ?? "").trim();
+    if (!t) continue;
+    const key = t.toLocaleLowerCase("it-IT");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+  }
+  return out.join(" · ");
+}
+
+const STORAGE_STRADE_REGISTRATI_KEY = "computo_metrico_strade_registrati";
+
+/**
+ * Riferimento da mostrare in ASSOCIA VOCE.
+ * Se sulla voce è già stato salvato, resta quello.
+ * Altrimenti prende il Rif. scritto in Misurazione STRADE.
+ * @param {{ voceAbbreviata?: string, riferimento?: string, misurazioniManuali?: object[] }} voce
+ */
+export function riferimentoPerAssociaVoceDaStrade(voce) {
+  const salvato = typeof voce?.riferimento === "string" ? voce.riferimento.trim() : "";
+  if (salvato) return salvato;
+  const mm = Array.isArray(voce?.misurazioniManuali) ? voce.misurazioniManuali : [];
+  const ids = new Set();
+  for (const row of mm) {
+    if (!isRigaSemiautoStrade(row)) continue;
+    const sid = typeof row?.stradeSchedaId === "string" ? row.stradeSchedaId.trim() : "";
+    if (sid) ids.add(sid);
+  }
+  if (ids.size === 0) return "";
+  let items = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_STRADE_REGISTRATI_KEY);
+    const data = raw ? JSON.parse(raw) : null;
+    items = Array.isArray(data?.items) ? data.items : [];
+  } catch {
+    return "";
+  }
+  const key = abbrevKey(voce?.voceAbbreviata);
+  const testi = [];
+  for (const snap of items) {
+    const id = snap?.id != null ? String(snap.id).trim() : "";
+    if (!ids.has(id)) continue;
+    testi.push(...elencoRiferimentiPerVoce(snap, key));
+  }
+  return testoRiferimentiUnici(testi);
+}
+
 /**
  * @param {{ id: string, pianoNome: string, descrizione?: string, ingombro?: object, marciapiedi?: object, aiuole?: object, parcheggi?: object, manufatti?: object, cordoli?: object, segnaletica?: object, fogna?: object, allacciFogna?: object, lucePubblica?: object, lucePrivata?: object, gas?: object, acqua?: object, telefonica?: object, sedeStradale?: object }} snapshot
  */
@@ -472,10 +623,21 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
     const mm = Array.isArray(item.misurazioniManuali) ? item.misurazioniManuali : [];
     const filtrati = mm.filter((row) => {
       if (!isRigaSemiautoStrade(row)) return true;
-      if (String(row?.tipoOggetto ?? "").trim().toUpperCase() !== "STRADA_MANUFATTO" &&
-          String(row?.tipoOggetto ?? "").trim().toUpperCase() !== "STRADA_CORDOLI" &&
-          String(row?.tipoOggetto ?? "").trim().toUpperCase() !== "STRADA_SEGNALETICA" &&
-          String(row?.tipoOggetto ?? "").trim().toUpperCase() !== "STRADA_VARIE") return true;
+      const tipoOg = String(row?.tipoOggetto ?? "").trim().toUpperCase();
+      const tipiDaRiscrivere = new Set([
+        "STRADA_MANUFATTO",
+        "STRADA_CORDOLI",
+        "STRADA_SEGNALETICA",
+        "STRADA_VARIE",
+        "STRADA_FOGNA",
+        "STRADA_ALLACCI_FOGNA",
+        "STRADA_LUCE_PUBBLICA",
+        "STRADA_LUCE_PRIVATA",
+        "STRADA_GAS",
+        "STRADA_ACQUA",
+        "STRADA_TELEFONICA",
+      ]);
+      if (!tipiDaRiscrivere.has(tipoOg)) return true;
       if (!schedaId) return true;
       const oldSid = typeof row.stradeSchedaId === "string" ? row.stradeSchedaId.trim() : "";
       return oldSid !== schedaId;
@@ -497,6 +659,7 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
         posizione: nextPos,
         voceAbbreviata: meta.label,
         unitaMisura: unitaNuova,
+        riferimento: testoRiferimentiUnici(elencoRiferimentiPerVoce(snapshot, key)),
       }),
     );
     keysGiaPresenti.add(key);
@@ -553,6 +716,11 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
     if (JSON.stringify(mmAggiornate) !== JSON.stringify(mmCorrenti)) {
       changed = true;
       item.misurazioniManuali = mmAggiornate;
+    }
+    const rifAuto = testoRiferimentiUnici(elencoRiferimentiPerVoce(snapshot, abbrevKey(ab)));
+    if (rifAuto && !String(item.riferimento ?? "").trim()) {
+      item.riferimento = rifAuto;
+      changed = true;
     }
   }
 

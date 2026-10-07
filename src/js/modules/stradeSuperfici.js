@@ -2,8 +2,9 @@
  * STRADE — zone di superficie, sede, poi impianti (segnaletica → acqua).
  * Le zone manuali hanno aree (formula × moltiplicatore, con «sottrai») e strati.
  * Cordoli: quantità a metro lineare (formula = lunghezza).
- * Zone formula/unità-voce (Segnaletica, Fogna, Allacci fogna, Luci, Gas, Acqua):
- *   formula × moltiplicatore; unità presa dalla voce dello strato.
+ * Segnaletica: formula × moltiplicatore, con larghezza facoltativa.
+ * Fogna, Allacci fogna, Luci, Gas, Acqua, Telefonica: come i Manufatti
+ *   (riferimento, tipo, formula, N° pezzi). Ogni tipo è una voce a numero.
  * Sede stradale: aree automatiche
  * Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti con area)
  * a parità di riferimento; si possono solo aggiungere strati.
@@ -44,9 +45,11 @@ export const TIPO_TELEFONICA = "telefonica";
 export const TIPO_VARIE = "varie";
 export const TIPO_SEDE_STRADALE = "sedeStradale";
 
-/** Zone con formula × mol; unità dalla voce; fuori dal calcolo Sede. */
-export const TIPI_ZONA_FORMULA_UNITA_VOCE = /** @type {const} */ ([
-  TIPO_SEGNALETICA,
+/** Segnaletica: formula × moltiplicatore, fuori dal calcolo Sede. */
+export const TIPI_ZONA_FORMULA_UNITA_VOCE = /** @type {const} */ ([TIPO_SEGNALETICA]);
+
+/** Stessa tabella dei Manufatti: Rif., tipo, formula, N° pezzi. Fuori dal calcolo Sede. */
+export const TIPI_ZONA_COME_MANUFATTI = /** @type {const} */ ([
   TIPO_FOGNA,
   TIPO_ALLACCI_FOGNA,
   TIPO_LUCE_PUBBLICA,
@@ -65,7 +68,8 @@ export const TIPI_ZONA_STRADA = /** @type {const} */ ([
   "manufatti",
   "cordoli",
   TIPO_SEDE_STRADALE,
-  ...TIPI_ZONA_FORMULA_UNITA_VOCE,
+  TIPO_SEGNALETICA,
+  ...TIPI_ZONA_COME_MANUFATTI,
   TIPO_VARIE,
 ]);
 
@@ -154,7 +158,14 @@ export function isZonaVarie(tipo) {
   return tipo === TIPO_VARIE;
 }
 
-/** Segnaletica, Fogna, Allacci fogna, Luci, Gas, Acqua, Telefonica. */
+/** Fogna, Allacci fogna, Luci, Gas, Acqua, Telefonica. */
+export function isZonaComeManufatti(tipo) {
+  return TIPI_ZONA_COME_MANUFATTI.includes(
+    /** @type {typeof TIPI_ZONA_COME_MANUFATTI[number]} */ (tipo),
+  );
+}
+
+/** Segnaletica. */
 export function isZonaFormulaUnitaVoce(tipo) {
   return TIPI_ZONA_FORMULA_UNITA_VOCE.includes(
     /** @type {typeof TIPI_ZONA_FORMULA_UNITA_VOCE[number]} */ (tipo),
@@ -163,7 +174,12 @@ export function isZonaFormulaUnitaVoce(tipo) {
 
 /** Cordoli / impianti: non sottraggono mq dalla Sede; niente spessore → volume. */
 export function isZonaEsclusaDaSede(tipo) {
-  return isZonaCordoli(tipo) || isZonaFormulaUnitaVoce(tipo) || isZonaVarie(tipo);
+  return (
+    isZonaCordoli(tipo) ||
+    isZonaFormulaUnitaVoce(tipo) ||
+    isZonaVarie(tipo) ||
+    isZonaComeManufatti(tipo)
+  );
 }
 
 function chiaveTipoManufatto(raw) {
@@ -436,6 +452,88 @@ export function normalizzaTipoVarie(raw) {
   return aggiunto.ok ? aggiunto.nome : "";
 }
 
+const STORAGE_TIPI_IMPIANTO = {
+  fogna: "computo_metrico_strade_tipi_fogna",
+  allacciFogna: "computo_metrico_strade_tipi_allacci_fogna",
+  lucePubblica: "computo_metrico_strade_tipi_luce_pubblica",
+  lucePrivata: "computo_metrico_strade_tipi_luce_privata",
+  gas: "computo_metrico_strade_tipi_gas",
+  acqua: "computo_metrico_strade_tipi_acqua",
+  telefonica: "computo_metrico_strade_tipi_telefonica",
+};
+
+function storageTipiImpianto(tipo) {
+  return STORAGE_TIPI_IMPIANTO[tipo] || "";
+}
+
+function loadTipiImpiantoExtra(tipo) {
+  const key = storageTipiImpianto(tipo);
+  if (!key) return [];
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTipiImpiantoExtra(tipo, nomi) {
+  const key = storageTipiImpianto(tipo);
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(nomi));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function elencoTipiImpianto(tipo) {
+  const out = [];
+  const seen = new Set();
+  for (const extra of loadTipiImpiantoExtra(tipo)) {
+    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
+    const key = chiaveTipoManufatto(nome);
+    if (!nome || seen.has(key)) continue;
+    seen.add(key);
+    out.push(nome);
+  }
+  return out;
+}
+
+/**
+ * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
+ */
+export function aggiungiTipoImpianto(tipo, raw) {
+  const etichetta = ZONA_LABELS[tipo] || "questa scheda";
+  if (!isZonaComeManufatti(tipo)) {
+    return { ok: false, nome: "", errore: "Questo tipo non si aggiunge in questa scheda.", giaPresente: false };
+  }
+  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return { ok: false, nome: "", errore: `Scrivi il nome del nuovo tipo di ${etichetta}.`, giaPresente: false };
+  if (nome.length > 60) {
+    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
+  }
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiImpianto(tipo).find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
+  const extra = loadTipiImpiantoExtra(tipo);
+  extra.push(nome);
+  saveTipiImpiantoExtra(tipo, extra);
+  return { ok: true, nome, errore: "", giaPresente: false };
+}
+
+export function normalizzaTipoImpianto(tipo, raw) {
+  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!nome || !isZonaComeManufatti(tipo)) return "";
+  const key = chiaveTipoManufatto(nome);
+  const noto = elencoTipiImpianto(tipo).find((x) => chiaveTipoManufatto(x) === key);
+  if (noto) return noto;
+  const aggiunto = aggiungiTipoImpianto(tipo, nome);
+  return aggiunto.ok ? aggiunto.nome : "";
+}
+
 /** Larghezza vuota = nulla (la quantità resta la formula). Numero ≥ 0 = metri, e la quantità diventa mq. */
 export function larghezzaArea(area) {
   const txt = String(area?.larghezza ?? "").trim();
@@ -680,6 +778,7 @@ export function emptyAreaStrada(nextId, n = 1) {
     tipoCordolo: "",
     tipoSegnaletica: "",
     tipoVarie: "",
+    tipoImpianto: "",
     larghezza: "",
   };
 }
@@ -707,6 +806,7 @@ export function duplicaAreaStrada(area, nextId, n) {
     tipoCordolo: normalizzaTipoCordolo(src.tipoCordolo),
     tipoSegnaletica: normalizzaTipoSegnaletica(src.tipoSegnaletica),
     tipoVarie: normalizzaTipoVarie(src.tipoVarie),
+    tipoImpianto: typeof src.tipoImpianto === "string" ? src.tipoImpianto.trim().replace(/\s+/g, " ") : "",
     larghezza: typeof src.larghezza === "string" ? src.larghezza : src.larghezza != null ? String(src.larghezza) : "",
   };
 }
@@ -785,7 +885,7 @@ export function rinumeraSottrazioniStrato(strato) {
   });
 }
 
-function sanificaArea(row, nextId, n) {
+function sanificaArea(row, nextId, n, tipoZona) {
   const src = row && typeof row === "object" ? row : {};
   const id = typeof src.id === "number" && Number.isFinite(src.id) ? src.id : nextId();
   return {
@@ -799,6 +899,7 @@ function sanificaArea(row, nextId, n) {
     tipoCordolo: normalizzaTipoCordolo(src.tipoCordolo),
     tipoSegnaletica: normalizzaTipoSegnaletica(src.tipoSegnaletica),
     tipoVarie: normalizzaTipoVarie(src.tipoVarie),
+    tipoImpianto: normalizzaTipoImpianto(tipoZona, src.tipoImpianto),
     larghezza: typeof src.larghezza === "string" ? src.larghezza : src.larghezza != null ? String(src.larghezza) : "",
   };
 }
@@ -830,7 +931,7 @@ function sanificaStrato(row, nextId, n) {
   };
 }
 
-export function sanificaZonaStrada(raw, nextId) {
+export function sanificaZonaStrada(raw, nextId, tipoZona) {
   const base = emptyZonaStrada(nextId);
   if (!raw || typeof raw !== "object") return base;
   const src = /** @type {Record<string, unknown>} */ (raw);
@@ -840,7 +941,7 @@ export function sanificaZonaStrada(raw, nextId) {
   base.aree =
     areeSrc.length === 0
       ? [emptyAreaStrada(nextId, 1)]
-      : areeSrc.map((a, i) => sanificaArea(a, nextId, i + 1));
+      : areeSrc.map((a, i) => sanificaArea(a, nextId, i + 1, tipoZona));
 
   const stratSrc = Array.isArray(src.strati)
     ? src.strati.filter((x) => x && typeof x === "object")
@@ -872,13 +973,13 @@ export function sanificaSchedaStrade(raw, nextId) {
   const src = raw && typeof raw === "object" ? raw : {};
   const out = {};
   for (const tipo of TIPI_ZONA_MANUALE) {
-    out[tipo] = sanificaZonaStrada(src[tipo], nextId);
+    out[tipo] = sanificaZonaStrada(src[tipo], nextId, tipo);
   }
   out.sedeStradale = sanificaZonaSedeStradale(src.sedeStradale, nextId);
   return out;
 }
 
-export function cloneZonaPerSnapshot(zona) {
+export function cloneZonaPerSnapshot(zona, tipoZona) {
   const src = zona && typeof zona === "object" ? zona : {};
   const aree = Array.isArray(src.aree) ? src.aree : [];
   const strati = Array.isArray(src.strati) ? src.strati : [];
@@ -895,6 +996,7 @@ export function cloneZonaPerSnapshot(zona) {
       tipoCordolo: normalizzaTipoCordolo(a?.tipoCordolo),
       tipoSegnaletica: normalizzaTipoSegnaletica(a?.tipoSegnaletica),
       tipoVarie: normalizzaTipoVarie(a?.tipoVarie),
+      tipoImpianto: normalizzaTipoImpianto(tipoZona, a?.tipoImpianto),
       larghezza: typeof a?.larghezza === "string" ? a.larghezza : a?.larghezza != null ? String(a.larghezza) : "",
     })),
     strati: strati.map((st, i) => ({
@@ -916,7 +1018,7 @@ export function cloneZonaPerSnapshot(zona) {
 export function cloneSchedaPerSnapshot(scheda) {
   const out = {};
   for (const tipo of TIPI_ZONA_STRADA) {
-    out[tipo] = cloneZonaPerSnapshot(scheda?.[tipo]);
+    out[tipo] = cloneZonaPerSnapshot(scheda?.[tipo], tipo);
   }
   return out;
 }
@@ -936,6 +1038,13 @@ export function zonaHaMisuraCompilata(tipo, zona, schedaCompleta) {
       (a) =>
         Boolean(String(a?.formula ?? "").trim()) ||
         Boolean(String(a?.tipoManufatto ?? "").trim()),
+    );
+  }
+  if (isZonaComeManufatti(tipo)) {
+    return aree.some(
+      (a) =>
+        Boolean(String(a?.formula ?? "").trim()) ||
+        Boolean(String(a?.tipoImpianto ?? "").trim()),
     );
   }
   if (isZonaCordoli(tipo)) {
@@ -976,6 +1085,10 @@ export function zonaManufattiHaTipo(zona) {
   return (zona?.aree || []).some((a) => Boolean(normalizzaTipoManufatto(a?.tipoManufatto)));
 }
 
+export function zonaImpiantoHaTipo(tipo, zona) {
+  return (zona?.aree || []).some((a) => Boolean(normalizzaTipoImpianto(tipo, a?.tipoImpianto)));
+}
+
 export function zonaCordoliHaTipo(zona) {
   return (zona?.aree || []).some((a) => Boolean(normalizzaTipoCordolo(a?.tipoCordolo)));
 }
@@ -995,6 +1108,10 @@ export function schedaStradeHaDatiRegistrabili(schedaCompleta) {
     if (!zonaHaMisuraCompilata(tipo, zona, schedaCompleta)) continue;
     if (isZonaManufatti(tipo)) {
       if (zonaManufattiHaTipo(zona)) return true;
+      continue;
+    }
+    if (isZonaComeManufatti(tipo)) {
+      if (zonaImpiantoHaTipo(tipo, zona)) return true;
       continue;
     }
     if (isZonaCordoli(tipo)) {
@@ -1023,6 +1140,10 @@ export function elencoZoneMisuraSenzaVoce(schedaCompleta) {
     if (!zonaHaMisuraCompilata(tipo, zona, schedaCompleta)) continue;
     if (isZonaManufatti(tipo)) {
       if (!zonaManufattiHaTipo(zona)) out.push("Manufatti (scegli il tipo)");
+      continue;
+    }
+    if (isZonaComeManufatti(tipo)) {
+      if (!zonaImpiantoHaTipo(tipo, zona)) out.push(`${ZONA_LABELS[tipo] || tipo} (scegli il tipo)`);
       continue;
     }
     if (isZonaCordoli(tipo)) {
@@ -1082,7 +1203,7 @@ function appendFormulaEMoltiplicatore(
   item,
   classPrefix,
   ariaBase,
-  { pezzi = false, lineare = false, primaMoltiplicatore = null, multilinea = false } = {},
+  { pezzi = false, lineare = false, primaMoltiplicatore = null, multilinea = false, sottraeSede = true } = {},
 ) {
   const tdF = document.createElement("td");
   tdF.className = "strade-formula-cell";
@@ -1118,7 +1239,9 @@ function appendFormulaEMoltiplicatore(
     pezzi ? `Numero pezzi ${ariaBase}` : `Moltiplicatore ${ariaBase}`,
   );
   inpM.title = pezzi
-    ? "Quanti pezzi contare nelle VOCI (vuoto = 1). Se c’è una formula, quell’area × pezzi si toglie dalla Sede."
+    ? sottraeSede
+      ? "Quanti pezzi contare nelle VOCI (vuoto = 1). Se c’è una formula, quell’area × pezzi si toglie dalla Sede."
+      : "Quanti pezzi contare nelle VOCI (vuoto = 1)."
     : lineare
       ? "Ripete il risultato della formula (vuoto = 1)"
       : "Moltiplica il risultato della formula (vuoto = 1)";
@@ -1235,16 +1358,41 @@ function appendTipoManufatto(tr, area) {
   tr.appendChild(td);
 }
 
+function appendTipoImpianto(tr, area, tipo) {
+  const td = document.createElement("td");
+  td.className = "strade-tipo-cell";
+  const sel = document.createElement("select");
+  sel.className = "strade-area-tipo-impianto";
+  const etichetta = ZONA_LABELS[tipo] || "impianto";
+  sel.setAttribute("aria-label", `Tipo ${etichetta}`);
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "— scegli —";
+  sel.appendChild(empty);
+  for (const t of elencoTipiImpianto(tipo)) {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    sel.appendChild(opt);
+  }
+  sel.value = normalizzaTipoImpianto(tipo, area?.tipoImpianto);
+  td.appendChild(sel);
+  tr.appendChild(td);
+}
+
 function renderAreeTable(tipo, zona) {
   const wrap = document.createElement("div");
   wrap.className = "vani-sup-section";
   const isManufatti = isZonaManufatti(tipo);
+  const isImpianto = isZonaComeManufatti(tipo);
+  const comeManufatti = isManufatti || isImpianto;
   const isCordoli = isZonaCordoli(tipo);
   const isSegnaletica = isZonaSegnaletica(tipo);
   const isVarie = isZonaVarie(tipo);
   const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipo) && !isSegnaletica;
   const unitaCol = isCordoli ? "Ml" : isFormulaUnitaVoce || isVarie ? "Ris." : "Mq";
   const titoloSezione = isCordoli ? "Lunghezze" : isFormulaUnitaVoce || isVarie ? "Calcoli" : "Aree";
+  const etichettaTipo = ZONA_LABELS[tipo] || tipo;
 
   const head = document.createElement("div");
   head.className = "vani-sup-section-head";
@@ -1254,8 +1402,8 @@ function renderAreeTable(tipo, zona) {
   const tableWrap = document.createElement("div");
   tableWrap.className = "vani-sup-table-wrap";
   const table = document.createElement("table");
-  table.className = isManufatti
-    ? "vani-sup-aree-table strade-aree-table--manufatti"
+  table.className = comeManufatti
+    ? `vani-sup-aree-table strade-aree-table--${isImpianto ? "impianto" : "manufatti"}`
     : isCordoli
       ? "vani-sup-aree-table strade-aree-table--cordoli"
       : isSegnaletica
@@ -1263,15 +1411,15 @@ function renderAreeTable(tipo, zona) {
         : isVarie
           ? "vani-sup-aree-table strade-aree-table--varie"
           : "vani-sup-aree-table";
-  const conTipo = isManufatti || isCordoli || isSegnaletica || isVarie;
-  table.innerHTML = isManufatti
+  const conTipo = comeManufatti || isCordoli || isSegnaletica || isVarie;
+  table.innerHTML = comeManufatti
     ? `<colgroup>
     <col class="strade-col-n"><col class="strade-col-rif"><col class="strade-col-tipo">
     <col class="strade-col-formula"><col class="strade-col-mol"><col class="strade-col-mq">
     <col class="strade-col-sottrai"><col class="strade-col-act">
   </colgroup>
   <thead><tr>
-    <th>N°</th><th>Rif.</th><th>Tipo manufatto</th><th>Formula</th><th>N° pezzi</th><th>Mq</th><th>Sottrai</th><th></th>
+    <th>N°</th><th>Rif.</th><th>${escapeHtml(isManufatti ? "Tipo manufatto" : `Tipo ${etichettaTipo.toLocaleLowerCase("it-IT")}`)}</th><th>Formula</th><th>N° pezzi</th><th>Mq</th><th>Sottrai</th><th></th>
   </tr></thead>`
     : isCordoli
       ? `<colgroup>
@@ -1334,6 +1482,7 @@ function renderAreeTable(tipo, zona) {
     tr.appendChild(tdRif);
 
     if (isManufatti) appendTipoManufatto(tr, area);
+    if (isImpianto) appendTipoImpianto(tr, area, tipo);
     if (isCordoli) appendTipoCordolo(tr, area);
     if (isSegnaletica) appendTipoSegnaletica(tr, area);
     if (isVarie) appendTipoVarie(tr, area);
@@ -1344,9 +1493,10 @@ function renderAreeTable(tipo, zona) {
       "strade-area",
       isCordoli ? "lunghezza" : isSegnaletica ? "segnaletica" : isVarie || isFormulaUnitaVoce ? "calcolo" : "area",
       {
-        pezzi: isManufatti,
+        pezzi: comeManufatti,
         lineare: isCordoli || isSegnaletica || isVarie || isFormulaUnitaVoce,
         multilinea: conTipo,
+        sottraeSede: isManufatti,
         primaMoltiplicatore: isSegnaletica ? () => appendLarghezza(tr, area) : null,
       },
     );
@@ -1427,6 +1577,8 @@ function renderAreeTable(tipo, zona) {
       ? "Risultato netto (base per gli strati; unità = voce)"
       : isVarie
         ? "Risultato netto (unità = voce del tipo)"
+        : isImpianto
+          ? "Mq netto (formula × pezzi; non entra nella Sede)"
       : "Mq netto zona (base per gli strati)";
   const tfoot = document.createElement("tfoot");
   tfoot.innerHTML = `
@@ -1449,6 +1601,7 @@ function renderAreeTable(tipo, zona) {
   tableWrap.appendChild(table);
   wrap.appendChild(tableWrap);
   if (isManufatti) wrap.appendChild(renderNuovoTipoManufatto());
+  if (isImpianto) wrap.appendChild(renderNuovoTipoImpianto(tipo));
   if (isCordoli) wrap.appendChild(renderNuovoTipoCordolo());
   if (isSegnaletica) wrap.appendChild(renderNuovoTipoSegnaletica());
   if (isVarie) wrap.appendChild(renderNuovoTipoVarie());
@@ -1534,6 +1687,29 @@ function renderNuovoTipoManufatto() {
   btn.type = "button";
   btn.className = "btn-action btn-secondary";
   btn.dataset.action = "aggiungi-tipo-manufatto";
+  btn.textContent = "Aggiungi tipo";
+  box.append(label, inp, btn);
+  return box;
+}
+
+function renderNuovoTipoImpianto(tipo) {
+  const etichetta = ZONA_LABELS[tipo] || "impianto";
+  const box = document.createElement("div");
+  box.className = "strade-nuovo-tipo";
+  const label = document.createElement("label");
+  label.className = "strade-nuovo-tipo-label";
+  label.textContent = `Nuovo tipo ${etichetta.toLocaleLowerCase("it-IT")}`;
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "strade-nuovo-tipo-nome";
+  inp.placeholder = "es. Tubo";
+  inp.setAttribute("aria-label", `Nome del nuovo tipo di ${etichetta}`);
+  inp.autocomplete = "off";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-action btn-secondary";
+  btn.dataset.action = "aggiungi-tipo-impianto";
+  btn.dataset.tipoZona = tipo;
   btn.textContent = "Aggiungi tipo";
   box.append(label, inp, btn);
   return box;
@@ -1867,6 +2043,8 @@ export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }
           ? "Scegli il tipo di segnaletica, oppure aggiungine uno nuovo. Ogni tipo diventa una voce nelle VOCI. In Formula metti la misura (es. 12,5). La larghezza puoi lasciarla vuota: la quantità resta quella della formula e l’unità la scegli in VOCI. Se scrivi la larghezza in metri, la quantità diventa mq (formula × larghezza). Non viene sottratta dalla Sede."
           : isZonaVarie(tipo)
             ? "Scegli il tipo (per ora Reinterro, oppure aggiungine uno nuovo). Ogni tipo diventa una voce nelle VOCI: lì scegli l’unità di misura e il prezzo. In Formula scrivi il calcolo (es. 12,5 oppure 2*3*0,4). Il risultato va in quella voce. Varie non entra nella Sede stradale."
+            : isZonaComeManufatti(tipo)
+              ? "Scegli il tipo, oppure aggiungine uno nuovo sotto la tabella. Ogni tipo diventa una voce nelle VOCI: lì scrivi la descrizione e il prezzo. Il campo N° pezzi è la quantità, a numero. La formula è facoltativa. Questa scheda non viene sottratta dalla Sede stradale."
             : isZonaFormulaUnitaVoce(tipo)
           ? "In Formula scrivi il calcolo (es. 2 oppure 1,2*3). Il moltiplicatore ripete quel risultato. L’unità di misura (n., ml., mq., a corpo…) la decide la Voce dello strato nelle VOCI. Questa scheda non viene sottratta dalla Sede stradale."
           : "In Formula puoi scrivere un’espressione (es. 12,5 * 3,2 oppure (10+2)/2). Il moltiplicatore (default 1) ripete quel risultato: 4, 1,5, 10… quello che ti serve. Il segno «sottrai» toglie quell’area da tutta la zona. Ogni strato parte da quel mq netto: puoi togliere altre aree solo da quello strato.";
@@ -1883,7 +2061,7 @@ export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }
     );
   } else {
     block.appendChild(renderAreeTable(tipo, data));
-    if (!isZonaManufatti(tipo) && !isZonaCordoli(tipo) && !isZonaSegnaletica(tipo) && !isZonaVarie(tipo)) {
+    if (!isZonaManufatti(tipo) && !isZonaComeManufatti(tipo) && !isZonaCordoli(tipo) && !isZonaSegnaletica(tipo) && !isZonaVarie(tipo)) {
       block.appendChild(renderStratiCards(tipo, data, datalistId));
     }
   }
@@ -1908,6 +2086,7 @@ export function syncZonaDaBlock(block, zona) {
     const tipoCor = row.querySelector(".strade-area-tipo-cordolo");
     const tipoSeg = row.querySelector(".strade-area-tipo-segnaletica");
     const tipoVar = row.querySelector(".strade-area-tipo-varie");
+    const tipoImp = row.querySelector(".strade-area-tipo-impianto");
     const lar = row.querySelector(".strade-area-larghezza");
     if (rif instanceof HTMLInputElement) area.riferimento = rif.value;
     if (formula instanceof HTMLInputElement || formula instanceof HTMLTextAreaElement) {
@@ -1919,6 +2098,9 @@ export function syncZonaDaBlock(block, zona) {
     if (tipoCor instanceof HTMLSelectElement) area.tipoCordolo = normalizzaTipoCordolo(tipoCor.value);
     if (tipoSeg instanceof HTMLSelectElement) area.tipoSegnaletica = normalizzaTipoSegnaletica(tipoSeg.value);
     if (tipoVar instanceof HTMLSelectElement) area.tipoVarie = normalizzaTipoVarie(tipoVar.value);
+    if (tipoImp instanceof HTMLSelectElement) {
+      area.tipoImpianto = normalizzaTipoImpianto(block.dataset.tipoZona || "", tipoImp.value);
+    }
     if (lar instanceof HTMLInputElement) area.larghezza = lar.value;
   });
 

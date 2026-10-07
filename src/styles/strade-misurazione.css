@@ -210,6 +210,7 @@
 
 /* Lo spazio orizzontale libero va a Rif. e Formula, non alle colonne piccole. */
 #vista-strade .strade-aree-table--manufatti .strade-col-rif,
+#vista-strade .strade-aree-table--impianto .strade-col-rif,
 #vista-strade .strade-aree-table--cordoli .strade-col-rif,
 #vista-strade .strade-aree-table--varie .strade-col-rif,
 #vista-strade .strade-aree-table--segnaletica .strade-col-rif {
@@ -217,6 +218,7 @@
 }
 
 #vista-strade .strade-aree-table--manufatti .strade-col-formula,
+#vista-strade .strade-aree-table--impianto .strade-col-formula,
 #vista-strade .strade-aree-table--cordoli .strade-col-formula,
 #vista-strade .strade-aree-table--varie .strade-col-formula,
 #vista-strade .strade-aree-table--segnaletica .strade-col-formula {
@@ -224,6 +226,7 @@
 }
 
 #vista-strade .strade-aree-table--manufatti .strade-col-tipo,
+#vista-strade .strade-aree-table--impianto .strade-col-tipo,
 #vista-strade .strade-aree-table--cordoli .strade-col-tipo,
 #vista-strade .strade-aree-table--varie .strade-col-tipo,
 #vista-strade .strade-aree-table--segnaletica .strade-col-tipo {
@@ -231,6 +234,7 @@
 }
 
 #vista-strade .strade-aree-table--manufatti td,
+#vista-strade .strade-aree-table--impianto td,
 #vista-strade .strade-aree-table--cordoli td,
 #vista-strade .strade-aree-table--varie td,
 #vista-strade .strade-aree-table--segnaletica td {
@@ -238,6 +242,7 @@
 }
 
 #vista-strade .strade-aree-table--manufatti .strade-formula-cell,
+#vista-strade .strade-aree-table--impianto .strade-formula-cell,
 #vista-strade .strade-aree-table--cordoli .strade-formula-cell,
 #vista-strade .strade-aree-table--varie .strade-formula-cell,
 #vista-strade .strade-aree-table--segnaletica .strade-formula-cell {
@@ -245,6 +250,7 @@
 }
 
 #vista-strade .strade-aree-table--manufatti .strade-area-formula,
+#vista-strade .strade-aree-table--impianto .strade-area-formula,
 #vista-strade .strade-aree-table--cordoli .strade-area-formula,
 #vista-strade .strade-aree-table--varie .strade-area-formula,
 #vista-strade .strade-aree-table--segnaletica .strade-area-formula {
