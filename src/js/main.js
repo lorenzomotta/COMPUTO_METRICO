@@ -94,6 +94,7 @@ import { buildRivestimentiRowsFromStorage, buildRivestimentiElevazioneRowsFromSt
 import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
 import { syncEsterniMisurazioniNelleVoci } from "./modules/esterniVariSyncVoci.js";
 import { initVoceUsaEsistente } from "./modules/voceUsaEsistente.js";
+import { initCapitolato } from "./modules/capitolato.js";
 import { riferimentoPerAssociaVoceDaStrade } from "./modules/stradeRegistroAggiornaVoci.js";
 import {
   canUndoComputo,
@@ -388,6 +389,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const STORAGE_CAMMINAMENTI_ESTERNI = "computo_metrico_esterni_vari_camminamenti";
   const STORAGE_MISURAZIONI_VARIE = "computo_metrico_misurazioni_varie";
   const STORAGE_VOCI = "computo_metrico_voci";
+  const STORAGE_CAPITOLATO_LIBERE = "computo_metrico_capitolato_libere";
   const STORAGE_VOCI_UNITA_OPTIONS = "computo_metrico_voci_unita_options";
   const STORAGE_ARCHIVIO_CAPITOLI = ARCHIVIO_CAPITOLI_STORAGE_KEY;
   const STORAGE_IFC_DATA = "computo_metrico_ifc_data";
@@ -435,6 +437,9 @@ window.addEventListener("DOMContentLoaded", () => {
   let misurazioniVarie = [];
   /** @type {{ idVoce: number, posizione: number, voceAbbreviata: string, riferimento?: string, unitaMisura: string, prezzo: number, tipoMisura: string, voce: string, note: string, misurazioniManuali?: { tipo?: string, piano: string, riferimento: string, tipoOggetto?: string, specifica?: string, formula: string, formulaValue: number|null, misura1?: number|null, misura2?: number|null, misura3?: number|null, canaleGronda?: boolean, grondaCanaleValore?: number|null, numero: number, segno: boolean, risultato: number, apertureCollegate?: { idAperturaMaster?: string, idApertura?: string, locale?: string, largh?: number, alt?: number, percentuale?: number, hDav?: number, ante?: number, tipologia?: string, falso?: string, scuro?: string, inferiata?: string, zanzariera?: string }[] }[] }[]} */
   let voci = [];
+  /** Dicitura di capitolato non ancora collegata a una voce breve. Non entra nell'elenco VOCI. */
+  let capitolatoLibere = [];
+  let capitolatoLibereId = 1;
   /** @type {{ idAperturaMaster: string, piano: string, zona?: string, locale: string, largh: number, alt: number, percentuale: number, hDav: number, ante: number, tipologia: string, falso: string, scuro: string, inferiata: string, zanzariera: string, controdavanzale: string }[]} */
   let apertureMaster = [];
   /** @type {string[]} */
@@ -1850,6 +1855,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("computo-voci-storage-externally-updated", () => {
     loadVoci();
+    loadCapitolatoLibere();
     // Stesse voci speciali che si aggiornano dopo VANI / aperture:
     // DAVANZALI, SOGLIE, CANALI, FALSI TELAI + voci per tipologia apertura.
     syncVociDerivateDaApertureMaster();
@@ -2198,6 +2204,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function saveVoci() {
     localStorage.setItem(STORAGE_VOCI, JSON.stringify(voci));
+    segnaComputoModificatoPerExportJson();
+  }
+
+  function saveCapitolatoLibere() {
+    localStorage.setItem(STORAGE_CAPITOLATO_LIBERE, JSON.stringify(capitolatoLibere));
     segnaComputoModificatoPerExportJson();
   }
 
@@ -2913,6 +2924,54 @@ window.addEventListener("DOMContentLoaded", () => {
       voci = [];
       voceIdCounter = 1;
     }
+  }
+
+  function loadCapitolatoLibere() {
+    try {
+      const raw = localStorage.getItem(STORAGE_CAPITOLATO_LIBERE);
+      if (!raw) {
+        capitolatoLibere = [];
+        capitolatoLibereId = 1;
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        capitolatoLibere = [];
+        capitolatoLibereId = 1;
+        return;
+      }
+      capitolatoLibere = parsed
+        .filter((item) => item && typeof item.voce === "string")
+        .map((item, index) => ({
+          id: typeof item.id === "number" && item.id > 0 ? item.id : index + 1,
+          voce: String(item.voce).replace(/\s+/g, " ").trim(),
+          unitaMisura:
+            typeof item.unitaMisura === "string" && item.unitaMisura.trim() !== ""
+              ? item.unitaMisura.trim()
+              : UNITA_MISURA_DEFAULT_OPTIONS[0],
+          prezzo: parseNonNegativeDecimal2(item.prezzo) ?? 0,
+        }))
+        .filter((item) => item.voce.length >= 50);
+      capitolatoLibereId =
+        capitolatoLibere.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+    } catch {
+      capitolatoLibere = [];
+      capitolatoLibereId = 1;
+    }
+  }
+
+  function vociPerCapitolato() {
+    const extra = capitolatoLibere.map((item) => ({
+      idVoce: -item.id,
+      posizione: Number.MAX_SAFE_INTEGER,
+      voceAbbreviata: "",
+      riferimento: "",
+      unitaMisura: item.unitaMisura,
+      prezzo: item.prezzo,
+      voce: item.voce,
+      soloCapitolato: true,
+    }));
+    return [...voci, ...extra];
   }
 
   function loadApertureMaster() {
@@ -5830,6 +5889,27 @@ window.addEventListener("DOMContentLoaded", () => {
     if (voceUnitaMisuraEl) voceUnitaMisuraEl.disabled = false;
   }
 
+  function apriModificaVoce(id) {
+    const row = voci.find((item) => item.idVoce === id);
+    if (!row || !voceDialogEl) return false;
+    editingVoceId = id;
+    const campiLimitati = voceBloccataInVoci(row);
+    setVoceDialogModalitaSoloUnitaMisura(campiLimitati);
+    voceIdEl.value = String(row.idVoce);
+    vocePosizioneEl.value = String(row.posizione);
+    popolaSelectCapitoliVoce(row.capitoloId || "");
+    voceAbbreviataEl.value = row.voceAbbreviata || "";
+    if (voceRiferimentoEl) voceRiferimentoEl.value = riferimentoPerAssociaVoceDaStrade(row);
+    renderVociUnitaOptions(row.unitaMisura || "");
+    if (vocePrezzoEl) vocePrezzoEl.value = fmt2(row.prezzo ?? 0);
+    if (voceTipoMisuraEl) voceTipoMisuraEl.value = normalizzaTipoMisuraVoce(row.tipoMisura);
+    voceTestoEl.value = row.voce;
+    voceNoteEl.value = row.note;
+    voceDialogEl.showModal();
+    setTimeout(() => (campiLimitati ? voceTestoEl : vocePosizioneEl)?.focus(), 0);
+    return true;
+  }
+
   function resetVoceForm() {
     voceIdEl.value = String(voceIdCounter);
     vocePosizioneEl.value = String(getPrimaPosizioneVoceDisponibile(""));
@@ -8332,6 +8412,7 @@ window.addEventListener("DOMContentLoaded", () => {
       camminamentiEsterni,
       misurazioniVarie,
       voci,
+      capitolatoLibere,
       apertureMaster,
       archivioPianiMisura: [...archivioPianiMisura],
       archivioCapitoli: [...archivioCapitoli],
@@ -8434,6 +8515,7 @@ window.addEventListener("DOMContentLoaded", () => {
     loadApertureMaster();
     syncVaniApertureLocalesForPicker(apertureElevazione, apertureMaster);
     loadVoci();
+    loadCapitolatoLibere();
     syncArchivioPianiMisuraCompleto();
     popolaDatalistArchivioPianiMisura(STORAGE_ARCHIVIO_PIANI_MISURA, "datalist-piani-misura-archivio");
     popolaDatalistVocibrevi("datalist-voci-esterni-vari");
@@ -8523,6 +8605,8 @@ window.addEventListener("DOMContentLoaded", () => {
       camminamentiEsterni = [];
       misurazioniVarie = [];
       voci = [];
+      capitolatoLibere = [];
+      capitolatoLibereId = 1;
       apertureMaster = [];
       archivioPianiMisura = [];
       archivioCapitoli = [];
@@ -8577,6 +8661,7 @@ window.addEventListener("DOMContentLoaded", () => {
       saveArchivioCapitoliToStorage();
       saveApertureMaster();
       saveVoci();
+      saveCapitolatoLibere();
       saveVociUnitaOptions();
       saveDavanzaliSbordi();
       saveSoglieSbordi();
@@ -9806,6 +9891,21 @@ window.addEventListener("DOMContentLoaded", () => {
     camminamentiEsterni = [];
     misurazioniVarie = importedMisurazioni;
     voci = importedVoci;
+    capitolatoLibere = Array.isArray(payload.capitolatoLibere)
+      ? payload.capitolatoLibere
+          .filter((item) => item && typeof item.voce === "string")
+          .map((item, index) => ({
+            id: typeof item.id === "number" && item.id > 0 ? item.id : index + 1,
+            voce: String(item.voce).replace(/\s+/g, " ").trim(),
+            unitaMisura:
+              typeof item.unitaMisura === "string" && item.unitaMisura.trim() !== ""
+                ? item.unitaMisura.trim()
+                : UNITA_MISURA_DEFAULT_OPTIONS[0],
+            prezzo: parseNonNegativeDecimal2(item.prezzo) ?? 0,
+          }))
+          .filter((item) => item.voce.length >= 50)
+      : [];
+    capitolatoLibereId = capitolatoLibere.reduce((max, item) => Math.max(max, item.id), 0) + 1;
     apertureMaster = importedApertureMaster;
 
     if (Array.isArray(payload.archivioPianiMisura)) {
@@ -9898,6 +9998,7 @@ window.addEventListener("DOMContentLoaded", () => {
     saveArchivioPianiMisuraToStorage();
     saveApertureMaster();
     saveVoci();
+    saveCapitolatoLibere();
     saveVociUnitaOptions();
 
     setPianoFormMode();
@@ -11122,15 +11223,136 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   initVoceUsaEsistente({
-    getVoci: () => voci,
+    getVoci: () => vociPerCapitolato(),
     getEditingId: () => editingVoceId,
-    onScelta: ({ voce, prezzo }) => {
+    onScelta: ({ voce, prezzo, unitaMisura }) => {
       if (voceTestoEl) voceTestoEl.value = voce;
       if (vocePrezzoEl && Number.isFinite(prezzo)) {
         vocePrezzoEl.value = String(prezzo);
       }
+      const unita = String(unitaMisura ?? "").trim();
+      if (voceUnitaMisuraEl && unita && !voceUnitaMisuraEl.disabled) {
+        const match = [...voceUnitaMisuraEl.options].find(
+          (opt) => opt.value.toLocaleLowerCase("it-IT") === unita.toLocaleLowerCase("it-IT"),
+        );
+        if (match) voceUnitaMisuraEl.value = match.value;
+      }
       voceTestoEl?.focus();
     },
+  });
+
+  function chiaveTestoVoceEstesa(raw) {
+    return String(raw ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLocaleLowerCase("it-IT");
+  }
+
+  function applicaModificheCapitolato(righe, nuove) {
+    const listaRighe = Array.isArray(righe) ? righe : [];
+    const listaNuove = Array.isArray(nuove) ? nuove : [];
+    if (listaRighe.length === 0 && listaNuove.length === 0) return;
+    const perChiave = new Map(listaRighe.map((riga) => [riga.chiaveOriginale, riga]));
+    let toccate = 0;
+    let unitaNuova = false;
+
+    function registraUnita(unita) {
+      if (!vociUnitaMisuraOptions.some((u) => u.toLowerCase() === unita.toLowerCase())) {
+        vociUnitaMisuraOptions.push(unita);
+        unitaNuova = true;
+      }
+    }
+
+    function applicaRiga(item, riga, conMisurazioni) {
+      const testo = String(riga.voce ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const unita = String(riga.unitaMisura ?? "").trim();
+      const prezzo = parseNonNegativeDecimal2(riga.prezzo);
+      if (testo.length < 50 || !unita || prezzo === null) return item;
+      const testoAttuale = String(item.voce ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const unitaAttuale = String(item.unitaMisura ?? "").trim();
+      const prezzoAttuale = parseNonNegativeDecimal2(item.prezzo) ?? 0;
+      if (testoAttuale === testo && unitaAttuale === unita && prezzoAttuale === prezzo) return item;
+      toccate += 1;
+      registraUnita(unita);
+      const next = { ...item, voce: testo, unitaMisura: unita, prezzo };
+      if (conMisurazioni) {
+        next.misurazioniManuali = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, unita);
+      }
+      return next;
+    }
+
+    let aggiornate = voci.map((item) => {
+      const riga = perChiave.get(chiaveTestoVoceEstesa(item.voce));
+      if (!riga) return item;
+      return applicaRiga(item, riga, true);
+    });
+    let libereAgg = capitolatoLibere.map((item) => {
+      const riga = perChiave.get(chiaveTestoVoceEstesa(item.voce));
+      if (!riga) return item;
+      return applicaRiga(item, riga, false);
+    });
+
+    for (const riga of listaNuove) {
+      const testo = String(riga.voce ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const chiave = chiaveTestoVoceEstesa(testo);
+      const giaPresente =
+        aggiornate.some((item) => chiaveTestoVoceEstesa(item.voce) === chiave) ||
+        libereAgg.some((item) => chiaveTestoVoceEstesa(item.voce) === chiave);
+      if (giaPresente) {
+        aggiornate = aggiornate.map((item) =>
+          chiaveTestoVoceEstesa(item.voce) === chiave ? applicaRiga(item, riga, true) : item,
+        );
+        libereAgg = libereAgg.map((item) =>
+          chiaveTestoVoceEstesa(item.voce) === chiave ? applicaRiga(item, riga, false) : item,
+        );
+        continue;
+      }
+      const unita = String(riga.unitaMisura ?? "").trim();
+      const prezzo = parseNonNegativeDecimal2(riga.prezzo);
+      if (testo.length < 50 || !unita || prezzo === null) continue;
+      registraUnita(unita);
+      libereAgg.push({
+        id: capitolatoLibereId++,
+        voce: testo,
+        unitaMisura: unita,
+        prezzo,
+      });
+      toccate += 1;
+    }
+
+    if (toccate === 0) return;
+    voci = aggiornate;
+    capitolatoLibere = libereAgg;
+    if (unitaNuova) {
+      saveVociUnitaOptions();
+      renderVociUnitaOptions(voceUnitaMisuraEl?.value || "");
+    }
+    saveVoci();
+    saveCapitolatoLibere();
+    renderVoci();
+  }
+
+  function eliminaCapitolatoLibera(chiave) {
+    const prima = capitolatoLibere.length;
+    capitolatoLibere = capitolatoLibere.filter(
+      (item) => chiaveTestoVoceEstesa(item.voce) !== chiave,
+    );
+    if (capitolatoLibere.length === prima) return;
+    saveCapitolatoLibere();
+  }
+
+  const capitolatoUi = initCapitolato({
+    getVoci: () => vociPerCapitolato(),
+    getUnitaOptions: () => vociUnitaMisuraOptions,
+    onSalva: applicaModificheCapitolato,
+    onEliminaSenzaBreve: eliminaCapitolatoLibera,
+    onModificaVoce: (idVoce) => apriModificaVoce(idVoce),
   });
 
   voceDialogCancelEl.addEventListener("click", () => {
@@ -11140,6 +11362,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   voceDialogEl?.addEventListener("close", () => {
     if (editingVoceSoloUnitaMisura) setVoceDialogModalitaSoloUnitaMisura(false);
+    capitolatoUi?.aggiornaSeAperto?.();
   });
 
   voceDeleteCancelEl.addEventListener("click", () => {
@@ -11548,23 +11771,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (Number.isNaN(id)) return;
 
     if (button.dataset.action === "edit-voce") {
-      const row = voci.find((item) => item.idVoce === id);
-      if (!row) return;
-      editingVoceId = id;
-      const campiLimitati = voceBloccataInVoci(row);
-      setVoceDialogModalitaSoloUnitaMisura(campiLimitati);
-      voceIdEl.value = String(row.idVoce);
-      vocePosizioneEl.value = String(row.posizione);
-      popolaSelectCapitoliVoce(row.capitoloId || "");
-      voceAbbreviataEl.value = row.voceAbbreviata || "";
-      if (voceRiferimentoEl) voceRiferimentoEl.value = riferimentoPerAssociaVoceDaStrade(row);
-      renderVociUnitaOptions(row.unitaMisura || "");
-      if (vocePrezzoEl) vocePrezzoEl.value = fmt2(row.prezzo ?? 0);
-      if (voceTipoMisuraEl) voceTipoMisuraEl.value = normalizzaTipoMisuraVoce(row.tipoMisura);
-      voceTestoEl.value = row.voce;
-      voceNoteEl.value = row.note;
-      voceDialogEl.showModal();
-      setTimeout(() => (campiLimitati ? voceTestoEl : vocePosizioneEl)?.focus(), 0);
+      apriModificaVoce(id);
       return;
     }
 
@@ -13105,6 +13312,7 @@ window.addEventListener("DOMContentLoaded", () => {
   loadApertureMaster();
   syncVaniApertureLocalesForPicker(apertureElevazione, apertureMaster);
   loadVoci();
+  loadCapitolatoLibere();
   syncArchivioPianiMisuraCompleto();
   migraApertureCollegateVociSuMaster();
   syncVociDerivateDaApertureMaster();
@@ -13198,6 +13406,8 @@ window.addEventListener("DOMContentLoaded", () => {
     const focusTesto = draft && draft.focusVoceTesto === true;
     setTimeout(() => (focusTesto ? voceTestoEl : vocePosizioneEl)?.focus(), 0);
   })();
+
+  capitolatoUi?.apriDaSessioneCerca?.();
 
   wireArchivioPianiMisuraComboInputs();
 

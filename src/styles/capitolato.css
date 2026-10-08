@@ -1,0 +1,184 @@
+/* Elenco CAPITOLATO: testi del campo VOCE, con unità e prezzo. */
+
+.capitolato-dialog {
+  width: min(1280px, 96vw);
+  max-height: min(92vh, 860px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.capitolato-dialog form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(92vh - 28px);
+}
+
+.capitolato-titolo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.capitolato-titolo h3 {
+  margin: 0;
+}
+
+.capitolato-aiuto {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #8eb0d4;
+  border-radius: 50%;
+  background: #eef4fb;
+  color: #1a3558;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.capitolato-aiuto:hover,
+.capitolato-aiuto[aria-expanded="true"] {
+  background: #d7e6f6;
+}
+
+.capitolato-hint {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #1e4a7a;
+}
+
+#capitolato-filtro {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.capitolato-aggiungi {
+  margin: 0 0 0 auto;
+}
+
+.capitolato-table-wrap {
+  overflow: auto;
+  max-height: min(58vh, 520px);
+  border: 1px solid #dbe5f2;
+  border-radius: 8px;
+}
+
+.capitolato-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.86rem;
+}
+
+.capitolato-col-voce {
+  width: auto;
+}
+
+.capitolato-col-unita {
+  width: 6.4rem;
+}
+
+.capitolato-col-prezzo {
+  width: 5.6rem;
+}
+
+.capitolato-col-brevi {
+  width: 11.4rem;
+}
+
+.capitolato-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  background: #eef4fb;
+  color: #243652;
+  padding: 8px;
+  border-bottom: 1px solid #dbe5f2;
+}
+
+.capitolato-table td {
+  padding: 6px 8px;
+  vertical-align: top;
+  border-bottom: 1px solid #e6eef8;
+  background: #fff;
+}
+
+.capitolato-table tr.is-hidden {
+  display: none;
+}
+
+.capitolato-dialog .capitolato-voce {
+  width: 100%;
+  min-height: 4.6rem;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.capitolato-unita,
+.capitolato-prezzo {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding-left: 4px;
+  padding-right: 2px;
+}
+
+.capitolato-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.capitolato-vedi-brevi {
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.capitolato-brevi-dialog {
+  width: min(820px, 94vw);
+  max-height: min(80vh, 640px);
+  overflow: auto;
+}
+
+.capitolato-brevi-modifica {
+  width: 52px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.capitolato-matita {
+  min-width: 36px;
+  padding: 4px 8px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.capitolato-brevi-voce {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #1e4a7a;
+}
+
+.capitolato-table tr.is-invalid td {
+  background: #fff4f4;
+}
+
+.capitolato-vuoto,
+.capitolato-msg {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+}
+
+.capitolato-msg {
+  color: #9b2c2c;
+  font-weight: 700;
+}

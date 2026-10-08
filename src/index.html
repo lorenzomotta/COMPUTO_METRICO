@@ -953,6 +953,7 @@
               <a href="cercavoce.html?v=9" class="btn-action btn-secondary sidebar-link-btn">CERCA VOCE</a>
               <button id="btn-aggiungi-voce" type="button" class="btn-action btn-secondary">AGGIUNGI VOCE</button>
               <button id="btn-vedi-voci" type="button" class="btn-action btn-compila">VEDI VOCI</button>
+              <button id="btn-capitolato" type="button" class="btn-action btn-secondary">CAPITOLATO</button>
               <button id="btn-apri-pdf-voci" type="button" class="btn-action btn-secondary">
                 APRI PDF VOCI (COMPLETO)
               </button>
@@ -1131,6 +1132,94 @@
             </button>
           </div>
         </form>
+      </dialog>
+
+      <dialog id="capitolato-dialog" class="formula-dialog capitolato-dialog">
+        <form id="capitolato-form" method="dialog">
+          <div class="capitolato-titolo">
+            <h3>CAPITOLATO</h3>
+            <button
+              id="capitolato-aiuto"
+              type="button"
+              class="capitolato-aiuto"
+              aria-expanded="false"
+              aria-controls="capitolato-hint"
+              title="Spiegazione"
+            >
+              ?
+            </button>
+            <button id="capitolato-aggiungi" type="button" class="btn-action btn-secondary capitolato-aggiungi">
+              Aggiungi voce
+            </button>
+          </div>
+          <p id="capitolato-hint" class="capitolato-hint" hidden>
+            Qui c’è il testo del campo <strong>VOCE</strong>, una sola volta anche se più voci brevi lo usano.
+            Puoi cambiare il testo, l’unità di misura e il prezzo. Quando salvi, la modifica vale per tutte le voci brevi collegate.
+            Se cambi il prezzo, i loro totali si aggiornano.
+            Il pulsante <strong>Vedi</strong> apre l’elenco delle voci brevi collegate a quella riga.
+            Qui compaiono solo i testi di almeno 50 caratteri, cioè le diciture già complete.
+            Con <strong>Aggiungi voce</strong> si apre Cerca voce (prezziario): scegli la dicitura ufficiale e torna qui con testo, unità e prezzo. Non serve ancora una voce breve.
+          </p>
+          <input
+            id="capitolato-filtro"
+            type="search"
+            placeholder="Cerca nel testo della voce..."
+            autocomplete="off"
+            aria-label="Cerca nel capitolato"
+          />
+          <div class="capitolato-table-wrap">
+            <table class="capitolato-table">
+              <colgroup>
+                <col class="capitolato-col-voce" />
+                <col class="capitolato-col-unita" />
+                <col class="capitolato-col-prezzo" />
+                <col class="capitolato-col-brevi" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>VOCE</th>
+                  <th>UNITÀ<br />DI MISURA</th>
+                  <th>PREZZO</th>
+                  <th>Voci brevi</th>
+                </tr>
+              </thead>
+              <tbody id="capitolato-body"></tbody>
+            </table>
+          </div>
+          <p id="capitolato-vuoto" class="capitolato-vuoto" hidden>
+            Nessuna voce con un testo di almeno 50 caratteri.
+          </p>
+          <p id="capitolato-msg" class="capitolato-msg" hidden></p>
+          <div class="formula-dialog-actions">
+            <button id="capitolato-cancel" type="button" class="btn-action btn-delete">Annulla</button>
+            <button id="capitolato-salva" type="submit" class="btn-action btn-secondary">Salva</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="capitolato-brevi-dialog" class="formula-dialog capitolato-brevi-dialog">
+        <h3>Voci brevi</h3>
+        <p id="capitolato-brevi-voce" class="capitolato-brevi-voce"></p>
+        <div class="capitolato-table-wrap">
+          <table class="capitolato-table">
+            <thead>
+              <tr>
+                <th>Voce abbreviata</th>
+                <th>Riferimento</th>
+                <th>Unità</th>
+                <th>Prezzo</th>
+                <th class="capitolato-brevi-modifica"></th>
+              </tr>
+            </thead>
+            <tbody id="capitolato-brevi-body"></tbody>
+          </table>
+        </div>
+        <p id="capitolato-brevi-vuoto" class="capitolato-vuoto" hidden>
+          Nessuna voce breve collegata.
+        </p>
+        <div class="formula-dialog-actions">
+          <button id="capitolato-brevi-chiudi" type="button" class="btn-action btn-secondary">Chiudi</button>
+        </div>
       </dialog>
 
       <dialog id="voce-mm-riga-dialog" class="formula-dialog voce-mm-riga-dialog">

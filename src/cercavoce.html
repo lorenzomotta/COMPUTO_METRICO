@@ -1321,10 +1321,53 @@
           }
         });
 
+        function estraiUnitaDaRiepilogo(text) {
+          const lines = String(text || "").split(/\r?\n/);
+          let last = "";
+          for (const line of lines) {
+            const m = line.match(
+              /Prezzo unitario\s*\(prezziario\)\s*:\s*[0-9][0-9.,]*\s*€\s*\/\s*(.+)\s*$/i,
+            );
+            if (m) last = m[1].trim();
+          }
+          return last;
+        }
+
         btnAggiungiComputo?.addEventListener("click", function () {
           const testo = riepilogoEl.value.trim();
           if (!testo) {
             setStatus("Compila prima il riepilogo (o premi «Aggiorna riepilogo»).", true);
+            return;
+          }
+          const fromCapitolato = new URLSearchParams(window.location.search).get("from") === "capitolato";
+          const prezzoNum = estraiUltimoPrezzoDaRiepilogo(riepilogoEl.value);
+          if (fromCapitolato) {
+            let payload = { perChiave: [], nuove: [] };
+            try {
+              const raw = sessionStorage.getItem("capitolatoCercaDraft");
+              if (raw) payload = JSON.parse(raw) || payload;
+            } catch (_) {
+              payload = { perChiave: [], nuove: [] };
+            }
+            if (!payload || typeof payload !== "object") payload = { perChiave: [], nuove: [] };
+            if (!Array.isArray(payload.nuove)) payload.nuove = [];
+            payload.nuove.unshift({
+              voce: riepilogoEl.value,
+              unita: estraiUnitaDaRiepilogo(riepilogoEl.value),
+              prezzo: prezzoNum != null ? Number(prezzoNum).toFixed(2) : "0",
+            });
+            try {
+              sessionStorage.setItem("capitolatoCercaDraft", JSON.stringify(payload));
+            } catch (_) {
+              setStatus("Impossibile salvare il testo per il capitolato.", true);
+              return;
+            }
+            const msgPrezzoCap =
+              prezzoNum != null
+                ? ` Prezzo ${Number(prezzoNum).toFixed(2)} € inviato al capitolato.`
+                : " (nessun prezzo trovato nel riepilogo).";
+            setStatus("Apertura capitolato…" + msgPrezzoCap, false);
+            window.location.href = "index.html?openCapitolato=1";
             return;
           }
           let draft = {};
@@ -1338,7 +1381,6 @@
           draft.testo = riepilogoEl.value;
           draft.focusVoceTesto = true;
 
-          const prezzoNum = estraiUltimoPrezzoDaRiepilogo(riepilogoEl.value);
           if (prezzoNum != null) {
             draft.prezzo = Number(prezzoNum).toFixed(2);
           }
@@ -1364,14 +1406,31 @@
         (function setupNavDaNuovaVoce() {
           const params = new URLSearchParams(window.location.search);
           const fromNuovaVoce = params.get("from") === "nuova-voce";
+          const fromCapitolato = params.get("from") === "capitolato";
           const btnTornaVoci = document.getElementById("btn-torna-voci");
           const btnTornaNuovaVoce = document.getElementById("btn-torna-nuova-voce");
-          if (fromNuovaVoce) {
+          if (fromNuovaVoce || fromCapitolato) {
             if (btnTornaVoci) btnTornaVoci.hidden = true;
-            if (btnTornaNuovaVoce) btnTornaNuovaVoce.hidden = false;
+            if (btnTornaNuovaVoce) {
+              btnTornaNuovaVoce.hidden = false;
+              btnTornaNuovaVoce.textContent = fromCapitolato
+                ? "← Torna al capitolato"
+                : "← Torna";
+            }
+          }
+          if (fromCapitolato) {
+            const sub = document.querySelector(".sub");
+            if (sub) {
+              sub.innerHTML =
+                "A <strong>sinistra</strong> le voci del prezziario; a <strong>destra</strong> le sottovoci. " +
+                "Poi premi <strong>Aggiungi al capitolato</strong>: testo, unità e prezzo tornano in CAPITOLATO, senza una voce breve.";
+            }
+            if (btnAggiungiComputo) btnAggiungiComputo.textContent = "Aggiungi al capitolato";
           }
           btnTornaNuovaVoce?.addEventListener("click", function () {
-            window.location.href = "index.html?openVoceDialog=1";
+            window.location.href = fromCapitolato
+              ? "index.html?openCapitolato=1"
+              : "index.html?openVoceDialog=1";
           });
         })();
 

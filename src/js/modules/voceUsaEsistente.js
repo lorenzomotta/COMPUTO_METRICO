@@ -46,21 +46,25 @@ export function elencoVociEstese(voci, { escludiIdVoce }) {
     const key = testo.toLocaleLowerCase("it-IT");
     const prezzo = Number(item.prezzo);
     const posizione = Number(item.posizione) || 0;
+    const soloCapitolato = item.soloCapitolato === true;
     const prev = groups.get(key);
     if (!prev) {
       groups.set(key, {
         idVoce: item.idVoce,
         voce: testo,
+        unitaMisura: String(item.unitaMisura ?? "").trim(),
         prezzo: Number.isFinite(prezzo) ? prezzo : 0,
-        nBrevi: 1,
+        nBrevi: soloCapitolato ? 0 : 1,
         posizione,
       });
       continue;
     }
+    if (soloCapitolato) continue;
     prev.nBrevi += 1;
     if (posizione < prev.posizione) {
       prev.posizione = posizione;
       prev.idVoce = item.idVoce;
+      prev.unitaMisura = String(item.unitaMisura ?? "").trim();
       prev.prezzo = Number.isFinite(prezzo) ? prezzo : prev.prezzo;
     }
   }
@@ -79,8 +83,9 @@ function renderLista(host, items, selectedId) {
     btn.setAttribute("aria-selected", selectedId === item.idVoce ? "true" : "false");
     if (selectedId === item.idVoce) btn.classList.add("is-selected");
     const testo = String(item.voce ?? "").trim();
-    const nBrevi = Number(item.nBrevi) || 1;
-    const usata = nBrevi > 1 ? ` · già usata da ${nBrevi} voci brevi` : "";
+    const nBrevi = Number(item.nBrevi);
+    const quante = Number.isFinite(nBrevi) ? nBrevi : 1;
+    const usata = quante > 1 ? ` · già usata da ${quante} voci brevi` : "";
     btn.innerHTML = `<span class="voce-usa-esistente-item-testo">${escapeHtml(testo)}</span>
       <span class="voce-usa-esistente-item-meta">${escapeHtml(formatEuroIt(item.prezzo))}${escapeHtml(usata)}</span>`;
     host.appendChild(btn);
@@ -181,6 +186,10 @@ export function initVoceUsaEsistente({ getVoci, getEditingId, onScelta }) {
     const voce = String(target?.voce ?? "").trim();
     if (!voce) return;
     chiudi();
-    onScelta?.({ voce, prezzo: Number(target.prezzo) || 0 });
+    onScelta?.({
+      voce,
+      prezzo: Number(target.prezzo) || 0,
+      unitaMisura: String(target.unitaMisura ?? "").trim(),
+    });
   });
 }
