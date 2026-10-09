@@ -4,6 +4,9 @@
   width: min(1280px, 96vw);
   max-height: min(92vh, 860px);
   overflow: hidden;
+}
+
+.capitolato-dialog[open] {
   display: flex;
   flex-direction: column;
 }
