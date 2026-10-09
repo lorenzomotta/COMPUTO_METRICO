@@ -1,18 +1,18 @@
 /**
  * STRADE — zone di superficie, sede, poi impianti (segnaletica → acqua).
  * Le zone manuali hanno aree (formula × moltiplicatore, con «sottrai») e strati.
- * Cordoli: quantità a metro lineare (formula = lunghezza).
- * Segnaletica: formula × moltiplicatore, con larghezza facoltativa.
- * Fogna, Allacci fogna, Luci, Gas, Acqua, Telefonica: come i Manufatti
- *   (riferimento, tipo, formula, N° pezzi). Ogni tipo è una voce a numero.
+ * Cordoli, Fogna, Allacci fogna, Luci, Gas, Acqua, Telefonica, Varie:
+ *   quantità = formula × pezzi; l’unità (ml., mq., mc.) si sceglie in VOCI.
+ * Segnaletica: quantità = formula × larghezza × pezzi; unità scelta in VOCI.
+ * Manufatti: quantità in VOCI = N° pezzi; la formula toglie mq dalla Sede.
  * Sede stradale: aree automatiche
  * Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti con area)
  * a parità di riferimento; si possono solo aggiungere strati.
- * Ordine schede: … Cordoli → Sede → Segnaletica → Fogna → Allacci fogna →
- * Luce pubblica → Luce privata → Gas → Acqua.
+ * Ordine schede: … Cordoli → Fogna → … → Telefonica → Segnaletica → Varie → Manufatti → Sede → Reinterro.
+ * Manufatti e Reinterro sono in sola lettura: le righe arrivano dalle spunte nelle altre schede.
  */
 
-/** @typedef {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'} TipoZonaStrada */
+/** @typedef {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'|'reinterro'} TipoZonaStrada */
 
 export const TIPI_ZONA_MANUALE = /** @type {const} */ ([
   "ingombro",
@@ -44,11 +44,12 @@ export const TIPO_ACQUA = "acqua";
 export const TIPO_TELEFONICA = "telefonica";
 export const TIPO_VARIE = "varie";
 export const TIPO_SEDE_STRADALE = "sedeStradale";
+export const TIPO_REINTERRO = "reinterro";
 
-/** Segnaletica: formula × moltiplicatore, fuori dal calcolo Sede. */
+/** Segnaletica: formula × larghezza × pezzi, fuori dal calcolo Sede. */
 export const TIPI_ZONA_FORMULA_UNITA_VOCE = /** @type {const} */ ([TIPO_SEGNALETICA]);
 
-/** Stessa tabella dei Manufatti: Rif., tipo, formula, N° pezzi. Fuori dal calcolo Sede. */
+/** Stessa tabella dei Manufatti, ma la quantità è formula × pezzi. Fuori dal calcolo Sede. */
 export const TIPI_ZONA_COME_MANUFATTI = /** @type {const} */ ([
   TIPO_FOGNA,
   TIPO_ALLACCI_FOGNA,
@@ -59,18 +60,19 @@ export const TIPI_ZONA_COME_MANUFATTI = /** @type {const} */ ([
   TIPO_TELEFONICA,
 ]);
 
-/** Ordine schede UI: superfici → Sede → impianti → Varie. */
+/** Ordine schede UI: superfici → impianti → Segnaletica → Varie → Manufatti → Sede → Reinterro. */
 export const TIPI_ZONA_STRADA = /** @type {const} */ ([
   "ingombro",
   "marciapiedi",
   "aiuole",
   "parcheggi",
-  "manufatti",
   "cordoli",
-  TIPO_SEDE_STRADALE,
-  TIPO_SEGNALETICA,
   ...TIPI_ZONA_COME_MANUFATTI,
+  TIPO_SEGNALETICA,
   TIPO_VARIE,
+  "manufatti",
+  TIPO_SEDE_STRADALE,
+  TIPO_REINTERRO,
 ]);
 
 export const VOCE_SEDE_STRADALE = "SEDE STRADALE";
@@ -116,6 +118,7 @@ export const ZONA_LABELS = {
   telefonica: "Telefonica",
   varie: "Varie",
   sedeStradale: "Sede stradale",
+  reinterro: "Reinterro",
 };
 
 /** Valore `tipoOggetto` nelle misurazioni VOCI. */
@@ -136,10 +139,15 @@ export const ZONA_TIPO_OGGETTO = {
   telefonica: "STRADA_TELEFONICA",
   varie: "STRADA_VARIE",
   sedeStradale: "STRADA_SEDE",
+  reinterro: "STRADA_REINTERRO",
 };
 
 export function isZonaSedeStradale(tipo) {
   return tipo === TIPO_SEDE_STRADALE;
+}
+
+export function isZonaReinterro(tipo) {
+  return tipo === TIPO_REINTERRO;
 }
 
 export function isZonaManufatti(tipo) {
@@ -189,10 +197,62 @@ function chiaveTipoManufatto(raw) {
     .toLocaleLowerCase("it-IT");
 }
 
-function loadTipiManufattoExtra() {
+function pulisciNomeTipo(raw) {
+  return String(raw ?? "").trim().replace(/\s+/g, " ");
+}
+
+function metaTipiVuota() {
+  return { nascosti: [], rinominati: {}, misure: {} };
+}
+
+function normalizzaMisureTipi(raw) {
+  /** @type {Record<string, { dimensioni: string, altezza: string }>} */
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw)) {
+    if (!v || typeof v !== "object") continue;
+    const dimensioni = pulisciNomeTipo(v.dimensioni || "").slice(0, 80);
+    const altezza = pulisciNomeTipo(v.altezza || "").slice(0, 40);
+    if (dimensioni || altezza) out[k] = { dimensioni, altezza };
+  }
+  return out;
+}
+
+function loadMetaTipi(storageKey) {
   try {
-    const raw = localStorage.getItem(STORAGE_TIPI_MANUFATTO_EXTRA);
-    if (!raw) return [];
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return metaTipiVuota();
+    const data = JSON.parse(raw);
+    const nascosti = Array.isArray(data?.nascosti)
+      ? data.nascosti.filter((x) => typeof x === "string")
+      : [];
+    /** @type {Record<string, string>} */
+    const rinominati = {};
+    if (data?.rinominati && typeof data.rinominati === "object") {
+      for (const [k, v] of Object.entries(data.rinominati)) {
+        const nome = pulisciNomeTipo(v);
+        if (nome) rinominati[k] = nome;
+      }
+    }
+    return { nascosti, rinominati, misure: normalizzaMisureTipi(data?.misure) };
+  } catch {
+    return metaTipiVuota();
+  }
+}
+
+function saveMetaTipi(storageKey, meta) {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(meta));
+  } catch {
+    /* ignore */
+  }
+}
+
+function leggiJsonArray(key) {
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw == null) return null;
     const data = JSON.parse(raw);
     return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
   } catch {
@@ -200,45 +260,368 @@ function loadTipiManufattoExtra() {
   }
 }
 
-function saveTipiManufattoExtra(nomi) {
+function scriviJson(key, value) {
+  if (!key) return;
   try {
-    localStorage.setItem(STORAGE_TIPI_MANUFATTO_EXTRA, JSON.stringify(nomi));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
     /* ignore */
   }
 }
 
-/** Tipi di base più quelli aggiunti dall’utente. */
-export function elencoTipiManufatto() {
-  const out = [...TIPI_MANUFATTO_BASE];
-  const seen = new Set(out.map((x) => chiaveTipoManufatto(x)));
-  for (const extra of loadTipiManufattoExtra()) {
-    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
-    const key = chiaveTipoManufatto(nome);
-    if (!nome || seen.has(key)) continue;
-    seen.add(key);
-    out.push(nome);
+function loadListaConLegacy(key, legacyKey) {
+  const attuale = leggiJsonArray(key);
+  if (attuale != null) return attuale.map(pulisciNomeTipo).filter(Boolean);
+  const legacy = legacyKey ? leggiJsonArray(legacyKey) : null;
+  const nomi = (legacy || []).map(pulisciNomeTipo).filter(Boolean);
+  if (nomi.length) scriviJson(key, nomi);
+  return nomi;
+}
+
+function loadMetaConLegacy(key, legacyKey) {
+  try {
+    if (key && localStorage.getItem(key) == null && legacyKey && localStorage.getItem(legacyKey) != null) {
+      const meta = loadMetaTipi(legacyKey);
+      scriviJson(key, meta);
+      return meta;
+    }
+  } catch {
+    /* ignore */
   }
-  return out;
+  return loadMetaTipi(key);
 }
 
 /**
- * Aggiunge un tipo all’elenco (se non c’è già).
+ * Libreria (resta nel programma) + nomi solo di questo computo.
+ * @param {readonly string[]} base
+ * @param {{ libreriaExtra: string, libreriaMeta: string, localeExtra: string, localeMeta: string, legacyExtra?: string, legacyMeta?: string }} chiavi
+ */
+function creaCatalogoTipi(base, chiavi) {
+  const libreriaExtra = chiavi.libreriaExtra;
+  const libreriaMeta = chiavi.libreriaMeta;
+  const localeExtra = chiavi.localeExtra;
+  const localeMeta = chiavi.localeMeta;
+  const legacyExtra = chiavi.legacyExtra || "";
+  const legacyMeta = chiavi.legacyMeta || "";
+
+  const libExtra = () => loadListaConLegacy(libreriaExtra, legacyExtra);
+  const saveLibExtra = (nomi) => scriviJson(libreriaExtra, nomi);
+  const locExtra = () => loadListaConLegacy(localeExtra, "");
+  const saveLocExtra = (nomi) => scriviJson(localeExtra, nomi);
+  const libMeta = () => loadMetaConLegacy(libreriaMeta, legacyMeta);
+  const saveLibMeta = (meta) => scriviJson(libreriaMeta, meta);
+  const locMeta = () => loadMetaTipi(localeMeta);
+  const saveLocMeta = (meta) => scriviJson(localeMeta, meta);
+
+  function pushUnico(out, seen, nome) {
+    const n = pulisciNomeTipo(nome);
+    const k = chiaveTipoManufatto(n);
+    if (!n || seen.has(k)) return;
+    seen.add(k);
+    out.push(n);
+  }
+
+  function elenco() {
+    const lib = libMeta();
+    const loc = locMeta();
+    const out = [];
+    const seen = new Set();
+    for (const b of base) {
+      const bk = chiaveTipoManufatto(b);
+      if (lib.nascosti.includes(bk) || loc.nascosti.includes(bk)) continue;
+      pushUnico(out, seen, loc.rinominati[bk] || lib.rinominati[bk] || b);
+    }
+    for (const extra of libExtra()) {
+      const k = chiaveTipoManufatto(extra);
+      if (loc.nascosti.includes(k)) continue;
+      pushUnico(out, seen, loc.rinominati[k] || extra);
+    }
+    for (const extra of locExtra()) pushUnico(out, seen, extra);
+    return out;
+  }
+
+  function chiaveBaseLibreria(nome) {
+    const key = chiaveTipoManufatto(nome);
+    const meta = libMeta();
+    const hit = base.find((b) => {
+      const bk = chiaveTipoManufatto(b);
+      if (meta.nascosti.includes(bk)) return false;
+      return chiaveTipoManufatto(meta.rinominati[bk] || b) === key;
+    });
+    return hit ? chiaveTipoManufatto(hit) : "";
+  }
+
+  function trova(nome) {
+    const key = chiaveTipoManufatto(nome);
+    const loc = locMeta();
+    for (const [k, v] of Object.entries(loc.rinominati)) {
+      if (chiaveTipoManufatto(v) === key) return { kind: "overlay", chiave: k };
+    }
+    const baseKey = chiaveBaseLibreria(nome);
+    if (baseKey) return { kind: "libreria", chiave: baseKey };
+    const extra = libExtra().find((x) => chiaveTipoManufatto(x) === key);
+    if (extra) return { kind: "libreria", chiave: chiaveTipoManufatto(extra) };
+    const locale = locExtra().find((x) => chiaveTipoManufatto(x) === key);
+    if (locale) return { kind: "locale", chiave: chiaveTipoManufatto(locale) };
+    return null;
+  }
+
+  function inLibreria(nome) {
+    const fonte = trova(nome);
+    return fonte != null && fonte.kind !== "locale";
+  }
+
+  function eBase(chiave) {
+    return base.some((b) => chiaveTipoManufatto(b) === chiave);
+  }
+
+  function controllaNuovo(raw, erroreVuoto) {
+    const nome = pulisciNomeTipo(raw);
+    if (!nome) return { ok: false, nome: "", errore: erroreVuoto, giaPresente: false };
+    if (nome.length > 60) {
+      return {
+        ok: false,
+        nome: "",
+        errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).",
+        giaPresente: false,
+      };
+    }
+    const noto = elenco().find((x) => chiaveTipoManufatto(x) === chiaveTipoManufatto(nome));
+    if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
+    return { ok: true, nome, errore: "", giaPresente: false };
+  }
+
+  function aggiungi(raw, erroreVuoto, inLibreriaFlag = false) {
+    const check = controllaNuovo(raw, erroreVuoto);
+    if (!check.ok || check.giaPresente) return check;
+    if (inLibreriaFlag) {
+      const extra = libExtra();
+      extra.push(check.nome);
+      saveLibExtra(extra);
+    } else {
+      const extra = locExtra();
+      extra.push(check.nome);
+      saveLocExtra(extra);
+    }
+    return { ok: true, nome: check.nome, errore: "", giaPresente: false };
+  }
+
+  function controllaRinomina(vecchio, nuovo, erroreVuoto) {
+    const da = pulisciNomeTipo(vecchio);
+    const a = pulisciNomeTipo(nuovo);
+    if (!da) return { ok: false, nome: "", errore: "Scegli il tipo da modificare.", giaPresente: false, invariato: false };
+    if (!a) return { ok: false, nome: "", errore: erroreVuoto, giaPresente: false, invariato: false };
+    if (a.length > 60) {
+      return {
+        ok: false,
+        nome: "",
+        errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).",
+        giaPresente: false,
+        invariato: false,
+      };
+    }
+    if (!trova(da)) {
+      return { ok: false, nome: "", errore: "Questo tipo non c’è nell’elenco.", giaPresente: false, invariato: false };
+    }
+    if (chiaveTipoManufatto(da) === chiaveTipoManufatto(a)) {
+      return { ok: true, nome: da, errore: "", giaPresente: false, invariato: true };
+    }
+    const occupato = elenco().find((x) => chiaveTipoManufatto(x) === chiaveTipoManufatto(a));
+    if (occupato) {
+      return {
+        ok: false,
+        nome: "",
+        errore: `Il tipo «${occupato}» c’è già nell’elenco.`,
+        giaPresente: true,
+        invariato: false,
+      };
+    }
+    return { ok: true, nome: a, errore: "", giaPresente: false, invariato: false };
+  }
+
+  function rinomina(vecchio, nuovo, erroreVuoto, inLibreriaFlag = false) {
+    const check = controllaRinomina(vecchio, nuovo, erroreVuoto);
+    if (!check.ok || check.invariato) return check;
+    const fonte = trova(pulisciNomeTipo(vecchio));
+    if (!fonte) {
+      return { ok: false, nome: "", errore: "Questo tipo non c’è nell’elenco.", giaPresente: false, invariato: false };
+    }
+    const a = check.nome;
+    if (inLibreriaFlag && fonte.kind === "locale") {
+      saveLocExtra(locExtra().filter((x) => chiaveTipoManufatto(x) !== fonte.chiave));
+      const extra = libExtra();
+      extra.push(a);
+      saveLibExtra(extra);
+      const loc = locMeta();
+      const lib = libMeta();
+      spostaMisureTra(loc, fonte.chiave, lib, chiaveTipoManufatto(a));
+      saveLocMeta(loc);
+      saveLibMeta(lib);
+    } else if (inLibreriaFlag && eBase(fonte.chiave)) {
+      const meta = libMeta();
+      meta.rinominati[fonte.chiave] = a;
+      saveLibMeta(meta);
+      const loc = locMeta();
+      delete loc.rinominati[fonte.chiave];
+      saveLocMeta(loc);
+    } else if (inLibreriaFlag) {
+      const extra = libExtra();
+      const idx = extra.findIndex((x) => chiaveTipoManufatto(x) === fonte.chiave);
+      if (idx >= 0) extra[idx] = a;
+      else extra.push(a);
+      saveLibExtra(extra);
+      const loc = locMeta();
+      delete loc.rinominati[fonte.chiave];
+      saveLocMeta(loc);
+      const lib = libMeta();
+      spostaMisureTra(lib, fonte.chiave, lib, chiaveTipoManufatto(a));
+      saveLibMeta(lib);
+    } else if (fonte.kind === "locale") {
+      const extra = locExtra();
+      const idx = extra.findIndex((x) => chiaveTipoManufatto(x) === fonte.chiave);
+      if (idx >= 0) extra[idx] = a;
+      saveLocExtra(extra);
+      const loc = locMeta();
+      spostaMisureTra(loc, fonte.chiave, loc, chiaveTipoManufatto(a));
+      saveLocMeta(loc);
+    } else {
+      const loc = locMeta();
+      loc.rinominati[fonte.chiave] = a;
+      saveLocMeta(loc);
+    }
+    return { ok: true, nome: a, errore: "", giaPresente: false, invariato: false };
+  }
+
+  function spostaMisureTra(metaDa, chiaveDa, metaA, chiaveA) {
+    if (!metaDa.misure) metaDa.misure = {};
+    if (!metaA.misure) metaA.misure = {};
+    if (metaDa === metaA && chiaveDa === chiaveA) return;
+    const dati = metaDa.misure[chiaveDa];
+    if (!dati) return;
+    metaA.misure[chiaveA] = dati;
+    delete metaDa.misure[chiaveDa];
+  }
+
+  function togliMisure(meta, chiave) {
+    if (meta?.misure) delete meta.misure[chiave];
+  }
+
+  function leggiMisure(nome) {
+    const fonte = trova(nome);
+    if (!fonte) return { dimensioni: "", altezza: "" };
+    const meta = fonte.kind === "locale" ? locMeta() : libMeta();
+    const m = meta.misure?.[fonte.chiave];
+    return { dimensioni: m?.dimensioni || "", altezza: m?.altezza || "" };
+  }
+
+  function salvaMisure(nome, dati) {
+    const fonte = trova(nome);
+    if (!fonte) return { ok: false };
+    const dimensioni = pulisciNomeTipo(dati?.dimensioni || "").slice(0, 80);
+    const altezza = pulisciNomeTipo(dati?.altezza || "").slice(0, 40);
+    const meta = fonte.kind === "locale" ? locMeta() : libMeta();
+    if (!meta.misure) meta.misure = {};
+    if (!dimensioni && !altezza) delete meta.misure[fonte.chiave];
+    else meta.misure[fonte.chiave] = { dimensioni, altezza };
+    if (fonte.kind === "locale") saveLocMeta(meta);
+    else saveLibMeta(meta);
+    return { ok: true };
+  }
+
+  function elimina(nome, inLibreriaFlag = false) {
+    const da = pulisciNomeTipo(nome);
+    if (!da) return { ok: false, errore: "Scegli il tipo da eliminare." };
+    const fonte = trova(da);
+    if (!fonte) return { ok: false, errore: "Questo tipo non c’è nell’elenco." };
+    if (inLibreriaFlag && fonte.kind !== "locale") {
+      if (eBase(fonte.chiave)) {
+        const meta = libMeta();
+        if (!meta.nascosti.includes(fonte.chiave)) meta.nascosti.push(fonte.chiave);
+        delete meta.rinominati[fonte.chiave];
+        togliMisure(meta, fonte.chiave);
+        saveLibMeta(meta);
+      } else {
+        saveLibExtra(libExtra().filter((x) => chiaveTipoManufatto(x) !== fonte.chiave));
+        const meta = libMeta();
+        togliMisure(meta, fonte.chiave);
+        saveLibMeta(meta);
+      }
+      const loc = locMeta();
+      delete loc.rinominati[fonte.chiave];
+      loc.nascosti = loc.nascosti.filter((k) => k !== fonte.chiave);
+      togliMisure(loc, fonte.chiave);
+      saveLocMeta(loc);
+      return { ok: true, errore: "" };
+    }
+    if (fonte.kind === "locale") {
+      saveLocExtra(locExtra().filter((x) => chiaveTipoManufatto(x) !== fonte.chiave));
+      const loc = locMeta();
+      togliMisure(loc, fonte.chiave);
+      saveLocMeta(loc);
+      return { ok: true, errore: "" };
+    }
+    const loc = locMeta();
+    if (!loc.nascosti.includes(fonte.chiave)) loc.nascosti.push(fonte.chiave);
+    delete loc.rinominati[fonte.chiave];
+    saveLocMeta(loc);
+    return { ok: true, errore: "" };
+  }
+
+  elenco();
+  return { elenco, aggiungi, rinomina, elimina, inLibreria, controllaNuovo, controllaRinomina, leggiMisure, salvaMisure };
+}
+
+const catalogoManufatto = creaCatalogoTipi(TIPI_MANUFATTO_BASE, {
+  libreriaExtra: "lp_libreria_strade_manufatto",
+  libreriaMeta: "lp_libreria_strade_manufatto_meta",
+  localeExtra: "computo_metrico_strade_tipi_locale_manufatto",
+  localeMeta: "computo_metrico_strade_tipi_locale_manufatto_meta",
+  legacyExtra: STORAGE_TIPI_MANUFATTO_EXTRA,
+  legacyMeta: "computo_metrico_strade_tipi_manufatto_meta",
+});
+
+/** Tipi di libreria più quelli usati solo in questo computo. */
+export function elencoTipiManufatto() {
+  return catalogoManufatto.elenco();
+}
+
+/** @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }} */
+export function controllaNuovoTipoManufatto(raw) {
+  return catalogoManufatto.controllaNuovo(raw, "Scrivi il nome del nuovo tipo.");
+}
+
+/**
+ * @param {string} raw
+ * @param {boolean} [inLibreria]
  * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
  */
-export function aggiungiTipoManufatto(raw) {
-  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
-  if (!nome) return { ok: false, nome: "", errore: "Scrivi il nome del nuovo tipo.", giaPresente: false };
-  if (nome.length > 60) {
-    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
-  }
-  const key = chiaveTipoManufatto(nome);
-  const noto = elencoTipiManufatto().find((x) => chiaveTipoManufatto(x) === key);
-  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
-  const extra = loadTipiManufattoExtra();
-  extra.push(nome);
-  saveTipiManufattoExtra(extra);
-  return { ok: true, nome, errore: "", giaPresente: false };
+export function aggiungiTipoManufatto(raw, inLibreria = false) {
+  return catalogoManufatto.aggiungi(raw, "Scrivi il nome del nuovo tipo.", inLibreria);
+}
+
+/** @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean, invariato: boolean }} */
+export function controllaRinominaTipoManufatto(vecchio, nuovo) {
+  return catalogoManufatto.controllaRinomina(vecchio, nuovo, "Scrivi la nuova dicitura.");
+}
+
+/**
+ * @param {boolean} [inLibreria]
+ * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean, invariato: boolean }}
+ */
+export function rinominaTipoManufatto(vecchio, nuovo, inLibreria = false) {
+  return catalogoManufatto.rinomina(vecchio, nuovo, "Scrivi la nuova dicitura.", inLibreria);
+}
+
+/**
+ * @param {boolean} [inLibreria]
+ * @returns {{ ok: boolean, errore: string }}
+ */
+export function eliminaTipoManufatto(nome, inLibreria = false) {
+  return catalogoManufatto.elimina(nome, inLibreria);
+}
+
+export function tipoManufattoInLibreria(nome) {
+  return catalogoManufatto.inLibreria(nome);
 }
 
 export function normalizzaTipoManufatto(raw) {
@@ -251,56 +634,46 @@ export function normalizzaTipoManufatto(raw) {
   return aggiunto.ok ? aggiunto.nome : "";
 }
 
-function loadTipiCordoloExtra() {
-  try {
-    const raw = localStorage.getItem(STORAGE_TIPI_CORDOLO_EXTRA);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTipiCordoloExtra(nomi) {
-  try {
-    localStorage.setItem(STORAGE_TIPI_CORDOLO_EXTRA, JSON.stringify(nomi));
-  } catch {
-    /* ignore */
-  }
-}
+const catalogoCordolo = creaCatalogoTipi(TIPI_CORDOLO_BASE, {
+  libreriaExtra: "lp_libreria_strade_cordolo",
+  libreriaMeta: "lp_libreria_strade_cordolo_meta",
+  localeExtra: "computo_metrico_strade_tipi_locale_cordolo",
+  localeMeta: "computo_metrico_strade_tipi_locale_cordolo_meta",
+  legacyExtra: STORAGE_TIPI_CORDOLO_EXTRA,
+  legacyMeta: "computo_metrico_strade_tipi_cordolo_meta",
+});
 
 /** Retto, Curvo, più i tipi aggiunti dall’utente. */
 export function elencoTipiCordolo() {
-  const out = [...TIPI_CORDOLO_BASE];
-  const seen = new Set(out.map((x) => chiaveTipoManufatto(x)));
-  for (const extra of loadTipiCordoloExtra()) {
-    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
-    const key = chiaveTipoManufatto(nome);
-    if (!nome || seen.has(key)) continue;
-    seen.add(key);
-    out.push(nome);
-  }
-  return out;
+  return catalogoCordolo.elenco();
 }
 
 /**
  * Aggiunge un tipo di cordolo all’elenco (se non c’è già).
  * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
  */
-export function aggiungiTipoCordolo(raw) {
-  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
-  if (!nome) return { ok: false, nome: "", errore: "Scrivi il nome del nuovo tipo di cordolo.", giaPresente: false };
-  if (nome.length > 60) {
-    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
-  }
-  const key = chiaveTipoManufatto(nome);
-  const noto = elencoTipiCordolo().find((x) => chiaveTipoManufatto(x) === key);
-  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
-  const extra = loadTipiCordoloExtra();
-  extra.push(nome);
-  saveTipiCordoloExtra(extra);
-  return { ok: true, nome, errore: "", giaPresente: false };
+export function controllaNuovoTipoCordolo(raw) {
+  return catalogoCordolo.controllaNuovo(raw, "Scrivi il nome del nuovo tipo di cordolo.");
+}
+
+export function aggiungiTipoCordolo(raw, inLibreria = false) {
+  return catalogoCordolo.aggiungi(raw, "Scrivi il nome del nuovo tipo di cordolo.", inLibreria);
+}
+
+export function controllaRinominaTipoCordolo(vecchio, nuovo) {
+  return catalogoCordolo.controllaRinomina(vecchio, nuovo, "Scrivi la nuova dicitura.");
+}
+
+export function rinominaTipoCordolo(vecchio, nuovo, inLibreria = false) {
+  return catalogoCordolo.rinomina(vecchio, nuovo, "Scrivi la nuova dicitura.", inLibreria);
+}
+
+export function eliminaTipoCordolo(nome, inLibreria = false) {
+  return catalogoCordolo.elimina(nome, inLibreria);
+}
+
+export function tipoCordoloInLibreria(nome) {
+  return catalogoCordolo.inLibreria(nome);
 }
 
 export function normalizzaTipoCordolo(raw) {
@@ -325,54 +698,44 @@ export const TIPI_SEGNALETICA_BASE = /** @type {const} */ ([
 
 const STORAGE_TIPI_SEGNALETICA_EXTRA = "computo_metrico_strade_tipi_segnaletica";
 
-function loadTipiSegnaleticaExtra() {
-  try {
-    const raw = localStorage.getItem(STORAGE_TIPI_SEGNALETICA_EXTRA);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTipiSegnaleticaExtra(nomi) {
-  try {
-    localStorage.setItem(STORAGE_TIPI_SEGNALETICA_EXTRA, JSON.stringify(nomi));
-  } catch {
-    /* ignore */
-  }
-}
+const catalogoSegnaletica = creaCatalogoTipi(TIPI_SEGNALETICA_BASE, {
+  libreriaExtra: "lp_libreria_strade_segnaletica",
+  libreriaMeta: "lp_libreria_strade_segnaletica_meta",
+  localeExtra: "computo_metrico_strade_tipi_locale_segnaletica",
+  localeMeta: "computo_metrico_strade_tipi_locale_segnaletica_meta",
+  legacyExtra: STORAGE_TIPI_SEGNALETICA_EXTRA,
+  legacyMeta: "computo_metrico_strade_tipi_segnaletica_meta",
+});
 
 export function elencoTipiSegnaletica() {
-  const out = [...TIPI_SEGNALETICA_BASE];
-  const seen = new Set(out.map((x) => chiaveTipoManufatto(x)));
-  for (const extra of loadTipiSegnaleticaExtra()) {
-    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
-    const key = chiaveTipoManufatto(nome);
-    if (!nome || seen.has(key)) continue;
-    seen.add(key);
-    out.push(nome);
-  }
-  return out;
+  return catalogoSegnaletica.elenco();
 }
 
 /**
  * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
  */
-export function aggiungiTipoSegnaletica(raw) {
-  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
-  if (!nome) return { ok: false, nome: "", errore: "Scrivi il nome del nuovo tipo di segnaletica.", giaPresente: false };
-  if (nome.length > 60) {
-    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
-  }
-  const key = chiaveTipoManufatto(nome);
-  const noto = elencoTipiSegnaletica().find((x) => chiaveTipoManufatto(x) === key);
-  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
-  const extra = loadTipiSegnaleticaExtra();
-  extra.push(nome);
-  saveTipiSegnaleticaExtra(extra);
-  return { ok: true, nome, errore: "", giaPresente: false };
+export function controllaNuovoTipoSegnaletica(raw) {
+  return catalogoSegnaletica.controllaNuovo(raw, "Scrivi il nome del nuovo tipo di segnaletica.");
+}
+
+export function aggiungiTipoSegnaletica(raw, inLibreria = false) {
+  return catalogoSegnaletica.aggiungi(raw, "Scrivi il nome del nuovo tipo di segnaletica.", inLibreria);
+}
+
+export function controllaRinominaTipoSegnaletica(vecchio, nuovo) {
+  return catalogoSegnaletica.controllaRinomina(vecchio, nuovo, "Scrivi la nuova dicitura.");
+}
+
+export function rinominaTipoSegnaletica(vecchio, nuovo, inLibreria = false) {
+  return catalogoSegnaletica.rinomina(vecchio, nuovo, "Scrivi la nuova dicitura.", inLibreria);
+}
+
+export function eliminaTipoSegnaletica(nome, inLibreria = false) {
+  return catalogoSegnaletica.elimina(nome, inLibreria);
+}
+
+export function tipoSegnaleticaInLibreria(nome) {
+  return catalogoSegnaletica.inLibreria(nome);
 }
 
 export function normalizzaTipoSegnaletica(raw) {
@@ -392,54 +755,44 @@ export const TIPI_VARIE_BASE = /** @type {const} */ (["Reinterro"]);
 
 const STORAGE_TIPI_VARIE_EXTRA = "computo_metrico_strade_tipi_varie";
 
-function loadTipiVarieExtra() {
-  try {
-    const raw = localStorage.getItem(STORAGE_TIPI_VARIE_EXTRA);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTipiVarieExtra(nomi) {
-  try {
-    localStorage.setItem(STORAGE_TIPI_VARIE_EXTRA, JSON.stringify(nomi));
-  } catch {
-    /* ignore */
-  }
-}
+const catalogoVarie = creaCatalogoTipi(TIPI_VARIE_BASE, {
+  libreriaExtra: "lp_libreria_strade_varie",
+  libreriaMeta: "lp_libreria_strade_varie_meta",
+  localeExtra: "computo_metrico_strade_tipi_locale_varie",
+  localeMeta: "computo_metrico_strade_tipi_locale_varie_meta",
+  legacyExtra: STORAGE_TIPI_VARIE_EXTRA,
+  legacyMeta: "computo_metrico_strade_tipi_varie_meta",
+});
 
 export function elencoTipiVarie() {
-  const out = [...TIPI_VARIE_BASE];
-  const seen = new Set(out.map((x) => chiaveTipoManufatto(x)));
-  for (const extra of loadTipiVarieExtra()) {
-    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
-    const key = chiaveTipoManufatto(nome);
-    if (!nome || seen.has(key)) continue;
-    seen.add(key);
-    out.push(nome);
-  }
-  return out;
+  return catalogoVarie.elenco();
 }
 
 /**
  * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
  */
-export function aggiungiTipoVarie(raw) {
-  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
-  if (!nome) return { ok: false, nome: "", errore: "Scrivi il nome del nuovo tipo.", giaPresente: false };
-  if (nome.length > 60) {
-    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
-  }
-  const key = chiaveTipoManufatto(nome);
-  const noto = elencoTipiVarie().find((x) => chiaveTipoManufatto(x) === key);
-  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
-  const extra = loadTipiVarieExtra();
-  extra.push(nome);
-  saveTipiVarieExtra(extra);
-  return { ok: true, nome, errore: "", giaPresente: false };
+export function controllaNuovoTipoVarie(raw) {
+  return catalogoVarie.controllaNuovo(raw, "Scrivi il nome del nuovo tipo.");
+}
+
+export function aggiungiTipoVarie(raw, inLibreria = false) {
+  return catalogoVarie.aggiungi(raw, "Scrivi il nome del nuovo tipo.", inLibreria);
+}
+
+export function controllaRinominaTipoVarie(vecchio, nuovo) {
+  return catalogoVarie.controllaRinomina(vecchio, nuovo, "Scrivi la nuova dicitura.");
+}
+
+export function rinominaTipoVarie(vecchio, nuovo, inLibreria = false) {
+  return catalogoVarie.rinomina(vecchio, nuovo, "Scrivi la nuova dicitura.", inLibreria);
+}
+
+export function eliminaTipoVarie(nome, inLibreria = false) {
+  return catalogoVarie.elimina(nome, inLibreria);
+}
+
+export function tipoVarieInLibreria(nome) {
+  return catalogoVarie.inLibreria(nome);
 }
 
 export function normalizzaTipoVarie(raw) {
@@ -466,62 +819,116 @@ function storageTipiImpianto(tipo) {
   return STORAGE_TIPI_IMPIANTO[tipo] || "";
 }
 
-function loadTipiImpiantoExtra(tipo) {
-  const key = storageTipiImpianto(tipo);
-  if (!key) return [];
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
+function catalogoImpianto(tipo) {
+  const legacy = storageTipiImpianto(tipo);
+  const id = String(tipo || "");
+  return creaCatalogoTipi([], {
+    libreriaExtra: `lp_libreria_strade_${id}`,
+    libreriaMeta: `lp_libreria_strade_${id}_meta`,
+    localeExtra: `computo_metrico_strade_tipi_locale_${id}`,
+    localeMeta: `computo_metrico_strade_tipi_locale_${id}_meta`,
+    legacyExtra: legacy,
+    legacyMeta: legacy ? `${legacy}_meta` : "",
+  });
 }
 
-function saveTipiImpiantoExtra(tipo, nomi) {
-  const key = storageTipiImpianto(tipo);
-  if (!key) return;
-  try {
-    localStorage.setItem(key, JSON.stringify(nomi));
-  } catch {
-    /* ignore */
-  }
+for (const tipoImpianto of Object.keys(STORAGE_TIPI_IMPIANTO)) {
+  catalogoImpianto(tipoImpianto).elenco();
 }
 
 export function elencoTipiImpianto(tipo) {
-  const out = [];
-  const seen = new Set();
-  for (const extra of loadTipiImpiantoExtra(tipo)) {
-    const nome = String(extra ?? "").trim().replace(/\s+/g, " ");
-    const key = chiaveTipoManufatto(nome);
-    if (!nome || seen.has(key)) continue;
-    seen.add(key);
-    out.push(nome);
-  }
-  return out;
+  if (!isZonaComeManufatti(tipo)) return [];
+  return catalogoImpianto(tipo).elenco();
 }
 
 /**
  * @returns {{ ok: boolean, nome: string, errore: string, giaPresente: boolean }}
  */
-export function aggiungiTipoImpianto(tipo, raw) {
+function erroreImpianto(tipo) {
+  return !isZonaComeManufatti(tipo);
+}
+
+export function controllaNuovoTipoImpianto(tipo, raw) {
   const etichetta = ZONA_LABELS[tipo] || "questa scheda";
-  if (!isZonaComeManufatti(tipo)) {
+  if (erroreImpianto(tipo)) {
     return { ok: false, nome: "", errore: "Questo tipo non si aggiunge in questa scheda.", giaPresente: false };
   }
-  const nome = String(raw ?? "").trim().replace(/\s+/g, " ");
-  if (!nome) return { ok: false, nome: "", errore: `Scrivi il nome del nuovo tipo di ${etichetta}.`, giaPresente: false };
-  if (nome.length > 60) {
-    return { ok: false, nome: "", errore: "Il nome del tipo è troppo lungo (massimo 60 caratteri).", giaPresente: false };
+  return catalogoImpianto(tipo).controllaNuovo(raw, `Scrivi il nome del nuovo tipo di ${etichetta}.`);
+}
+
+export function aggiungiTipoImpianto(tipo, raw, inLibreria = false) {
+  const etichetta = ZONA_LABELS[tipo] || "questa scheda";
+  if (erroreImpianto(tipo)) {
+    return { ok: false, nome: "", errore: "Questo tipo non si aggiunge in questa scheda.", giaPresente: false };
   }
-  const key = chiaveTipoManufatto(nome);
-  const noto = elencoTipiImpianto(tipo).find((x) => chiaveTipoManufatto(x) === key);
-  if (noto) return { ok: true, nome: noto, errore: "", giaPresente: true };
-  const extra = loadTipiImpiantoExtra(tipo);
-  extra.push(nome);
-  saveTipiImpiantoExtra(tipo, extra);
-  return { ok: true, nome, errore: "", giaPresente: false };
+  return catalogoImpianto(tipo).aggiungi(raw, `Scrivi il nome del nuovo tipo di ${etichetta}.`, inLibreria);
+}
+
+export function controllaRinominaTipoImpianto(tipo, vecchio, nuovo) {
+  const etichetta = ZONA_LABELS[tipo] || "questa scheda";
+  if (erroreImpianto(tipo)) {
+    return {
+      ok: false,
+      nome: "",
+      errore: "Questo tipo non si modifica in questa scheda.",
+      giaPresente: false,
+      invariato: false,
+    };
+  }
+  return catalogoImpianto(tipo).controllaRinomina(vecchio, nuovo, `Scrivi la nuova dicitura di ${etichetta}.`);
+}
+
+export function rinominaTipoImpianto(tipo, vecchio, nuovo, inLibreria = false) {
+  const etichetta = ZONA_LABELS[tipo] || "questa scheda";
+  if (erroreImpianto(tipo)) {
+    return {
+      ok: false,
+      nome: "",
+      errore: "Questo tipo non si modifica in questa scheda.",
+      giaPresente: false,
+      invariato: false,
+    };
+  }
+  return catalogoImpianto(tipo).rinomina(vecchio, nuovo, `Scrivi la nuova dicitura di ${etichetta}.`, inLibreria);
+}
+
+export function eliminaTipoImpianto(tipo, nome, inLibreria = false) {
+  if (erroreImpianto(tipo)) {
+    return { ok: false, errore: "Questo tipo non si elimina in questa scheda." };
+  }
+  return catalogoImpianto(tipo).elimina(nome, inLibreria);
+}
+
+export function tipoImpiantoInLibreria(tipo, nome) {
+  if (erroreImpianto(tipo)) return false;
+  return catalogoImpianto(tipo).inLibreria(nome);
+}
+
+function catalogoTipiZona(tipoZona) {
+  if (isZonaManufatti(tipoZona)) return catalogoManufatto;
+  if (isZonaCordoli(tipoZona)) return catalogoCordolo;
+  if (isZonaSegnaletica(tipoZona)) return catalogoSegnaletica;
+  if (isZonaVarie(tipoZona)) return catalogoVarie;
+  if (isZonaComeManufatti(tipoZona)) return catalogoImpianto(tipoZona);
+  return null;
+}
+
+/** Se il tipo è in libreria, Dimensioni e Spessore salvati. Altrimenti null. */
+export function misureTipoDaLibreria(tipoZona, nome) {
+  const nomePulito = String(nome ?? "").trim();
+  if (!nomePulito) return null;
+  const cat = catalogoTipiZona(tipoZona);
+  if (!cat || !cat.inLibreria(nomePulito)) return null;
+  const m = cat.leggiMisure(nomePulito);
+  return {
+    dimensioni: String(m?.dimensioni || "").trim(),
+    spessore: String(m?.altezza || "").trim(),
+  };
+}
+
+/** Se il tipo è in libreria, restituisce il testo di Dimensioni. Altrimenti stringa vuota. */
+export function dimensioniFormulaDaLibreria(tipoZona, nome) {
+  return misureTipoDaLibreria(tipoZona, nome)?.dimensioni || "";
 }
 
 export function normalizzaTipoImpianto(tipo, raw) {
@@ -534,7 +941,7 @@ export function normalizzaTipoImpianto(tipo, raw) {
   return aggiunto.ok ? aggiunto.nome : "";
 }
 
-/** Larghezza vuota = nulla (la quantità resta la formula). Numero ≥ 0 = metri, e la quantità diventa mq. */
+/** Larghezza vuota = non si moltiplica. Se c’è un numero, la quantità è formula × larghezza × pezzi. */
 export function larghezzaArea(area) {
   const txt = String(area?.larghezza ?? "").trim();
   if (txt === "") return null;
@@ -572,6 +979,28 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
+/** Come evalFormulaArea, e accetta anche la «x» al posto del per. Esempio: 0,40 x 0,40. */
+function evalFormulaDimensioni(raw) {
+  const txt = String(raw ?? "").trim().replaceAll("x", "*").replaceAll("X", "*");
+  return evalFormulaArea(txt);
+}
+
+function parseAltezzaTipo(raw) {
+  const txt = String(raw ?? "").trim();
+  if (!txt) return { vuota: true, valore: null, valida: true };
+  const n = Number(txt.replace(",", "."));
+  if (!Number.isFinite(n) || n < 0) return { vuota: false, valore: null, valida: false };
+  return { vuota: false, valore: Number(n.toFixed(3)), valida: true };
+}
+
+function calcolaAreaVolumeTipo(dimensioni, altezza) {
+  const testo = String(dimensioni ?? "").trim();
+  const area = testo ? evalFormulaDimensioni(testo) : null;
+  const h = parseAltezzaTipo(altezza);
+  const volume = area != null && !h.vuota && h.valida ? Number((area * h.valore).toFixed(3)) : null;
+  return { area, volume, formulaErrata: testo !== "" && area == null, altezzaErrata: !h.valida };
+}
+
 /** Valuta una formula come in MISURE VARIE: numeri, + − * /, parentesi. */
 export function evalFormulaArea(raw) {
   const txt = String(raw ?? "").trim();
@@ -579,6 +1008,8 @@ export function evalFormulaArea(raw) {
   const normalized = txt
     .replaceAll(",", ".")
     .replaceAll("×", "*")
+    .replaceAll("x", "*")
+    .replaceAll("X", "*")
     .replaceAll("⋅", "*")
     .replaceAll("·", "*")
     .replaceAll("−", "-")
@@ -622,6 +1053,14 @@ function formulaArea(area) {
   const diretta = String(area?.formula ?? "").trim();
   if (diretta) return diretta;
   return formulaDaLatiLegacy(area?.lato1, area?.lato2);
+}
+
+function testoDimensioniArea(area) {
+  return pulisciNomeTipo(area?.dimensioni || "").slice(0, 80);
+}
+
+function testoSpessoreArea(area) {
+  return pulisciNomeTipo(area?.spessore || "").slice(0, 40);
 }
 
 /** Risultato = formula × moltiplicatore. Se c’è la larghezza, si moltiplica anche quella (mq). */
@@ -678,6 +1117,92 @@ export function chiaveRiferimento(raw) {
     .toLocaleLowerCase("it-IT");
 }
 
+/** Nome lungo, come la voce breve: «Pozzetto ispezione (Fogna)». */
+function etichettaTipoEstesa(tipoZona, nomeTipo) {
+  const nome = String(nomeTipo ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return "";
+  const sezione = ZONA_LABELS[tipoZona] || tipoZona;
+  return `${nome} (${sezione})`;
+}
+
+const ZONE_SPUNTA_MANUFATTI = ["fogna", "allacciFogna", "lucePubblica", "lucePrivata", "gas", "acqua", "telefonica", "varie"];
+
+function nomeTipoPerSpuntaManufatti(tipo, area) {
+  if (isZonaVarie(tipo)) return normalizzaTipoVarie(area?.tipoVarie);
+  if (isZonaComeManufatti(tipo)) return normalizzaTipoImpianto(tipo, area?.tipoImpianto);
+  return "";
+}
+
+/** Righe di Fogna, impianti e Varie con la spunta Manufatti. Non sono salvate nella scheda Manufatti. */
+export function areeManufattiDaSpunta(scheda) {
+  const out = [];
+  for (const tipo of ZONE_SPUNTA_MANUFATTI) {
+    for (const area of scheda?.[tipo]?.aree || []) {
+      if (area?.inManufatti !== true) continue;
+      const nome = nomeTipoPerSpuntaManufatti(tipo, area);
+      if (!nome) continue;
+      out.push({
+        id: `der-${tipo}-${area.id}`,
+        derivata: true,
+        origineTipo: tipo,
+        origineId: area.id,
+        n: out.length + 1,
+        riferimento: typeof area.riferimento === "string" ? area.riferimento : "",
+        formula: formulaArea(area),
+        moltiplicatore: testoMoltiplicatore(area.moltiplicatore),
+        segno: area.segno === true,
+        tipoManufatto: etichettaTipoEstesa(tipo, nome),
+      });
+    }
+  }
+  return out;
+}
+
+/** Righe di Fogna, impianti e Varie con la spunta Reinterro. Non sono salvate in una scheda a parte. */
+export function areeReinterroDaSpunta(scheda) {
+  const out = [];
+  for (const tipo of ZONE_SPUNTA_MANUFATTI) {
+    for (const area of scheda?.[tipo]?.aree || []) {
+      if (area?.inReinterro !== true) continue;
+      const nome = nomeTipoPerSpuntaManufatti(tipo, area);
+      if (!nome) continue;
+      out.push({
+        id: `der-rei-${tipo}-${area.id}`,
+        derivata: true,
+        origineTipo: tipo,
+        origineId: area.id,
+        n: out.length + 1,
+        riferimento: typeof area.riferimento === "string" ? area.riferimento : "",
+        formula: formulaArea(area),
+        moltiplicatore: testoMoltiplicatore(area.moltiplicatore),
+        segno: area.segno === true,
+        tipoReinterro: etichettaTipoEstesa(tipo, nome),
+        dimensioni: testoDimensioniArea(area),
+        spessore: testoSpessoreArea(area),
+      });
+    }
+  }
+  return out;
+}
+
+function areaManufattoVuota(area) {
+  return (
+    !String(area?.tipoManufatto ?? "").trim() &&
+    !String(area?.formula ?? "").trim() &&
+    !String(area?.riferimento ?? "").trim()
+  );
+}
+
+function mqManufattiPerRiferimento(scheda, rifKey) {
+  let tot = mqNettoZonaPerRiferimento(scheda?.manufatti, rifKey);
+  for (const area of areeManufattiDaSpunta(scheda)) {
+    if (chiaveRiferimento(area.riferimento) !== rifKey) continue;
+    const mq = mqDiArea(area);
+    tot += area.segno === true ? -mq : mq;
+  }
+  return Number(tot.toFixed(3));
+}
+
 export function mqNettoZonaPerRiferimento(zona, rifKey) {
   let tot = 0;
   for (const area of zona?.aree || []) {
@@ -705,6 +1230,11 @@ export function elencoRiferimentiSede(scheda) {
       else if (tipo === "ingombro" && label) labels.set(key, label);
     }
   }
+  for (const a of areeManufattiDaSpunta(scheda)) {
+    const key = chiaveRiferimento(a.riferimento);
+    const label = String(a.riferimento ?? "").trim();
+    if (!labels.has(key)) labels.set(key, label);
+  }
   let n = 1;
   const rows = [];
   for (const [key, riferimento] of labels) {
@@ -712,7 +1242,7 @@ export function elencoRiferimentiSede(scheda) {
     const mqMarciapiedi = mqNettoZonaPerRiferimento(scheda?.marciapiedi, key);
     const mqAiuole = mqNettoZonaPerRiferimento(scheda?.aiuole, key);
     const mqParcheggi = mqNettoZonaPerRiferimento(scheda?.parcheggi, key);
-    const mqManufatti = mqNettoZonaPerRiferimento(scheda?.manufatti, key);
+    const mqManufatti = mqManufattiPerRiferimento(scheda, key);
     const mqSede = Number(
       (mqIngombro - mqMarciapiedi - mqAiuole - mqParcheggi - mqManufatti).toFixed(3),
     );
@@ -780,6 +1310,10 @@ export function emptyAreaStrada(nextId, n = 1) {
     tipoVarie: "",
     tipoImpianto: "",
     larghezza: "",
+    dimensioni: "",
+    spessore: "",
+    inManufatti: false,
+    inReinterro: false,
   };
 }
 
@@ -808,6 +1342,10 @@ export function duplicaAreaStrada(area, nextId, n) {
     tipoVarie: normalizzaTipoVarie(src.tipoVarie),
     tipoImpianto: typeof src.tipoImpianto === "string" ? src.tipoImpianto.trim().replace(/\s+/g, " ") : "",
     larghezza: typeof src.larghezza === "string" ? src.larghezza : src.larghezza != null ? String(src.larghezza) : "",
+    dimensioni: testoDimensioniArea(src),
+    spessore: testoSpessoreArea(src),
+    inManufatti: src.inManufatti === true,
+    inReinterro: src.inReinterro === true,
   };
 }
 
@@ -901,6 +1439,10 @@ function sanificaArea(row, nextId, n, tipoZona) {
     tipoVarie: normalizzaTipoVarie(src.tipoVarie),
     tipoImpianto: normalizzaTipoImpianto(tipoZona, src.tipoImpianto),
     larghezza: typeof src.larghezza === "string" ? src.larghezza : src.larghezza != null ? String(src.larghezza) : "",
+    dimensioni: testoDimensioniArea(src),
+    spessore: testoSpessoreArea(src),
+    inManufatti: src.inManufatti === true,
+    inReinterro: src.inReinterro === true,
   };
 }
 
@@ -998,6 +1540,10 @@ export function cloneZonaPerSnapshot(zona, tipoZona) {
       tipoVarie: normalizzaTipoVarie(a?.tipoVarie),
       tipoImpianto: normalizzaTipoImpianto(tipoZona, a?.tipoImpianto),
       larghezza: typeof a?.larghezza === "string" ? a.larghezza : a?.larghezza != null ? String(a.larghezza) : "",
+      dimensioni: testoDimensioniArea(a),
+      spessore: testoSpessoreArea(a),
+      inManufatti: a?.inManufatti === true,
+      inReinterro: a?.inReinterro === true,
     })),
     strati: strati.map((st, i) => ({
       id: typeof st?.id === "number" ? st.id : 0,
@@ -1032,6 +1578,7 @@ export function zonaHaMisuraCompilata(tipo, zona, schedaCompleta) {
   if (isZonaSedeStradale(tipo)) {
     return areeVirtualiSede(schedaCompleta).length > 0;
   }
+  if (isZonaReinterro(tipo)) return false;
   const aree = Array.isArray(zona?.aree) ? zona.aree : [];
   if (isZonaManufatti(tipo)) {
     return aree.some(
@@ -1136,6 +1683,7 @@ export function elencoZoneMisuraSenzaVoce(schedaCompleta) {
   const out = [];
   if (!schedaCompleta || typeof schedaCompleta !== "object") return out;
   for (const tipo of TIPI_ZONA_STRADA) {
+    if (isZonaReinterro(tipo)) continue;
     const zona = schedaCompleta[tipo];
     if (!zonaHaMisuraCompilata(tipo, zona, schedaCompleta)) continue;
     if (isZonaManufatti(tipo)) {
@@ -1211,10 +1759,16 @@ function appendFormulaEMoltiplicatore(
   if (inpF instanceof HTMLTextAreaElement) inpF.rows = 1;
   else inpF.type = "text";
   inpF.className = `${classPrefix}-formula`;
-  inpF.placeholder = pezzi ? "opz. area 1 pezzo" : lineare ? "es. 12,5" : "es. 12,5 * 3,2";
+  inpF.placeholder = pezzi
+    ? sottraeSede
+      ? "opz. area 1 pezzo"
+      : "es. 12,5 oppure 2*3"
+    : lineare
+      ? "es. 12,5"
+      : "es. 12,5 * 3,2";
   inpF.setAttribute(
     "aria-label",
-    pezzi ? `Formula area di un pezzo ${ariaBase}` : `Formula ${ariaBase}`,
+    pezzi && sottraeSede ? `Formula area di un pezzo ${ariaBase}` : `Formula ${ariaBase}`,
   );
   inpF.autocomplete = "off";
   inpF.spellcheck = false;
@@ -1241,7 +1795,7 @@ function appendFormulaEMoltiplicatore(
   inpM.title = pezzi
     ? sottraeSede
       ? "Quanti pezzi contare nelle VOCI (vuoto = 1). Se c’è una formula, quell’area × pezzi si toglie dalla Sede."
-      : "Quanti pezzi contare nelle VOCI (vuoto = 1)."
+      : "Moltiplica il risultato della formula (vuoto = 1). In VOCI la quantità è formula × pezzi."
     : lineare
       ? "Ripete il risultato della formula (vuoto = 1)"
       : "Moltiplica il risultato della formula (vuoto = 1)";
@@ -1337,6 +1891,138 @@ function appendLarghezza(tr, area) {
   tr.appendChild(td);
 }
 
+function appendTipoManufattoTesto(tr, testo, origineTipo) {
+  const td = document.createElement("td");
+  td.className = "strade-tipo-cell";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "strade-area-tipo-manufatto-testo";
+  inp.readOnly = true;
+  inp.value = testo || "";
+  const da = ZONA_LABELS[origineTipo] || "un'altra scheda";
+  inp.title = `Arriva da ${da}. È lo stesso nome che va in VOCI.`;
+  inp.setAttribute("aria-label", "Tipo manufatto");
+  td.appendChild(inp);
+  tr.appendChild(td);
+}
+
+function appendSpuntaManufatti(tr, area) {
+  const td = document.createElement("td");
+  td.className = "strade-spunta-cell";
+  const lbl = document.createElement("label");
+  lbl.className = "strade-spunta-manufatti";
+  const chk = document.createElement("input");
+  chk.type = "checkbox";
+  chk.className = "strade-area-in-manufatti";
+  chk.checked = area?.inManufatti === true;
+  chk.setAttribute("aria-label", "Copia questa riga in Manufatti");
+  lbl.title = "Se la spunti, la riga compare in Manufatti con il nome della voce, la stessa formula e gli stessi pezzi.";
+  lbl.append(chk, document.createTextNode(" Manufatti"));
+  td.appendChild(lbl);
+  tr.appendChild(td);
+}
+
+function appendSpuntaReinterro(tr, area) {
+  const td = document.createElement("td");
+  td.className = "strade-spunta-cell";
+  const lbl = document.createElement("label");
+  lbl.className = "strade-spunta-reinterro";
+  const chk = document.createElement("input");
+  chk.type = "checkbox";
+  chk.className = "strade-area-in-reinterro";
+  chk.checked = area?.inReinterro === true;
+  chk.setAttribute("aria-label", "Copia questa riga in Reinterro");
+  lbl.title = "Se la spunti, la riga compare in Reinterro con il nome della voce, Dimensioni, Spessore, la stessa formula e gli stessi pezzi.";
+  lbl.append(chk, document.createTextNode(" Reinterro"));
+  td.appendChild(lbl);
+  tr.appendChild(td);
+}
+
+function appendDimensioniSpessore(tr, area) {
+  const tdD = document.createElement("td");
+  const dim = document.createElement("input");
+  dim.type = "text";
+  dim.className = "strade-area-dimensioni";
+  dim.placeholder = "0,40 x 0,40";
+  dim.setAttribute("aria-label", "Dimensioni");
+  dim.autocomplete = "off";
+  dim.value = testoDimensioniArea(area);
+  tdD.appendChild(dim);
+  tr.appendChild(tdD);
+
+  const tdS = document.createElement("td");
+  const spe = document.createElement("input");
+  spe.type = "text";
+  spe.className = "strade-area-spessore";
+  spe.placeholder = "es. 0,10";
+  spe.setAttribute("aria-label", "Spessore");
+  spe.autocomplete = "off";
+  spe.value = testoSpessoreArea(area);
+  tdS.appendChild(spe);
+  tr.appendChild(tdS);
+}
+
+function appendTipoReinterroTesto(tr, testo, origineTipo) {
+  const td = document.createElement("td");
+  td.className = "strade-tipo-cell";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "strade-area-tipo-reinterro-testo";
+  inp.readOnly = true;
+  inp.value = testo || "";
+  const da = ZONA_LABELS[origineTipo] || "un'altra scheda";
+  inp.title = `Arriva da ${da}. È lo stesso nome che va in VOCI.`;
+  inp.setAttribute("aria-label", "Tipo reinterro");
+  td.appendChild(inp);
+  tr.appendChild(td);
+}
+
+function bloccaRigaManufattoDerivata(tr, origineTipo, vaiOrigine) {
+  const da = ZONA_LABELS[origineTipo] || "un'altra scheda";
+  for (const el of tr.querySelectorAll("input, textarea, select")) {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.readOnly = true;
+    if (el instanceof HTMLInputElement && el.type === "checkbox") el.disabled = true;
+    if (el instanceof HTMLSelectElement) el.disabled = true;
+  }
+  const act = tr.querySelector(".strade-area-act");
+  if (!act) return;
+  act.replaceChildren();
+  if (vaiOrigine && origineTipo) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn-action btn-secondary vani-btn-micro strade-btn-vai-origine";
+    btn.dataset.action = "vai-origine-riga";
+    btn.dataset.scheda = origineTipo;
+    btn.dataset.areaId = String(vaiOrigine.origineId ?? "");
+    btn.title = `Apri la riga in ${da}, dove puoi modificarla.`;
+    btn.setAttribute("aria-label", `Apri la riga in ${da}`);
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`;
+    act.appendChild(btn);
+    return;
+  }
+  const nota = document.createElement("span");
+  nota.className = "strade-riga-origine";
+  nota.textContent = da;
+  nota.title = `Riga copiata da ${da}. Per cambiarla, modifica quella scheda.`;
+  act.appendChild(nota);
+}
+
+function totaliAreeConDerivate(zona, extra) {
+  const base = totaliAreeZona(zona);
+  let mqPos = base.mqPos;
+  let mqNeg = base.mqNeg;
+  for (const area of extra || []) {
+    const mq = mqDiArea(area);
+    if (area?.segno === true) mqNeg += mq;
+    else mqPos += mq;
+  }
+  return {
+    mqPos: Number(mqPos.toFixed(3)),
+    mqNeg: Number(mqNeg.toFixed(3)),
+    mqNetto: Number((mqPos - mqNeg).toFixed(3)),
+  };
+}
+
 function appendTipoManufatto(tr, area) {
   const td = document.createElement("td");
   td.className = "strade-tipo-cell";
@@ -1380,15 +2066,20 @@ function appendTipoImpianto(tr, area, tipo) {
   tr.appendChild(td);
 }
 
-function renderAreeTable(tipo, zona) {
+function renderAreeTable(tipo, zona, schedaCompleta) {
   const wrap = document.createElement("div");
   wrap.className = "vani-sup-section";
   const isManufatti = isZonaManufatti(tipo);
+  const isReinterro = isZonaReinterro(tipo);
   const isImpianto = isZonaComeManufatti(tipo);
-  const comeManufatti = isManufatti || isImpianto;
+  const comeManufatti = isManufatti || isImpianto || isReinterro;
   const isCordoli = isZonaCordoli(tipo);
   const isSegnaletica = isZonaSegnaletica(tipo);
   const isVarie = isZonaVarie(tipo);
+  const conSpuntaManufatti = isImpianto || isVarie;
+  const conDimensioni = isImpianto || isVarie || isReinterro;
+  const colDimensioni = `<col class="strade-col-dimensioni"><col class="strade-col-spessore">`;
+  const thDimensioni = `<th>Dimensioni</th><th>Spessore</th>`;
   const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipo) && !isSegnaletica;
   const unitaCol = isCordoli ? "Ml" : isFormulaUnitaVoce || isVarie ? "Ris." : "Mq";
   const titoloSezione = isCordoli ? "Lunghezze" : isFormulaUnitaVoce || isVarie ? "Calcoli" : "Aree";
@@ -1403,7 +2094,7 @@ function renderAreeTable(tipo, zona) {
   tableWrap.className = "vani-sup-table-wrap";
   const table = document.createElement("table");
   table.className = comeManufatti
-    ? `vani-sup-aree-table strade-aree-table--${isImpianto ? "impianto" : "manufatti"}`
+    ? `vani-sup-aree-table strade-aree-table--${isReinterro ? "reinterro" : isImpianto ? "impianto" : "manufatti"}`
     : isCordoli
       ? "vani-sup-aree-table strade-aree-table--cordoli"
       : isSegnaletica
@@ -1415,11 +2106,13 @@ function renderAreeTable(tipo, zona) {
   table.innerHTML = comeManufatti
     ? `<colgroup>
     <col class="strade-col-n"><col class="strade-col-rif"><col class="strade-col-tipo">
+    ${isImpianto ? `<col class="strade-col-spunta"><col class="strade-col-spunta">` : ""}
+    ${isImpianto || isReinterro ? colDimensioni : ""}
     <col class="strade-col-formula"><col class="strade-col-mol"><col class="strade-col-mq">
-    <col class="strade-col-sottrai"><col class="strade-col-act">
+    ${isManufatti ? "" : `<col class="strade-col-sottrai">`}<col class="strade-col-act">
   </colgroup>
   <thead><tr>
-    <th>N°</th><th>Rif.</th><th>${escapeHtml(isManufatti ? "Tipo manufatto" : `Tipo ${etichettaTipo.toLocaleLowerCase("it-IT")}`)}</th><th>Formula</th><th>N° pezzi</th><th>Mq</th><th>Sottrai</th><th></th>
+    <th>N°</th><th>Rif.</th><th>${escapeHtml(isManufatti ? "Tipo manufatto" : isReinterro ? "Tipo reinterro" : `Tipo ${etichettaTipo.toLocaleLowerCase("it-IT")}`)}</th>${isImpianto ? "<th>Manufatti</th><th>Reinterro</th>" : ""}${isImpianto || isReinterro ? thDimensioni : ""}<th>Formula</th><th>N° pezzi</th><th>${isManufatti ? "Mq" : "Ris."}</th>${isManufatti ? "" : "<th>Sottrai</th>"}<th></th>
   </tr></thead>`
     : isCordoli
       ? `<colgroup>
@@ -1428,7 +2121,7 @@ function renderAreeTable(tipo, zona) {
     <col class="strade-col-sottrai"><col class="strade-col-act">
   </colgroup>
   <thead><tr>
-    <th>N°</th><th>Rif.</th><th>Tipo cordolo</th><th>Formula</th><th>×</th><th>Ml</th><th>Sottrai</th><th></th>
+    <th>N°</th><th>Rif.</th><th>Tipo cordolo</th><th>Formula</th><th>×</th><th>Ris.</th><th>Sottrai</th><th></th>
   </tr></thead>`
       : isSegnaletica
         ? `<colgroup>
@@ -1442,11 +2135,13 @@ function renderAreeTable(tipo, zona) {
         : isVarie
           ? `<colgroup>
     <col class="strade-col-n"><col class="strade-col-rif"><col class="strade-col-tipo">
+    <col class="strade-col-spunta"><col class="strade-col-spunta">
+    ${colDimensioni}
     <col class="strade-col-formula"><col class="strade-col-mol"><col class="strade-col-mq">
     <col class="strade-col-sottrai"><col class="strade-col-act">
   </colgroup>
   <thead><tr>
-    <th>N°</th><th>Rif.</th><th>Tipo varie</th><th>Formula</th><th>×</th><th>Ris.</th><th>Sottrai</th><th></th>
+    <th>N°</th><th>Rif.</th><th>Tipo varie</th><th>Manufatti</th><th>Reinterro</th>${thDimensioni}<th>Formula</th><th>×</th><th>Ris.</th><th>Sottrai</th><th></th>
   </tr></thead>`
           : `<colgroup>
     <col class="strade-col-n"><col class="strade-col-rif">
@@ -1458,10 +2153,24 @@ function renderAreeTable(tipo, zona) {
   </tr></thead>`;
   const tbody = document.createElement("tbody");
 
-  for (const area of zona.aree || []) {
+  const righeTabella = [];
+  if (isReinterro) {
+    for (const area of areeReinterroDaSpunta(schedaCompleta)) righeTabella.push({ area, derivata: true });
+  } else if (isManufatti) {
+    for (const area of areeManufattiDaSpunta(schedaCompleta)) righeTabella.push({ area, derivata: true });
+  }
+  if (!isReinterro) {
+    for (const area of zona.aree || []) {
+      if (isManufatti && areaManufattoVuota(area)) continue;
+      righeTabella.push({ area, derivata: false });
+    }
+  }
+
+  for (const { area, derivata } of righeTabella) {
     const tr = document.createElement("tr");
     tr.className = "vani-sup-area-row";
     tr.dataset.areaId = String(area.id);
+    if (derivata) tr.dataset.derivata = "1";
 
     const tdN = document.createElement("td");
     tdN.className = "vani-sup-strato-num";
@@ -1481,11 +2190,18 @@ function renderAreeTable(tipo, zona) {
     tdRif.appendChild(inpRif);
     tr.appendChild(tdRif);
 
-    if (isManufatti) appendTipoManufatto(tr, area);
+    if (isReinterro) appendTipoReinterroTesto(tr, area.tipoReinterro, area.origineTipo);
+    else if (isManufatti && derivata) appendTipoManufattoTesto(tr, area.tipoManufatto, area.origineTipo);
+    else if (isManufatti) appendTipoManufatto(tr, area);
     if (isImpianto) appendTipoImpianto(tr, area, tipo);
     if (isCordoli) appendTipoCordolo(tr, area);
     if (isSegnaletica) appendTipoSegnaletica(tr, area);
     if (isVarie) appendTipoVarie(tr, area);
+    if (conSpuntaManufatti) {
+      appendSpuntaManufatti(tr, area);
+      appendSpuntaReinterro(tr, area);
+    }
+    if (conDimensioni) appendDimensioniSpessore(tr, area);
 
     appendFormulaEMoltiplicatore(
       tr,
@@ -1494,7 +2210,7 @@ function renderAreeTable(tipo, zona) {
       isCordoli ? "lunghezza" : isSegnaletica ? "segnaletica" : isVarie || isFormulaUnitaVoce ? "calcolo" : "area",
       {
         pezzi: comeManufatti,
-        lineare: isCordoli || isSegnaletica || isVarie || isFormulaUnitaVoce,
+        lineare: isCordoli || isSegnaletica || isVarie || isFormulaUnitaVoce || isReinterro,
         multilinea: conTipo,
         sottraeSede: isManufatti,
         primaMoltiplicatore: isSegnaletica ? () => appendLarghezza(tr, area) : null,
@@ -1504,6 +2220,7 @@ function renderAreeTable(tipo, zona) {
     const mqInfo = testoMqRiga(area, area.segno === true);
     appendCellettaMq(tr, mqInfo.text, mqInfo.err, "area-mq");
 
+    if (!isManufatti) {
     const tdSegno = document.createElement("td");
     tdSegno.className = "vani-sup-strato-segno-cell";
     const lbl = document.createElement("label");
@@ -1523,6 +2240,7 @@ function renderAreeTable(tipo, zona) {
     lbl.append(" sottrai");
     tdSegno.appendChild(lbl);
     tr.appendChild(tdSegno);
+    }
 
     const tdAct = document.createElement("td");
     tdAct.className = "strade-area-act";
@@ -1532,6 +2250,7 @@ function renderAreeTable(tipo, zona) {
     btnDup.dataset.action = "duplica-area-strada";
     btnDup.dataset.tipoZona = tipo;
     btnDup.dataset.areaId = String(area.id);
+    if (derivata) btnDup.disabled = true;
     btnDup.title = "Duplica area (copia formula, moltiplicatore e segno)";
     btnDup.setAttribute("aria-label", "Duplica area");
     btnDup.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M5 17V5a2 2 0 0 1 2-2h10"/></svg>`;
@@ -1544,68 +2263,273 @@ function renderAreeTable(tipo, zona) {
     btnRm.dataset.areaId = String(area.id);
     btnRm.textContent = "✕";
     btnRm.title = "Rimuovi area";
-    btnRm.disabled = (zona.aree || []).length <= 1;
+    btnRm.disabled = derivata || (zona.aree || []).length <= 1;
     tdAct.appendChild(btnRm);
     tr.appendChild(tdAct);
+    if (derivata) {
+      bloccaRigaManufattoDerivata(
+        tr,
+        area.origineTipo,
+        isManufatti ? { origineId: area.origineId } : null,
+      );
+    }
 
     tbody.appendChild(tr);
   }
 
   table.appendChild(tbody);
 
-  const t = totaliAreeZona(zona);
-  const labelColspan = isSegnaletica ? 6 : conTipo ? 5 : 4;
+  const t = totaliAreeConDerivate(
+    isReinterro ? { aree: [] } : zona,
+    isReinterro ? areeReinterroDaSpunta(schedaCompleta) : isManufatti ? areeManufattiDaSpunta(schedaCompleta) : [],
+  );
+  const labelColspan =
+    (isSegnaletica ? 6 : conTipo ? 5 : 4) + (conSpuntaManufatti ? 2 : 0) + (conDimensioni ? 2 : 0);
   const labelPos = isCordoli
     ? "Totale lunghezze positive"
     : isSegnaletica
       ? "Totale positivo"
-      : isFormulaUnitaVoce || isVarie
+      : isFormulaUnitaVoce || isVarie || isReinterro
       ? "Totale valori positivi"
       : "Totale aree positive";
   const labelNeg = isCordoli
     ? "Totale lunghezze negative"
     : isSegnaletica
       ? "Totale negativo"
-      : isFormulaUnitaVoce || isVarie
+      : isFormulaUnitaVoce || isVarie || isReinterro
       ? "Totale valori negativi"
       : "Totale aree negative";
   const labelNetto = isCordoli
-    ? "Ml netto zona (base per gli strati)"
+    ? "Risultato netto (formula × pezzi; unità in VOCI)"
     : isSegnaletica
-      ? "Risultato netto (se c’è la larghezza è in mq)"
+      ? "Risultato netto (formula × larghezza × pezzi; unità in VOCI)"
       : isFormulaUnitaVoce
       ? "Risultato netto (base per gli strati; unità = voce)"
       : isVarie
-        ? "Risultato netto (unità = voce del tipo)"
-        : isImpianto
-          ? "Mq netto (formula × pezzi; non entra nella Sede)"
+        ? "Risultato netto (formula × pezzi; unità in VOCI)"
+        : isReinterro
+          ? "Risultato netto (formula × pezzi, copiato dalle schede di partenza)"
+          : isImpianto
+          ? "Risultato netto (formula × pezzi; unità in VOCI; non entra nella Sede)"
       : "Mq netto zona (base per gli strati)";
+  const codaColspan = isManufatti ? 1 : 2;
   const tfoot = document.createElement("tfoot");
   tfoot.innerHTML = `
     <tr class="vani-sup-totale-row vani-sup-totale-row--pos">
       <td colspan="${labelColspan}">${labelPos}</td>
       <td class="vani-sup-calc vani-sup-totale-mq-pos">${fmtDim(t.mqPos)}</td>
-      <td colspan="2"></td>
+      <td colspan="${codaColspan}"></td>
     </tr>
     <tr class="vani-sup-totale-row vani-sup-totale-row--neg">
       <td colspan="${labelColspan}">${labelNeg}</td>
       <td class="vani-sup-calc vani-sup-totale-mq-neg">${fmtTotaleNegativo(t.mqNeg)}</td>
-      <td colspan="2"></td>
+      <td colspan="${codaColspan}"></td>
     </tr>
     <tr class="vani-sup-totale-row vani-sup-totale-row--netto">
       <td colspan="${labelColspan}">${labelNetto}</td>
       <td class="vani-sup-calc vani-sup-totale-mq-netto">${fmtDim(t.mqNetto)}</td>
-      <td colspan="2"></td>
+      <td colspan="${codaColspan}"></td>
     </tr>`;
   table.appendChild(tfoot);
   tableWrap.appendChild(table);
   wrap.appendChild(tableWrap);
-  if (isManufatti) wrap.appendChild(renderNuovoTipoManufatto());
-  if (isImpianto) wrap.appendChild(renderNuovoTipoImpianto(tipo));
-  if (isCordoli) wrap.appendChild(renderNuovoTipoCordolo());
-  if (isSegnaletica) wrap.appendChild(renderNuovoTipoSegnaletica());
-  if (isVarie) wrap.appendChild(renderNuovoTipoVarie());
   return wrap;
+}
+
+export function zonaHaLibreriaTipi(tipo) {
+  return (
+    isZonaManufatti(tipo) ||
+    isZonaComeManufatti(tipo) ||
+    isZonaCordoli(tipo) ||
+    isZonaSegnaletica(tipo) ||
+    isZonaVarie(tipo)
+  );
+}
+
+export function renderElencoLibreriaTipologie(tipo) {
+  if (isZonaManufatti(tipo)) {
+    return renderElencoTipiModificabili(
+      elencoTipiManufatto(),
+      "salva-tipo-manufatto",
+      "elimina-tipo-manufatto",
+      "",
+      catalogoManufatto,
+    );
+  }
+  if (isZonaComeManufatti(tipo)) {
+    return renderElencoTipiModificabili(
+      elencoTipiImpianto(tipo),
+      "salva-tipo-impianto",
+      "elimina-tipo-impianto",
+      tipo,
+      catalogoImpianto(tipo),
+    );
+  }
+  if (isZonaCordoli(tipo)) {
+    return renderElencoTipiModificabili(
+      elencoTipiCordolo(),
+      "salva-tipo-cordolo",
+      "elimina-tipo-cordolo",
+      "",
+      catalogoCordolo,
+    );
+  }
+  if (isZonaSegnaletica(tipo)) {
+    return renderElencoTipiModificabili(
+      elencoTipiSegnaletica(),
+      "salva-tipo-segnaletica",
+      "elimina-tipo-segnaletica",
+      "",
+      catalogoSegnaletica,
+    );
+  }
+  if (isZonaVarie(tipo)) {
+    return renderElencoTipiModificabili(elencoTipiVarie(), "salva-tipo-varie", "elimina-tipo-varie", "", catalogoVarie);
+  }
+  const vuoto = document.createElement("p");
+  vuoto.className = "strade-tipi-esistenti-vuoto";
+  vuoto.textContent = "Questa scheda non ha una libreria di tipi.";
+  return vuoto;
+}
+
+function renderBarraTipologie(tipo) {
+  const bar = document.createElement("div");
+  bar.className = "strade-tipologie-barra";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-action btn-secondary strade-btn-libreria-tipologie";
+  btn.dataset.action = "apri-libreria-tipologie";
+  btn.textContent = "Libreria Tipologie";
+  const nuovo = isZonaManufatti(tipo)
+    ? renderNuovoTipoManufatto()
+    : isZonaComeManufatti(tipo)
+      ? renderNuovoTipoImpianto(tipo)
+      : isZonaCordoli(tipo)
+        ? renderNuovoTipoCordolo()
+        : isZonaSegnaletica(tipo)
+          ? renderNuovoTipoSegnaletica()
+          : renderNuovoTipoVarie();
+  bar.append(btn, nuovo);
+  return bar;
+}
+
+function aggiornaCalcoliTipoRiga(row) {
+  const dim = row.querySelector(".strade-tipo-dimensioni");
+  const alt = row.querySelector(".strade-tipo-spessore");
+  const areaEl = row.querySelector(".strade-tipo-area");
+  const volEl = row.querySelector(".strade-tipo-volume");
+  if (!(dim instanceof HTMLInputElement) || !(alt instanceof HTMLInputElement) || !areaEl || !volEl) return;
+  const calc = calcolaAreaVolumeTipo(dim.value, alt.value);
+  areaEl.textContent = calc.area == null ? "—" : fmtDim(calc.area);
+  volEl.textContent = calc.volume == null ? "—" : fmtDim(calc.volume);
+  areaEl.title = calc.formulaErrata
+    ? "Formula non valida. Usa numeri e x, per esempio 0,40 x 0,40."
+    : "Risultato della formula Dimensioni";
+  volEl.title = calc.altezzaErrata
+    ? "Spessore non valido. Scrivi un numero, oppure lascialo vuoto."
+    : calc.volume == null
+      ? "Volume vuoto perché manca lo spessore o l’area"
+      : "Area × Spessore";
+}
+
+function renderElencoTipiModificabili(nomi, actionSalva, actionElimina, tipoZona = "", catalogo = null) {
+  const box = document.createElement("div");
+  box.className = "strade-tipi-esistenti";
+  const title = document.createElement("p");
+  title.className = "strade-tipi-esistenti-titolo";
+  title.textContent = "Libreria tipi";
+  const hint = document.createElement("p");
+  hint.className = "strade-tipi-esistenti-hint";
+  hint.textContent =
+    "In Dimensioni scrivi una formula, per esempio 0,40 x 0,40. Area è il risultato. Volume è Area × Spessore. Se lo Spessore è vuoto, Volume resta vuoto. Questi numeri si salvano da soli con il tipo.";
+  box.append(title, hint);
+  if (!nomi.length) {
+    const empty = document.createElement("p");
+    empty.className = "strade-tipi-esistenti-vuoto";
+    empty.textContent = "Nessun tipo. Scrivilo nel campo in alto e premi Aggiungi tipo.";
+    box.append(empty);
+    return box;
+  }
+  const table = document.createElement("table");
+  table.className = "strade-tipi-tabella";
+  const thead = document.createElement("thead");
+  thead.innerHTML = `<tr>
+    <th>Tipo</th>
+    <th>Dimensioni</th>
+    <th>Spessore</th>
+    <th>Area</th>
+    <th>Volume</th>
+    <th></th>
+  </tr>`;
+  const tbody = document.createElement("tbody");
+  table.append(thead, tbody);
+  for (const nome of nomi) {
+    const mis = catalogo?.leggiMisure?.(nome) || { dimensioni: "", altezza: "" };
+    const row = document.createElement("tr");
+    row.className = "strade-tipo-riga";
+    const tdNome = document.createElement("td");
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "strade-tipo-nome-edit";
+    inp.value = nome;
+    inp.dataset.nomeOriginale = nome;
+    inp.setAttribute("aria-label", `Dicitura del tipo ${nome}`);
+    inp.autocomplete = "off";
+    tdNome.append(inp);
+    const tdDim = document.createElement("td");
+    const dim = document.createElement("input");
+    dim.type = "text";
+    dim.className = "strade-tipo-dimensioni";
+    dim.value = mis.dimensioni || "";
+    dim.placeholder = "0,40 x 0,40";
+    dim.setAttribute("aria-label", `Dimensioni di ${nome}`);
+    dim.autocomplete = "off";
+    tdDim.append(dim);
+    const tdAlt = document.createElement("td");
+    const alt = document.createElement("input");
+    alt.type = "text";
+    alt.className = "strade-tipo-spessore";
+    alt.value = mis.altezza || "";
+    alt.placeholder = "es. 0,10";
+    alt.setAttribute("aria-label", `Spessore di ${nome}`);
+    alt.autocomplete = "off";
+    tdAlt.append(alt);
+    const tdArea = document.createElement("td");
+    tdArea.className = "strade-tipo-area strade-tipo-calc";
+    tdArea.textContent = "—";
+    const tdVol = document.createElement("td");
+    tdVol.className = "strade-tipo-volume strade-tipo-calc";
+    tdVol.textContent = "—";
+    const tdAzioni = document.createElement("td");
+    const azioni = document.createElement("div");
+    azioni.className = "strade-tipo-azioni";
+    const salva = document.createElement("button");
+    salva.type = "button";
+    salva.className = "btn-action btn-secondary";
+    salva.dataset.action = actionSalva;
+    if (tipoZona) salva.dataset.tipoZona = tipoZona;
+    salva.textContent = "Salva nome";
+    const elim = document.createElement("button");
+    elim.type = "button";
+    elim.className = "btn-action btn-delete";
+    elim.dataset.action = actionElimina;
+    if (tipoZona) elim.dataset.tipoZona = tipoZona;
+    elim.textContent = "Elimina";
+    azioni.append(salva, elim);
+    tdAzioni.append(azioni);
+    row.append(tdNome, tdDim, tdAlt, tdArea, tdVol, tdAzioni);
+    const salvaMisureRiga = () => {
+      aggiornaCalcoliTipoRiga(row);
+      const originale = inp.dataset.nomeOriginale || nome;
+      catalogo?.salvaMisure?.(originale, { dimensioni: dim.value, altezza: alt.value });
+    };
+    dim.addEventListener("input", salvaMisureRiga);
+    alt.addEventListener("input", salvaMisureRiga);
+    aggiornaCalcoliTipoRiga(row);
+    tbody.append(row);
+  }
+  box.append(table);
+  return box;
 }
 
 function renderNuovoTipoVarie() {
@@ -2036,19 +2960,22 @@ export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }
   hint.textContent = isSede
     ? "Le aree si calcolano da sole: per ogni riferimento, Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti). I manufatti senza area non vengono sottratti. Cordoli e le schede impianti (Segnaletica, Fogna, Allacci fogna, Luci, Gas, Acqua, Telefonica) non entrano in questo calcolo. Qui puoi solo aggiungere strati. Il primo strato è già «SEDE STRADALE»."
     : isZonaManufatti(tipo)
-      ? "Scegli il tipo, oppure aggiungine uno nuovo sotto la tabella. Ogni tipo diventa una voce nelle VOCI: lì scrivi la descrizione e il prezzo. Il campo N° pezzi è la quantità, a numero. Se compili anche una formula, quell’area × pezzi viene sottratta dalla Sede stradale."
+      ? "Questa scheda è in sola lettura. Le righe arrivano dalla spunta Manufatti in Fogna, negli impianti o in Varie. Il tipo è il nome della voce, per esempio Pozzetto ispezione (Fogna). Formula e N° pezzi sono quelli della scheda di partenza. L’icona della lente apre la scheda da cui arriva la riga."
+      : isZonaReinterro(tipo)
+        ? "Questa scheda è in sola lettura. Le righe arrivano dalla spunta Reintero in Fogna, negli impianti o in Varie. Il tipo è il nome della voce, per esempio Pozzetto ispezione (Fogna). Dimensioni, Spessore, formula e N° pezzi sono quelli della scheda di partenza."
       : isZonaCordoli(tipo)
-        ? "Scegli il tipo di cordolo (Retto, Curvo, oppure aggiungine uno nuovo). Ogni tipo diventa una voce nelle VOCI: lì scrivi la descrizione e il prezzo. In Formula metti la lunghezza (es. 12,5 oppure 3+4,2): la quantità è in metri lineari (ml). I Cordoli non vengono sottratti dalla Sede stradale."
+        ? "Scegli il tipo di cordolo (Retto, Curvo, oppure aggiungine uno nuovo). Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × pezzi. Se la formula è vuota, la quantità è 0. I Cordoli non vengono sottratti dalla Sede stradale."
         : isZonaSegnaletica(tipo)
-          ? "Scegli il tipo di segnaletica, oppure aggiungine uno nuovo. Ogni tipo diventa una voce nelle VOCI. In Formula metti la misura (es. 12,5). La larghezza puoi lasciarla vuota: la quantità resta quella della formula e l’unità la scegli in VOCI. Se scrivi la larghezza in metri, la quantità diventa mq (formula × larghezza). Non viene sottratta dalla Sede."
+          ? "Scegli il tipo di segnaletica, oppure aggiungine uno nuovo. Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × larghezza × pezzi. Se manca la larghezza, conta come 1. Se la formula è vuota, la quantità è 0. Non viene sottratta dalla Sede."
           : isZonaVarie(tipo)
-            ? "Scegli il tipo (per ora Reinterro, oppure aggiungine uno nuovo). Ogni tipo diventa una voce nelle VOCI: lì scegli l’unità di misura e il prezzo. In Formula scrivi il calcolo (es. 12,5 oppure 2*3*0,4). Il risultato va in quella voce. Varie non entra nella Sede stradale."
+            ? "Scegli il tipo (per ora Reinterro, oppure aggiungine uno nuovo). Se il tipo è in libreria, Dimensioni e Spessore si compilano da soli. Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × pezzi. Se la formula è vuota, la quantità è 0. La spunta Manufatti copia la riga nella scheda Manufatti. La spunta Reinterro copia anche Dimensioni e Spessore. Varie non entra nella Sede stradale."
             : isZonaComeManufatti(tipo)
-              ? "Scegli il tipo, oppure aggiungine uno nuovo sotto la tabella. Ogni tipo diventa una voce nelle VOCI: lì scrivi la descrizione e il prezzo. Il campo N° pezzi è la quantità, a numero. La formula è facoltativa. Questa scheda non viene sottratta dalla Sede stradale."
+              ? "Scegli il tipo, oppure aggiungine uno nuovo nel campo in alto. Se il tipo è in libreria, Dimensioni e Spessore si compilano da soli. Nella casella resta solo il nome, per esempio Pozzetto ispezione. In VOCI la voce breve diventa «Pozzetto ispezione (Luce pubblica)»: tra parentesi c’è questa scheda, così lo stesso tipo in un’altra sezione non si mescola. La spunta Manufatti copia la riga nella scheda Manufatti. La spunta Reinterro copia anche Dimensioni e Spessore, con la stessa formula e gli stessi pezzi. Lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × pezzi. Se la formula è vuota, la quantità è 0. Questa scheda non viene sottratta dalla Sede stradale."
             : isZonaFormulaUnitaVoce(tipo)
           ? "In Formula scrivi il calcolo (es. 2 oppure 1,2*3). Il moltiplicatore ripete quel risultato. L’unità di misura (n., ml., mq., a corpo…) la decide la Voce dello strato nelle VOCI. Questa scheda non viene sottratta dalla Sede stradale."
           : "In Formula puoi scrivere un’espressione (es. 12,5 * 3,2 oppure (10+2)/2). Il moltiplicatore (default 1) ripete quel risultato: 4, 1,5, 10… quello che ti serve. Il segno «sottrai» toglie quell’area da tutta la zona. Ogni strato parte da quel mq netto: puoi togliere altre aree solo da quello strato.";
 
+  if (zonaHaLibreriaTipi(tipo) && !isZonaManufatti(tipo)) block.appendChild(renderBarraTipologie(tipo));
   block.appendChild(head);
   block.appendChild(hint);
   if (isSede) {
@@ -2060,12 +2987,25 @@ export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }
       }),
     );
   } else {
-    block.appendChild(renderAreeTable(tipo, data));
-    if (!isZonaManufatti(tipo) && !isZonaComeManufatti(tipo) && !isZonaCordoli(tipo) && !isZonaSegnaletica(tipo) && !isZonaVarie(tipo)) {
+    block.appendChild(renderAreeTable(tipo, data, schedaCompleta));
+    if (!isZonaManufatti(tipo) && !isZonaReinterro(tipo) && !isZonaComeManufatti(tipo) && !isZonaCordoli(tipo) && !isZonaSegnaletica(tipo) && !isZonaVarie(tipo)) {
       block.appendChild(renderStratiCards(tipo, data, datalistId));
     }
   }
+  if (isZonaManufatti(tipo) || isZonaReinterro(tipo)) bloccaPannelloSolaLettura(block);
   return block;
+}
+
+function bloccaPannelloSolaLettura(block) {
+  block.classList.add("strade-pannello-sola-lettura");
+  for (const el of block.querySelectorAll("input, textarea, select, button")) {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      if (el.type === "checkbox") el.disabled = true;
+      else el.readOnly = true;
+    }
+    if (el instanceof HTMLSelectElement) el.disabled = true;
+    if (el instanceof HTMLButtonElement && !el.classList.contains("strade-btn-vai-origine")) el.disabled = true;
+  }
 }
 
 export function syncZonaDaBlock(block, zona) {
@@ -2101,6 +3041,14 @@ export function syncZonaDaBlock(block, zona) {
     if (tipoImp instanceof HTMLSelectElement) {
       area.tipoImpianto = normalizzaTipoImpianto(block.dataset.tipoZona || "", tipoImp.value);
     }
+    const spuntaMan = row.querySelector(".strade-area-in-manufatti");
+    if (spuntaMan instanceof HTMLInputElement) area.inManufatti = spuntaMan.checked;
+    const spuntaRei = row.querySelector(".strade-area-in-reinterro");
+    if (spuntaRei instanceof HTMLInputElement) area.inReinterro = spuntaRei.checked;
+    const dimArea = row.querySelector(".strade-area-dimensioni");
+    const speArea = row.querySelector(".strade-area-spessore");
+    if (dimArea instanceof HTMLInputElement) area.dimensioni = testoDimensioniArea({ dimensioni: dimArea.value });
+    if (speArea instanceof HTMLInputElement) area.spessore = testoSpessoreArea({ spessore: speArea.value });
     if (lar instanceof HTMLInputElement) area.larghezza = lar.value;
   });
 
@@ -2144,7 +3092,24 @@ export function aggiornaCalcoliZonaBlock(block, zona, mqBaseOverride) {
     }
   });
 
-  const t = totaliAreeZona(zona);
+  let extraPos = 0;
+  let extraNeg = 0;
+  block.querySelectorAll('.vani-sup-area-row[data-derivata="1"]').forEach((row) => {
+    const item = {
+      formula: row.querySelector(".strade-area-formula")?.value ?? "",
+      moltiplicatore: row.querySelector(".strade-area-moltiplicatore")?.value ?? "1",
+    };
+    const mq = mqDiArea(item);
+    const segno = row.querySelector(".vani-sup-area-segno");
+    if (segno instanceof HTMLInputElement && segno.checked) extraNeg += mq;
+    else extraPos += mq;
+  });
+  const t0 = totaliAreeZona(zona);
+  const t = {
+    mqPos: Number((t0.mqPos + extraPos).toFixed(3)),
+    mqNeg: Number((t0.mqNeg + extraNeg).toFixed(3)),
+    mqNetto: Number((t0.mqPos + extraPos - (t0.mqNeg + extraNeg)).toFixed(3)),
+  };
   const pos = block.querySelector(".vani-sup-totale-mq-pos");
   const neg = block.querySelector(".vani-sup-totale-mq-neg");
   const netto = block.querySelector(".vani-sup-totale-mq-netto");

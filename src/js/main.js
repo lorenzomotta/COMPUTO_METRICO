@@ -88,6 +88,8 @@ import {
   openVistaStrade,
   wireStradeUi,
 } from "./strade-misurazione.js";
+import { applicaStradeDaImport, datiStradePerExport } from "./strade.js";
+import { applicaSchedeModuliDaImport, leggiSchedeModuliPerExport } from "./modules/computoPacchettoSchede.js";
 import { openVistaMisureVarie, wireMisureVarieUi } from "./misure-varie.js";
 import { openVistaScavo, wireScavoUi, dismissScavoIfOpen } from "./scavo.js";
 import { buildRivestimentiRowsFromStorage, buildRivestimentiElevazioneRowsFromStorage, buildRivestimentiPerimetraliRowsFromStorage, buildIntonacoRusticoRowsFromStorage, buildIntonacoRusticoEsternoRowsFromStorage, buildIntonacoCivileRowsFromStorage, buildIntonacoCivileEsternoRowsFromStorage, buildGessoRowsFromStorage, buildZoccoloRowsFromStorage } from "./modules/rivestimentiRiepilogo.js";
@@ -6495,7 +6497,13 @@ window.addEventListener("DOMContentLoaded", () => {
                 trMm.appendChild(createCell(m.piano || ""));
                 trMm.appendChild(createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.tipoOggetto || "") : ""));
                 trMm.appendChild(createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.specifica || "") : (m.riferimento || "")));
-                trMm.appendChild(createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? "" : (m.formula || "")));
+                const daStradeRiga =
+                  typeof m?.stradeSchedaId === "string" && m.stradeSchedaId.trim() !== "";
+                trMm.appendChild(
+                  createCell(
+                    mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA && !daStradeRiga ? "" : (m.formula || ""),
+                  ),
+                );
                 trMm.appendChild(
                   createCell(mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA ? (m.misura1 === null ? "" : Number(m.misura1).toFixed(3)) : ""),
                 );
@@ -7791,19 +7799,19 @@ window.addEventListener("DOMContentLoaded", () => {
               const detailLine =
                 mmTipo === VOCE_MM_TIPO_SEMIAUTOMATICA
                   ? misurazioneDaStrade
-                    ? tipoOgPdf === "STRADA_MANUFATTO" ||
-                      tipoOgPdf === "STRADA_FOGNA" ||
-                      tipoOgPdf === "STRADA_ALLACCI_FOGNA" ||
-                      tipoOgPdf === "STRADA_LUCE_PUBBLICA" ||
-                      tipoOgPdf === "STRADA_LUCE_PRIVATA" ||
-                      tipoOgPdf === "STRADA_GAS" ||
-                      tipoOgPdf === "STRADA_ACQUA" ||
-                      tipoOgPdf === "STRADA_TELEFONICA"
+                    ? tipoOgPdf === "STRADA_MANUFATTO"
                       ? formatPdfDettaglioManufatto(m)
                       : tipoOgPdf === "STRADA_SEGNALETICA"
                         ? formatPdfDettaglioSegnaletica(m)
                         : tipoOgPdf === "STRADA_CORDOLI" ||
-                          tipoOgPdf === "STRADA_VARIE"
+                          tipoOgPdf === "STRADA_VARIE" ||
+                          tipoOgPdf === "STRADA_FOGNA" ||
+                          tipoOgPdf === "STRADA_ALLACCI_FOGNA" ||
+                          tipoOgPdf === "STRADA_LUCE_PUBBLICA" ||
+                          tipoOgPdf === "STRADA_LUCE_PRIVATA" ||
+                          tipoOgPdf === "STRADA_GAS" ||
+                          tipoOgPdf === "STRADA_ACQUA" ||
+                          tipoOgPdf === "STRADA_TELEFONICA"
                         ? formatPdfDettaglioCordoli(m)
                         : formatPdfDettaglioStrada(m)
                     : isSolaioInternoPdf
@@ -8418,6 +8426,13 @@ window.addEventListener("DOMContentLoaded", () => {
       archivioCapitoli: [...archivioCapitoli],
       vociUnitaMisuraOptions,
       ifcLink,
+      strade: datiStradePerExport(),
+      schedeModuli: leggiSchedeModuliPerExport(),
+      davanzaliSbordi: { ...davanzaliSbordiByKey },
+      soglieSbordi: { ...soglieSbordiByKey },
+      falsiTelaiLegnoAggiunte: { ...falsiTelaiLegnoAggiunteByKey },
+      falsiTelaiAlluminioAggiunte: { ...falsiTelaiAlluminioAggiunteByKey },
+      ifcData: ifcDataCache,
     };
   }
 
@@ -9580,6 +9595,18 @@ window.addEventListener("DOMContentLoaded", () => {
     if (ok) window.alert("Esportazione XLS completata.");
   }
 
+  function mappaDecimaliImport(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const out = {};
+    Object.entries(raw).forEach(([key, value]) => {
+      if (typeof key !== "string" || key.trim() === "") return;
+      const n = parseNonNegativeDecimal2(value);
+      if (n === null) return;
+      out[key] = Number(n.toFixed(2));
+    });
+    return out;
+  }
+
   async function importComputoFromPayload(payloadRaw) {
     const payload =
       payloadRaw && typeof payloadRaw === "object" && payloadRaw.data && typeof payloadRaw.data === "object"
@@ -9888,7 +9915,7 @@ window.addEventListener("DOMContentLoaded", () => {
     scaviEsterni = importedScavi;
     corselliEsterni = importedCorselli;
     scivoliEsterni = importedScivoli;
-    camminamentiEsterni = [];
+    camminamentiEsterni = importedCamminamenti;
     misurazioniVarie = importedMisurazioni;
     voci = importedVoci;
     capitolatoLibere = Array.isArray(payload.capitolatoLibere)
@@ -10000,6 +10027,32 @@ window.addEventListener("DOMContentLoaded", () => {
     saveVoci();
     saveCapitolatoLibere();
     saveVociUnitaOptions();
+    if (payload.strade && typeof payload.strade === "object") {
+      applicaStradeDaImport(payload.strade);
+    }
+    if (payload.schedeModuli && typeof payload.schedeModuli === "object") {
+      applicaSchedeModuliDaImport(payload.schedeModuli);
+    }
+    if (payload.davanzaliSbordi && typeof payload.davanzaliSbordi === "object") {
+      davanzaliSbordiByKey = mappaDecimaliImport(payload.davanzaliSbordi);
+      saveDavanzaliSbordi();
+    }
+    if (payload.soglieSbordi && typeof payload.soglieSbordi === "object") {
+      soglieSbordiByKey = mappaDecimaliImport(payload.soglieSbordi);
+      saveSoglieSbordi();
+    }
+    if (payload.falsiTelaiLegnoAggiunte && typeof payload.falsiTelaiLegnoAggiunte === "object") {
+      falsiTelaiLegnoAggiunteByKey = mappaDecimaliImport(payload.falsiTelaiLegnoAggiunte);
+      saveFalsiTelaiLegnoAggiunte();
+    }
+    if (payload.falsiTelaiAlluminioAggiunte && typeof payload.falsiTelaiAlluminioAggiunte === "object") {
+      falsiTelaiAlluminioAggiunteByKey = mappaDecimaliImport(payload.falsiTelaiAlluminioAggiunte);
+      saveFalsiTelaiAlluminioAggiunte();
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "ifcData")) {
+      ifcDataCache = payload.ifcData && typeof payload.ifcData === "object" ? payload.ifcData : null;
+      saveIfcData();
+    }
 
     setPianoFormMode();
     setStratiFormMode();
@@ -10037,6 +10090,7 @@ window.addEventListener("DOMContentLoaded", () => {
           (error && error.message ? ` Dettaglio: ${error.message}` : "");
       }
     }
+    document.dispatchEvent(new CustomEvent("computo-storage-ripristinato"));
     refreshComputoBaselineSnapshot();
     return { ifcLinkedPath: linkedIfcPath, ifcAutoLoaded, ifcAutoLoadMessage };
   }
@@ -12866,7 +12920,7 @@ window.addEventListener("DOMContentLoaded", () => {
   stradeSidebarButtonEl.type = "button";
   stradeSidebarButtonEl.className = "btn-action btn-secondary";
   stradeSidebarButtonEl.textContent = "STRADE";
-  stradeSidebarButtonEl.title = "Ingombro, marciapiedi, aiuole, parcheggi, manufatti, cordoli, sede, segnaletica, fogna, allacci fogna, luci, gas, acqua, telefonica e varie";
+  stradeSidebarButtonEl.title = "Ingombro, marciapiedi, aiuole, parcheggi, manufatti, cordoli, sede, reinterro, segnaletica, fogna, allacci fogna, luci, gas, acqua, telefonica e varie";
   stradeSidebarButtonEl.addEventListener("click", () => {
     openVistaStrade();
   });

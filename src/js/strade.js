@@ -12,10 +12,14 @@ import { popolaDatalistVocibrevi } from "./modules/archivioVociVocibrevi.js";
 import {
   aggiornaVociDaSnapshotStrade,
   rimuoviRigheMisurazioniPerSchedaStrade,
+  rinominaVoceTipoStrade,
+  tipoStradeUsatoNelComputo,
+  voceBreveDaTipoZona,
 } from "./modules/stradeRegistroAggiornaVoci.js";
 import {
   TIPI_ZONA_STRADA,
   ZONA_LABELS,
+  ZONA_TIPO_OGGETTO,
   emptyAreaStrada,
   duplicaAreaStrada,
   emptyStratoStrada,
@@ -27,12 +31,16 @@ import {
   rinumeraStratiZona,
   rinumeraSottrazioniStrato,
   renderZonaStradaPanel,
+  renderElencoLibreriaTipologie,
+  zonaHaLibreriaTipi,
+  misureTipoDaLibreria,
   syncZonaDaBlock,
   aggiornaCalcoliZonaBlock,
   schedaStradeHaDatiRegistrabili,
   elencoZoneMisuraSenzaVoce,
   maxIdNelloScheda,
   isZonaSedeStradale,
+  isZonaReinterro,
   isZonaManufatti,
   isZonaComeManufatti,
   isZonaCordoli,
@@ -44,6 +52,31 @@ import {
   aggiungiTipoCordolo,
   aggiungiTipoSegnaletica,
   aggiungiTipoVarie,
+  controllaNuovoTipoManufatto,
+  controllaNuovoTipoImpianto,
+  controllaNuovoTipoCordolo,
+  controllaNuovoTipoSegnaletica,
+  controllaNuovoTipoVarie,
+  rinominaTipoManufatto,
+  rinominaTipoImpianto,
+  rinominaTipoCordolo,
+  rinominaTipoSegnaletica,
+  rinominaTipoVarie,
+  controllaRinominaTipoManufatto,
+  controllaRinominaTipoImpianto,
+  controllaRinominaTipoCordolo,
+  controllaRinominaTipoSegnaletica,
+  controllaRinominaTipoVarie,
+  eliminaTipoManufatto,
+  eliminaTipoImpianto,
+  eliminaTipoCordolo,
+  eliminaTipoSegnaletica,
+  eliminaTipoVarie,
+  tipoManufattoInLibreria,
+  tipoImpiantoInLibreria,
+  tipoCordoloInLibreria,
+  tipoSegnaleticaInLibreria,
+  tipoVarieInLibreria,
   totaliSedeStradale,
 } from "./modules/stradeSuperfici.js";
 
@@ -53,7 +86,7 @@ const DATALIST_VOCI = "strade-vocibrevi-datalist";
 let nextId = 1;
 let pianoNome = "";
 let descrizione = "";
-/** @type {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'} */
+/** @type {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'|'reinterro'} */
 let schedaAttiva = "ingombro";
 let scheda = emptySchedaStrade(() => nextId++);
 /** @type {{ id: string, pianoNome: string, descrizione: string }[]} */
@@ -93,6 +126,103 @@ function saveRegistrati() {
   } catch {
     /* ignore */
   }
+}
+
+function chiaveTipoLocaleStradeOk(key) {
+  return typeof key === "string" && /^computo_metrico_strade_tipi_locale_[A-Za-z0-9_]+$/.test(key);
+}
+
+function chiaveLibreriaStradeOk(key) {
+  return typeof key === "string" && /^lp_libreria_strade_[A-Za-z0-9_]+$/.test(key);
+}
+
+function leggiVociStorage(accetta) {
+  /** @type {Record<string, unknown>} */
+  const out = {};
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!accetta(key)) continue;
+      const raw = localStorage.getItem(key);
+      if (raw == null) continue;
+      try {
+        out[key] = JSON.parse(raw);
+      } catch {
+        out[key] = raw;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return out;
+}
+
+function sostituisciVociStorage(mappa, accetta) {
+  const daTogliere = [];
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (accetta(key)) daTogliere.push(key);
+    }
+    for (const key of daTogliere) localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+  if (!mappa || typeof mappa !== "object") return;
+  for (const [key, value] of Object.entries(mappa)) {
+    if (!accetta(key) || value == null) continue;
+    try {
+      localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Schede STRADE, tipi di questo computo e libreria tipi, da mettere nel file esportato. */
+export function datiStradePerExport() {
+  let registrati = null;
+  try {
+    const raw = localStorage.getItem(STORAGE_STRADE_REGISTRATI_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && typeof data === "object" && Array.isArray(data.items)) registrati = data;
+    }
+  } catch {
+    registrati = null;
+  }
+  return {
+    registrati,
+    tipiLocale: leggiVociStorage(chiaveTipoLocaleStradeOk),
+    libreria: leggiVociStorage(chiaveLibreriaStradeOk),
+  };
+}
+
+/** Riscrive le schede STRADE lette da un computo importato. */
+export function applicaStradeDaImport(blocco) {
+  if (!blocco || typeof blocco !== "object") return;
+  sostituisciVociStorage(blocco.tipiLocale, chiaveTipoLocaleStradeOk);
+  if (blocco.libreria && typeof blocco.libreria === "object") {
+    sostituisciVociStorage(blocco.libreria, chiaveLibreriaStradeOk);
+  }
+  const reg = blocco.registrati;
+  try {
+    if (reg && typeof reg === "object" && Array.isArray(reg.items)) {
+      localStorage.setItem(
+        STORAGE_STRADE_REGISTRATI_KEY,
+        JSON.stringify({ v: 1, items: reg.items }),
+      );
+    } else {
+      localStorage.removeItem(STORAGE_STRADE_REGISTRATI_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
+  loadRegistrati();
+  resetBozza();
+  const shell = document.getElementById("vista-strade");
+  if (shell && !shell.hidden) refreshAll();
+  else renderSidebarLista();
 }
 
 function mostraFeedback(msg, isErr = false) {
@@ -194,17 +324,19 @@ function aggiornaSidebarAzioniAttive() {
   if (label) label.textContent = nomeZona;
   const sede = isZonaSedeStradale(schedaAttiva);
   const manufatti = isZonaManufatti(schedaAttiva);
+  const reinterro = isZonaReinterro(schedaAttiva);
   const cordoli = isZonaCordoli(schedaAttiva);
   const segnaletica = isZonaSegnaletica(schedaAttiva);
   const varie = isZonaVarie(schedaAttiva);
   const impianto = isZonaComeManufatti(schedaAttiva);
-  const senzaStrati = manufatti || cordoli || segnaletica || varie || impianto;
+  const senzaStrati = manufatti || reinterro || cordoli || segnaletica || varie || impianto;
   nav.querySelectorAll("button.vani-sidebar-azione").forEach((btn) => {
     if (!(btn instanceof HTMLButtonElement)) return;
     const azione = btn.getAttribute("data-sidebar-azione");
     const disabilita =
       (sede && (azione === "aggiungi-area" || azione === "aggiungi-sottrazione")) ||
-      (manufatti && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
+      (manufatti && (azione === "aggiungi-area" || azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
+      (reinterro && (azione === "aggiungi-area" || azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
       (cordoli && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
       (segnaletica && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
       (varie && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
@@ -214,6 +346,10 @@ function aggiornaSidebarAzioniAttive() {
     if (azione === "aggiungi-area") {
       btn.title = sede
         ? "Nella Sede stradale le aree si calcolano da sole"
+        : manufatti
+          ? "Manufatti è in sola lettura: le righe arrivano dalla spunta nelle altre schede"
+          : reinterro
+            ? "Reinterro è in sola lettura: le righe arrivano dalla spunta nelle altre schede"
         : isZonaCordoli(schedaAttiva)
           ? `Aggiunge una lunghezza in ${nomeZona}`
           : isZonaComeManufatti(schedaAttiva)
@@ -225,6 +361,8 @@ function aggiornaSidebarAzioniAttive() {
       btn.title = senzaStrati
         ? manufatti
           ? "Nei Manufatti la voce è il tipo, non lo strato"
+          : reinterro
+            ? "In Reinterro la voce è il tipo, non lo strato"
           : cordoli
             ? "Nei Cordoli la voce è il tipo, non lo strato"
             : segnaletica
@@ -239,6 +377,8 @@ function aggiornaSidebarAzioniAttive() {
         : senzaStrati
           ? manufatti
             ? "Nei Manufatti non ci sono strati"
+            : reinterro
+              ? "In Reinterro non ci sono strati"
             : cordoli
               ? "Nei Cordoli non ci sono strati"
               : segnaletica
@@ -316,6 +456,45 @@ function renderForm() {
     }),
   );
   aggiornaSidebarAzioniAttive();
+  aggiornaModaleTipologie();
+}
+
+function aggiornaModaleTipologie() {
+  const dlg = document.getElementById("strade-tipologie-dialog");
+  if (!(dlg instanceof HTMLDialogElement) || !dlg.open) return;
+  if (!zonaHaLibreriaTipi(schedaAttiva)) {
+    dlg.close();
+    return;
+  }
+  const lista = document.getElementById("strade-tipologie-lista");
+  if (lista) lista.replaceChildren(renderElencoLibreriaTipologie(schedaAttiva));
+  const title = document.getElementById("strade-tipologie-title");
+  if (title) title.textContent = `Libreria Tipologie — ${ZONA_LABELS[schedaAttiva] || ""}`;
+}
+
+function apriLibreriaTipologie(nomeDaCompilare = "") {
+  if (!zonaHaLibreriaTipi(schedaAttiva)) return;
+  const dlg = document.getElementById("strade-tipologie-dialog");
+  if (!(dlg instanceof HTMLDialogElement) || typeof dlg.showModal !== "function") return;
+  const lista = document.getElementById("strade-tipologie-lista");
+  if (lista) lista.replaceChildren(renderElencoLibreriaTipologie(schedaAttiva));
+  const title = document.getElementById("strade-tipologie-title");
+  if (title) title.textContent = `Libreria Tipologie — ${ZONA_LABELS[schedaAttiva] || ""}`;
+  if (!dlg.open) dlg.showModal();
+  const nome = String(nomeDaCompilare || "").trim().toLocaleLowerCase("it-IT");
+  if (!nome || !lista) return;
+  queueMicrotask(() => {
+    for (const inp of lista.querySelectorAll(".strade-tipo-nome-edit")) {
+      if (!(inp instanceof HTMLInputElement)) continue;
+      if (inp.value.trim().toLocaleLowerCase("it-IT") !== nome) continue;
+      const row = inp.closest("tr");
+      row?.classList.add("strade-tipo-riga--appena-aggiunta");
+      row?.scrollIntoView({ block: "nearest" });
+      const dim = row?.querySelector(".strade-tipo-dimensioni");
+      if (dim instanceof HTMLInputElement) dim.focus();
+      return;
+    }
+  });
 }
 
 function refreshAll() {
@@ -418,15 +597,280 @@ function onHostChange(e) {
   if (!block) return;
   const tipo = String(block.dataset.tipoZona || "");
   if (!TIPI_ZONA_STRADA.includes(/** @type {typeof TIPI_ZONA_STRADA[number]} */ (tipo))) return;
+  if (
+    t instanceof HTMLSelectElement &&
+    t.matches(
+      ".strade-area-tipo-manufatto, .strade-area-tipo-cordolo, .strade-area-tipo-segnaletica, .strade-area-tipo-varie, .strade-area-tipo-impianto",
+    )
+  ) {
+    const misure = misureTipoDaLibreria(tipo, t.value);
+    const riga = t.closest("tr");
+    const formula = riga?.querySelector(".strade-area-formula");
+    const campoDim = riga?.querySelector(".strade-area-dimensioni");
+    const campoSpe = riga?.querySelector(".strade-area-spessore");
+    if (misure) {
+      if (
+        misure.dimensioni &&
+        (formula instanceof HTMLInputElement || formula instanceof HTMLTextAreaElement) &&
+        !formula.readOnly
+      ) {
+        formula.value = misure.dimensioni;
+        if (formula instanceof HTMLTextAreaElement) {
+          formula.style.height = "auto";
+          formula.style.height = `${Math.min(Math.max(formula.scrollHeight, 28), 160)}px`;
+        }
+      }
+      if (campoDim instanceof HTMLInputElement && !campoDim.readOnly) campoDim.value = misure.dimensioni;
+      if (campoSpe instanceof HTMLInputElement && !campoSpe.readOnly && misure.spessore) {
+        campoSpe.value = misure.spessore;
+      }
+    }
+  }
   syncZonaDaBlock(block, scheda[tipo]);
   const mqOverride = isZonaSedeStradale(tipo) ? totaliSedeStradale(scheda).mqNetto : undefined;
   aggiornaCalcoliZonaBlock(block, scheda[tipo], mqOverride);
 }
 
-function onHostClick(e) {
+function stessoNomeTipo(a, b) {
+  const na = String(a ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("it-IT");
+  const nb = String(b ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("it-IT");
+  return na !== "" && na === nb;
+}
+
+function tipoUsatoInSchede(tipoZona, campo, nome) {
+  const guarda = (s) => (s?.[tipoZona]?.aree || []).some((area) => stessoNomeTipo(area?.[campo], nome));
+  if (guarda(scheda)) return true;
+  return registrati.some((rec) => guarda(rec));
+}
+
+function applicaNomeAlleSchede(tipoZona, campo, vecchio, nuovo) {
+  const tocca = (s) => {
+    for (const area of s?.[tipoZona]?.aree || []) {
+      if (stessoNomeTipo(area?.[campo], vecchio)) area[campo] = nuovo;
+    }
+  };
+  tocca(scheda);
+  for (const rec of registrati) tocca(rec);
+  saveRegistrati();
+}
+
+function cfgModificaTipo(action, btn) {
+  if (action.endsWith("manufatto")) {
+    return {
+      zona: "manufatti",
+      campo: "tipoManufatto",
+      tipoOggetto: "STRADA_MANUFATTO",
+      controllaNuovo: controllaNuovoTipoManufatto,
+      aggiungi: (nome, inLibreria) => aggiungiTipoManufatto(nome, inLibreria),
+      controllaRinomina: controllaRinominaTipoManufatto,
+      rinomina: (vecchio, nuovo, inLibreria) => rinominaTipoManufatto(vecchio, nuovo, inLibreria),
+      elimina: (nome, inLibreria) => eliminaTipoManufatto(nome, inLibreria),
+      inLibreria: tipoManufattoInLibreria,
+    };
+  }
+  if (action.endsWith("cordolo")) {
+    return {
+      zona: "cordoli",
+      campo: "tipoCordolo",
+      tipoOggetto: "STRADA_CORDOLI",
+      controllaNuovo: controllaNuovoTipoCordolo,
+      aggiungi: (nome, inLibreria) => aggiungiTipoCordolo(nome, inLibreria),
+      controllaRinomina: controllaRinominaTipoCordolo,
+      rinomina: (vecchio, nuovo, inLibreria) => rinominaTipoCordolo(vecchio, nuovo, inLibreria),
+      elimina: (nome, inLibreria) => eliminaTipoCordolo(nome, inLibreria),
+      inLibreria: tipoCordoloInLibreria,
+    };
+  }
+  if (action.endsWith("segnaletica")) {
+    return {
+      zona: "segnaletica",
+      campo: "tipoSegnaletica",
+      tipoOggetto: "STRADA_SEGNALETICA",
+      controllaNuovo: controllaNuovoTipoSegnaletica,
+      aggiungi: (nome, inLibreria) => aggiungiTipoSegnaletica(nome, inLibreria),
+      controllaRinomina: controllaRinominaTipoSegnaletica,
+      rinomina: (vecchio, nuovo, inLibreria) => rinominaTipoSegnaletica(vecchio, nuovo, inLibreria),
+      elimina: (nome, inLibreria) => eliminaTipoSegnaletica(nome, inLibreria),
+      inLibreria: tipoSegnaleticaInLibreria,
+    };
+  }
+  if (action.endsWith("varie")) {
+    return {
+      zona: "varie",
+      campo: "tipoVarie",
+      tipoOggetto: "STRADA_VARIE",
+      controllaNuovo: controllaNuovoTipoVarie,
+      aggiungi: (nome, inLibreria) => aggiungiTipoVarie(nome, inLibreria),
+      controllaRinomina: controllaRinominaTipoVarie,
+      rinomina: (vecchio, nuovo, inLibreria) => rinominaTipoVarie(vecchio, nuovo, inLibreria),
+      elimina: (nome, inLibreria) => eliminaTipoVarie(nome, inLibreria),
+      inLibreria: tipoVarieInLibreria,
+    };
+  }
+  if (action.endsWith("impianto")) {
+    const zona = String(btn.getAttribute("data-tipo-zona") || "");
+    return {
+      zona,
+      campo: "tipoImpianto",
+      tipoOggetto: ZONA_TIPO_OGGETTO[zona] || "",
+      controllaNuovo: (nome) => controllaNuovoTipoImpianto(zona, nome),
+      aggiungi: (nome, inLibreria) => aggiungiTipoImpianto(zona, nome, inLibreria),
+      controllaRinomina: (vecchio, nuovo) => controllaRinominaTipoImpianto(zona, vecchio, nuovo),
+      rinomina: (vecchio, nuovo, inLibreria) => rinominaTipoImpianto(zona, vecchio, nuovo, inLibreria),
+      elimina: (nome, inLibreria) => eliminaTipoImpianto(zona, nome, inLibreria),
+      inLibreria: (nome) => tipoImpiantoInLibreria(zona, nome),
+    };
+  }
+  return null;
+}
+
+function chiediSiNo(titolo, msg) {
+  const dlg = document.getElementById("strade-libreria-dialog");
+  const titleEl = document.getElementById("strade-libreria-title");
+  const msgEl = document.getElementById("strade-libreria-msg");
+  const btnSi = document.getElementById("strade-libreria-si");
+  const btnNo = document.getElementById("strade-libreria-no");
+  if (
+    !(dlg instanceof HTMLDialogElement) ||
+    !(btnSi instanceof HTMLButtonElement) ||
+    !(btnNo instanceof HTMLButtonElement) ||
+    typeof dlg.showModal !== "function"
+  ) {
+    return Promise.resolve(window.confirm(msg));
+  }
+  if (titleEl) titleEl.textContent = titolo;
+  if (msgEl) msgEl.textContent = msg;
+  return new Promise((resolve) => {
+    let chiuso = false;
+    const fine = (val) => {
+      if (chiuso) return;
+      chiuso = true;
+      btnSi.removeEventListener("click", onSi);
+      btnNo.removeEventListener("click", onNo);
+      dlg.removeEventListener("cancel", onCancel);
+      if (dlg.open) dlg.close();
+      resolve(val);
+    };
+    const onSi = () => fine(true);
+    const onNo = () => fine(false);
+    const onCancel = (e) => {
+      e.preventDefault();
+      fine(false);
+    };
+    btnSi.addEventListener("click", onSi);
+    btnNo.addEventListener("click", onNo);
+    dlg.addEventListener("cancel", onCancel);
+    dlg.showModal();
+    btnSi.focus();
+  });
+}
+
+async function onHostClick(e) {
   const btn = e.target instanceof Element ? e.target.closest("button[data-action]") : null;
   if (!btn) return;
   const action = btn.getAttribute("data-action");
+
+  if (action === "apri-libreria-tipologie") {
+    apriLibreriaTipologie();
+    return;
+  }
+
+  if (action === "vai-origine-riga") {
+    const destinazione = String(btn.getAttribute("data-scheda") || "");
+    const areaId = String(btn.getAttribute("data-area-id") || "");
+    if (!TIPI_ZONA_STRADA.includes(/** @type {typeof TIPI_ZONA_STRADA[number]} */ (destinazione))) return;
+    syncBozzaDaDom();
+    schedaAttiva = /** @type {typeof schedaAttiva} */ (destinazione);
+    renderForm();
+    queueMicrotask(() => {
+      const row = areaId
+        ? document.querySelector(`.strade-sup-block .vani-sup-area-row[data-area-id="${CSS.escape(areaId)}"]`)
+        : null;
+      if (row instanceof HTMLElement) {
+        row.classList.add("strade-riga-origine-evidenza");
+        row.scrollIntoView({ block: "center" });
+      }
+      document.getElementById(`strade-scheda-tab-${destinazione}`)?.focus();
+    });
+    return;
+  }
+
+  if (action && (action.startsWith("salva-tipo-") || action.startsWith("elimina-tipo-"))) {
+    const cfg = cfgModificaTipo(action, btn);
+    if (!cfg) return;
+    syncBozzaDaDom();
+    const row = btn.closest(".strade-tipo-riga");
+    const inp = row?.querySelector(".strade-tipo-nome-edit");
+    const originale = inp instanceof HTMLInputElement ? inp.dataset.nomeOriginale || "" : "";
+    if (action.startsWith("salva-tipo-")) {
+      const nuovo = inp instanceof HTMLInputElement ? inp.value : "";
+      const check = cfg.controllaRinomina(originale, nuovo);
+      if (!check.ok) {
+        mostraFeedback(check.errore, true);
+        return;
+      }
+      if (check.invariato) {
+        mostraFeedback("Il nome è già quello.");
+        return;
+      }
+      const giaInLibreria = cfg.inLibreria(originale);
+      const si = await chiediSiNo(
+        "Libreria",
+        giaInLibreria
+          ? `Vuoi modificare «${originale}» in «${check.nome}» anche nella libreria? Con Sì lo ritrovi così nei computi successivi. Con No il nome nuovo resta solo in questo computo.`
+          : `Vuoi aggiungere «${check.nome}» alla libreria? Con Sì lo ritrovi nei computi successivi. Con No la modifica resta solo in questo computo.`,
+      );
+      const esito = cfg.rinomina(originale, check.nome, si);
+      if (!esito.ok) {
+        mostraFeedback(esito.errore, true);
+        return;
+      }
+      applicaNomeAlleSchede(cfg.zona, cfg.campo, originale, esito.nome);
+      const vocePrima = voceBreveDaTipoZona(cfg.zona, originale);
+      const voceDopo = voceBreveDaTipoZona(cfg.zona, esito.nome);
+      const vociNuove = rinominaVoceTipoStrade(vocePrima, voceDopo, cfg.tipoOggetto);
+      const vociVecchie = rinominaVoceTipoStrade(originale, voceDopo, cfg.tipoOggetto);
+      const voci = { aggiornata: Boolean(vociNuove.aggiornata || vociVecchie.aggiornata) };
+      renderForm();
+      const dove = si ? "La libreria è aggiornata." : "Il nome resta solo in questo computo.";
+      mostraFeedback(
+        voci.aggiornata
+          ? `Tipo aggiornato in «${esito.nome}». Anche le VOCI usano questo nome. ${dove}`
+          : `Tipo aggiornato in «${esito.nome}». ${dove}`,
+      );
+      return;
+    }
+    const inSchede = tipoUsatoInSchede(cfg.zona, cfg.campo, originale);
+    const nomeVoce = voceBreveDaTipoZona(cfg.zona, originale);
+    const inComputo =
+      tipoStradeUsatoNelComputo(nomeVoce, cfg.tipoOggetto) ||
+      tipoStradeUsatoNelComputo(originale, cfg.tipoOggetto);
+    if (inSchede || inComputo) {
+      const motivi = [];
+      if (inComputo) motivi.push("è già usato nelle VOCI");
+      if (inSchede) motivi.push("è già scelto in una riga di Misurazione strade");
+      mostraFeedback(`Non puoi eliminare «${originale}»: ${motivi.join(" e ")}.`, true);
+      return;
+    }
+    const giaInLibreria = cfg.inLibreria(originale);
+    const si = await chiediSiNo(
+      "Elimina tipo",
+      giaInLibreria
+        ? `Eliminare «${originale}» dalla libreria? Non lo troverai nei computi successivi.`
+        : `Eliminare «${originale}»? È solo in questo computo.`,
+    );
+    if (!si) return;
+    const esito = cfg.elimina(originale, giaInLibreria);
+    if (!esito.ok) {
+      mostraFeedback(esito.errore, true);
+      return;
+    }
+    renderForm();
+    mostraFeedback(
+      giaInLibreria ? `Tipo «${originale}» tolto dalla libreria.` : `Tipo «${originale}» eliminato da questo computo.`,
+    );
+    return;
+  }
 
   if (
     action === "aggiungi-tipo-manufatto" ||
@@ -436,26 +880,35 @@ function onHostClick(e) {
     action === "aggiungi-tipo-impianto"
   ) {
     syncBozzaDaDom();
+    const cfg = cfgModificaTipo(action, btn);
+    if (!cfg) return;
     const inp = btn.parentElement?.querySelector(".strade-nuovo-tipo-nome");
     const nome = inp instanceof HTMLInputElement ? inp.value : "";
-    const tipoImpianto = String(btn.getAttribute("data-tipo-zona") || "");
-    const esito =
-      action === "aggiungi-tipo-cordolo"
-        ? aggiungiTipoCordolo(nome)
-        : action === "aggiungi-tipo-segnaletica"
-          ? aggiungiTipoSegnaletica(nome)
-          : action === "aggiungi-tipo-varie"
-            ? aggiungiTipoVarie(nome)
-            : action === "aggiungi-tipo-impianto"
-              ? aggiungiTipoImpianto(tipoImpianto, nome)
-            : aggiungiTipoManufatto(nome);
+    const check = cfg.controllaNuovo(nome);
+    if (!check.ok) {
+      mostraFeedback(check.errore, true);
+      return;
+    }
+    if (check.giaPresente) {
+      apriLibreriaTipologie(check.nome);
+      mostraFeedback(`Il tipo «${check.nome}» c’è già. Puoi compilare dimensioni e spessore.`);
+      return;
+    }
+    const si = await chiediSiNo(
+      "Libreria",
+      `Vuoi aggiungere «${check.nome}» alla libreria? Con Sì lo ritrovi nei computi successivi. Con No resta solo in questo computo.`,
+    );
+    const esito = cfg.aggiungi(check.nome, si);
     if (!esito.ok) {
       mostraFeedback(esito.errore, true);
       return;
     }
     renderForm();
+    apriLibreriaTipologie(esito.nome);
     mostraFeedback(
-      esito.giaPresente ? `Il tipo «${esito.nome}» c’è già nell’elenco.` : `Tipo «${esito.nome}» aggiunto. Ora puoi sceglierlo.`,
+      si
+        ? `Tipo «${esito.nome}» aggiunto alla libreria. Scrivi dimensioni e spessore.`
+        : `Tipo «${esito.nome}» aggiunto solo in questo computo. Scrivi dimensioni e spessore.`,
     );
     return;
   }
@@ -478,7 +931,7 @@ function onHostClick(e) {
   const zona = scheda[tipo];
 
   if (action === "rimuovi-area-strada") {
-    if (isZonaSedeStradale(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo)) return;
     const aid = Number(btn.getAttribute("data-area-id"));
     if ((zona.aree || []).length <= 1) return;
     zona.aree = zona.aree.filter((a) => a.id !== aid);
@@ -487,7 +940,7 @@ function onHostClick(e) {
     return;
   }
   if (action === "duplica-area-strada") {
-    if (isZonaSedeStradale(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo)) return;
     const aid = Number(btn.getAttribute("data-area-id"));
     const idx = (zona.aree || []).findIndex((a) => a.id === aid);
     if (idx < 0) return;
@@ -542,21 +995,21 @@ function onSidebarAzioniClick(e) {
   if (!zona) return;
 
   if (azione === "aggiungi-area") {
-    if (isZonaSedeStradale(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo)) return;
     zona.aree.push(emptyAreaStrada(() => nextId++, zona.aree.length + 1));
     rinumeraAreeZona(zona);
     renderForm();
     return;
   }
   if (azione === "aggiungi-strato") {
-    if (isZonaManufatti(tipo) || isZonaComeManufatti(tipo) || isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return;
+    if (isZonaManufatti(tipo) || isZonaReinterro(tipo) || isZonaComeManufatti(tipo) || isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return;
     zona.strati.push(emptyStratoStrada(() => nextId++, zona.strati.length + 1));
     rinumeraStratiZona(zona);
     renderForm();
     return;
   }
   if (azione === "aggiungi-sottrazione") {
-    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaComeManufatti(tipo) || isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo) || isZonaComeManufatti(tipo) || isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return;
     const st = zona.strati[zona.strati.length - 1];
     if (!st) return;
     if (!Array.isArray(st.sottrazioni)) st.sottrazioni = [];
@@ -609,15 +1062,29 @@ export function initStradeUi() {
   document.getElementById("strade-sidebar-list")?.addEventListener("click", onSidebarListClick);
 
   const host = document.getElementById("strade-gerarchia-host");
+  const onInvioTipo = (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement)) return;
+    if (e.key !== "Enter") return;
+    if (t.classList.contains("strade-nuovo-tipo-nome")) {
+      e.preventDefault();
+      t.parentElement?.querySelector("button[data-action='aggiungi-tipo-manufatto'], button[data-action='aggiungi-tipo-cordolo'], button[data-action='aggiungi-tipo-segnaletica'], button[data-action='aggiungi-tipo-varie'], button[data-action='aggiungi-tipo-impianto']")?.click();
+      return;
+    }
+    if (t.classList.contains("strade-tipo-nome-edit")) {
+      e.preventDefault();
+      t.closest(".strade-tipo-riga")?.querySelector("button[data-action^='salva-tipo-']")?.click();
+    }
+  };
   host?.addEventListener("input", onHostInput);
   host?.addEventListener("change", onHostChange);
   host?.addEventListener("click", onHostClick);
-  host?.addEventListener("keydown", (e) => {
-    const t = e.target;
-    if (!(t instanceof HTMLInputElement) || !t.classList.contains("strade-nuovo-tipo-nome")) return;
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    t.parentElement?.querySelector("button[data-action='aggiungi-tipo-manufatto'], button[data-action='aggiungi-tipo-cordolo'], button[data-action='aggiungi-tipo-segnaletica'], button[data-action='aggiungi-tipo-varie'], button[data-action='aggiungi-tipo-impianto']")?.click();
+  host?.addEventListener("keydown", onInvioTipo);
+  const dlgTipologie = document.getElementById("strade-tipologie-dialog");
+  dlgTipologie?.addEventListener("click", onHostClick);
+  dlgTipologie?.addEventListener("keydown", onInvioTipo);
+  document.getElementById("strade-tipologie-chiudi")?.addEventListener("click", () => {
+    if (dlgTipologie instanceof HTMLDialogElement && dlgTipologie.open) dlgTipologie.close();
   });
   host?.addEventListener(
     "blur",

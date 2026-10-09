@@ -6,10 +6,10 @@
  *   per ogni sottrazione di quello strato;
  * - sede stradale: aree automatiche Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti)
  *   per stesso riferimento (niente sottrazioni per-strato; Cordoli esclusi);
- * - manufatti, fogna, allacci fogna, luci, gas, acqua, telefonica:
- *   una voce per ogni tipo (non per strato); quantità = N° pezzi, unità n.;
- * - cordoli: una voce per ogni tipo di cordolo (non per strato); quantità in ml (formula = lunghezza);
- * - segnaletica: una voce per ogni tipo; quantità = formula, oppure formula × larghezza (mq) se la larghezza c’è;
+ * - manufatti: una voce per tipo; quantità = N° pezzi (la formula toglie mq dalla Sede);
+ * - fogna, allacci fogna, luci, gas, acqua, telefonica, cordoli, varie:
+ *   una voce per tipo; quantità = formula × pezzi; l’unità (ml., mq., mc.) si sceglie in VOCI;
+ * - segnaletica: una voce per tipo; quantità = formula × larghezza × pezzi; unità scelta in VOCI;
  */
 
 import { STORAGE_VOCI_ARCHIVIO_KEY } from "./archivioVociVocibrevi.js";
@@ -20,6 +20,7 @@ import {
   evalFormulaArea,
   parseMoltiplicatoreArea,
   isZonaSedeStradale,
+  isZonaReinterro,
   isZonaManufatti,
   isZonaComeManufatti,
   isZonaCordoli,
@@ -44,6 +45,14 @@ const UNITA_ML = "ml.";
 /** Sentinel: non forzare unità (usa quella già in VOCI / lascia vuota se nuova). */
 const UNITA_DA_VOCE = null;
 const TIPI_OGGETTO = new Set(Object.values(ZONA_TIPO_OGGETTO));
+
+/** In VOCI la voce breve degli impianti è «tipo (sezione)». Nella casella Tipo resta solo il tipo. */
+export function voceBreveDaTipoZona(tipoZona, nomeTipo) {
+  const nome = String(nomeTipo ?? "").trim().replace(/\s+/g, " ");
+  if (!nome || !isZonaComeManufatti(tipoZona)) return nome;
+  const sezione = ZONA_LABELS[tipoZona] || tipoZona;
+  return `${nome} (${sezione})`;
+}
 
 function abbrevKey(s) {
   return String(s ?? "")
@@ -119,13 +128,13 @@ function creaRigaArea({
   if (tipoCor) specificaParts.push(tipoCor);
   if (tipoSeg) specificaParts.push(tipoSeg);
   if (tipoVar) specificaParts.push(tipoVar);
-  if (tipoImp) specificaParts.push(tipoImp);
+  if (tipoImp) specificaParts.push(voceBreveDaTipoZona(tipoZona, tipoImp));
   if (formulaTxt) specificaParts.push(formulaTxt);
   const isSegnaletica = isZonaSegnaletica(tipoZona);
   const lar = isSegnaletica ? larghezzaArea(area) : null;
   if (lar != null) specificaParts.push(`larg. ${lar}`);
-  const comeManufatti = isZonaManufatti(tipoZona) || isZonaComeManufatti(tipoZona);
-  if (!comeManufatti && mol !== 1) specificaParts.push(`×${mol}`);
+  const soloManufatti = isZonaManufatti(tipoZona);
+  if (!soloManufatti && mol !== 1) specificaParts.push(`×${mol}`);
   if (specificaExtra) specificaParts.push(specificaExtra);
   const specifica = specificaParts.join(" · ") || label;
   const isManufatti = isZonaManufatti(tipoZona);
@@ -139,8 +148,8 @@ function creaRigaArea({
   let misura2 = null;
   let misura3 = null;
   let numero = 1;
-  if (isManufatti || isComeManufatti) {
-    // Quantità in VOCI = moltiplicatore (conteggio a numero).
+  if (isManufatti) {
+    // Quantità in VOCI = moltiplicatore (conteggio a numero). La formula toglie mq dalla Sede.
     if (Number.isInteger(mol) && mol >= 0) {
       misura1 = 1;
       numero = mol;
@@ -159,8 +168,8 @@ function creaRigaArea({
       numero = 1;
     }
     misura2 = lar;
-  } else if (isCordoli || isFormulaUnitaVoce || isVarie) {
-    // Formula × moltiplicatore; niente spessore. Unità: ml (cordoli) o dalla voce (impianti).
+  } else if (isComeManufatti || isCordoli || isFormulaUnitaVoce || isVarie) {
+    // Formula × pezzi. L’unità (ml., mq., mc.) resta quella scelta in VOCI.
     const base = formulaVal == null ? 0 : Number(formulaVal.toFixed(3));
     if (Number.isInteger(mol) && mol >= 0) {
       misura1 = base;
@@ -213,6 +222,7 @@ function raccogliAbbrevDaScheda(snapshot) {
   /** @type {Map<string, { label: string, unita: string }>} */
   const abbrevs = new Map();
   for (const tipo of TIPI_ZONA_STRADA) {
+    if (isZonaReinterro(tipo)) continue;
     const zona = snapshot?.[tipo];
     if (isZonaManufatti(tipo)) {
       for (const area of zona?.aree || []) {
@@ -227,8 +237,9 @@ function raccogliAbbrevDaScheda(snapshot) {
       for (const area of zona?.aree || []) {
         const nome = normalizzaTipoImpianto(tipo, area?.tipoImpianto);
         if (!nome) continue;
-        const key = abbrevKey(nome);
-        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_N });
+        const voceBreve = voceBreveDaTipoZona(tipo, nome);
+        const key = abbrevKey(voceBreve);
+        if (!abbrevs.has(key)) abbrevs.set(key, { label: voceBreve, unita: UNITA_DA_VOCE });
       }
       continue;
     }
@@ -237,7 +248,7 @@ function raccogliAbbrevDaScheda(snapshot) {
         const nome = normalizzaTipoCordolo(area?.tipoCordolo);
         if (!nome) continue;
         const key = abbrevKey(nome);
-        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_ML });
+        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_DA_VOCE });
       }
       continue;
     }
@@ -246,10 +257,7 @@ function raccogliAbbrevDaScheda(snapshot) {
         const nome = normalizzaTipoSegnaletica(area?.tipoSegnaletica);
         if (!nome) continue;
         const key = abbrevKey(nome);
-        const conLar = larghezzaArea(area) != null;
-        const prev = abbrevs.get(key);
-        if (!prev) abbrevs.set(key, { label: nome, unita: conLar ? UNITA_MQ : UNITA_DA_VOCE });
-        else if (conLar) prev.unita = UNITA_MQ;
+        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_DA_VOCE });
       }
       continue;
     }
@@ -270,7 +278,7 @@ function raccogliAbbrevDaScheda(snapshot) {
         if (isZonaManufatti(tipo)) {
           abbrevs.set(key, { label: vb, unita: UNITA_N });
         } else if (isZonaCordoli(tipo)) {
-          abbrevs.set(key, { label: vb, unita: UNITA_ML });
+          abbrevs.set(key, { label: vb, unita: UNITA_DA_VOCE });
         } else if (isZonaFormulaUnitaVoce(tipo)) {
           abbrevs.set(key, { label: vb, unita: UNITA_DA_VOCE });
         } else {
@@ -292,6 +300,7 @@ function raccogliRighePerVoce(snapshot, voceKey) {
   const seen = new Set();
 
   for (const tipo of TIPI_ZONA_STRADA) {
+    if (isZonaReinterro(tipo)) continue;
     const zona = snapshot?.[tipo];
     const aree = isZonaSedeStradale(tipo) ? areeVirtualiSede(snapshot) : Array.isArray(zona?.aree) ? zona.aree : [];
     if (isZonaManufatti(tipo)) {
@@ -317,7 +326,7 @@ function raccogliRighePerVoce(snapshot, voceKey) {
     if (isZonaComeManufatti(tipo)) {
       for (const area of aree) {
         const nome = normalizzaTipoImpianto(tipo, area?.tipoImpianto);
-        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        if (!nome || abbrevKey(voceBreveDaTipoZona(tipo, nome)) !== voceKey) continue;
         const dedupeKey = ["area", tipo, nome, String(area?.id ?? "")].join("|");
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
@@ -460,6 +469,7 @@ function elencoRiferimentiPerVoce(snapshot, voceKey) {
     if (t) out.push(t);
   };
   for (const tipo of TIPI_ZONA_STRADA) {
+    if (isZonaReinterro(tipo)) continue;
     const zona = snapshot?.[tipo];
     const aree = isZonaSedeStradale(tipo)
       ? areeVirtualiSede(snapshot)
@@ -477,7 +487,7 @@ function elencoRiferimentiPerVoce(snapshot, voceKey) {
     if (isZonaComeManufatti(tipo)) {
       for (const area of aree) {
         const nome = normalizzaTipoImpianto(tipo, area?.tipoImpianto);
-        if (!nome || abbrevKey(nome) !== voceKey) continue;
+        if (!nome || abbrevKey(voceBreveDaTipoZona(tipo, nome)) !== voceKey) continue;
         push(area?.riferimento);
       }
       continue;
@@ -571,8 +581,25 @@ export function riferimentoPerAssociaVoceDaStrade(voce) {
 /**
  * @param {{ id: string, pianoNome: string, descrizione?: string, ingombro?: object, marciapiedi?: object, aiuole?: object, parcheggi?: object, manufatti?: object, cordoli?: object, segnaletica?: object, fogna?: object, allacciFogna?: object, lucePubblica?: object, lucePrivata?: object, gas?: object, acqua?: object, telefonica?: object, sedeStradale?: object }} snapshot
  */
+function allineaVociBreviImpianto(snapshot) {
+  for (const tipo of TIPI_ZONA_STRADA) {
+    if (!isZonaComeManufatti(tipo)) continue;
+    const tipoOggetto = ZONA_TIPO_OGGETTO[tipo] || "";
+    const visti = new Set();
+    for (const area of snapshot?.[tipo]?.aree || []) {
+      const nome = normalizzaTipoImpianto(tipo, area?.tipoImpianto);
+      if (!nome || visti.has(abbrevKey(nome))) continue;
+      visti.add(abbrevKey(nome));
+      const estesa = voceBreveDaTipoZona(tipo, nome);
+      if (abbrevKey(estesa) === abbrevKey(nome)) continue;
+      rinominaVoceTipoStrade(nome, estesa, tipoOggetto);
+    }
+  }
+}
+
 export function aggiornaVociDaSnapshotStrade(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return { righe: 0, vociAggiornate: 0 };
+  allineaVociBreviImpianto(snapshot);
   const schedaId =
     snapshot.id != null && String(snapshot.id).trim() !== "" ? String(snapshot.id).trim() : "";
   const abbrevs = raccogliAbbrevDaScheda(snapshot);
@@ -650,9 +677,8 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
 
   for (const [key, meta] of abbrevs) {
     if (keysGiaPresenti.has(key)) continue;
-    // Segnaletica / Fogna / Allacci fogna / Luci / Gas / Acqua: se la voce non esiste ancora, la creiamo
-    // senza forzare l’unità (l’utente la sceglie in VOCI; se esiste già, si usa quella).
-    const unitaNuova = meta.unita == null ? "" : meta.unita;
+    // Fogna, cordoli, segnaletica, varie: voce nuova parte da mq.; se esiste già, l’unità scelta resta.
+    const unitaNuova = meta.unita == null ? UNITA_MQ : meta.unita;
     voci.push(
       creaVoceManualeDaVocibreve({
         idVoce: nextId,
@@ -772,4 +798,140 @@ export function rimuoviRigheMisurazioniPerSchedaStrade(schedaId) {
   } catch {
     /* ignore */
   }
+}
+
+function loadVociArchivio() {
+  try {
+    const raw = localStorage.getItem(STORAGE_VOCI_ARCHIVIO_KEY);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveVociArchivio(voci) {
+  localStorage.setItem(STORAGE_VOCI_ARCHIVIO_KEY, JSON.stringify(voci));
+  if (typeof document !== "undefined") {
+    document.dispatchEvent(new CustomEvent("computo-voci-storage-externally-updated"));
+  }
+}
+
+function sostituisciNomeInSpecifica(specifica, vecchio, nuovo) {
+  const key = abbrevKey(vecchio);
+  const parts = String(specifica ?? "").split(" · ");
+  let changed = false;
+  const out = parts.map((p) => {
+    if (abbrevKey(p) === key) {
+      changed = true;
+      return nuovo;
+    }
+    return p;
+  });
+  return { text: changed ? out.join(" · ") : String(specifica ?? ""), changed };
+}
+
+function rigaDiQuestoTipo(row, tipoOggetto) {
+  return (
+    isRigaSemiautoStrade(row) &&
+    String(row?.tipoOggetto ?? "").trim().toUpperCase() === tipoOggetto
+  );
+}
+
+/** Vero se nelle VOCI c’è già una voce o una misurazione di questo tipo con quel nome. */
+export function tipoStradeUsatoNelComputo(nome, tipoOggetto) {
+  const key = abbrevKey(nome);
+  const tipo = String(tipoOggetto ?? "").trim().toUpperCase();
+  if (!key || !tipo) return false;
+  const voci = loadVociArchivio();
+  if (!Array.isArray(voci)) return false;
+  for (const item of voci) {
+    if (item == null || typeof item !== "object") continue;
+    const mm = Array.isArray(item.misurazioniManuali) ? item.misurazioniManuali : [];
+    for (const row of mm) {
+      if (!rigaDiQuestoTipo(row, tipo)) continue;
+      const parts = String(row?.specifica ?? "").split(" · ");
+      if (parts.some((p) => abbrevKey(p) === key)) return true;
+    }
+    if (abbrevKey(item.voceAbbreviata) !== key) continue;
+    const questi = mm.filter((row) => rigaDiQuestoTipo(row, tipo));
+    const altriStrade = mm.filter((row) => isRigaSemiautoStrade(row) && !rigaDiQuestoTipo(row, tipo));
+    if (questi.length > 0) return true;
+    if (altriStrade.length === 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Aggiorna il nome della voce e la dicitura dentro le misurazioni di quella scheda.
+ * Se la stessa voce contiene anche misurazioni di un’altra scheda, sposta solo queste.
+ */
+export function rinominaVoceTipoStrade(nomeVecchio, nomeNuovo, tipoOggetto) {
+  const keyOld = abbrevKey(nomeVecchio);
+  const keyNew = abbrevKey(nomeNuovo);
+  const tipo = String(tipoOggetto ?? "").trim().toUpperCase();
+  if (!keyOld || !keyNew || keyOld === keyNew || !tipo) return { ok: true, aggiornata: false };
+  const voci = loadVociArchivio();
+  if (!Array.isArray(voci)) return { ok: false, aggiornata: false };
+  const source = voci.find((item) => item && abbrevKey(item.voceAbbreviata) === keyOld);
+  if (!source) return { ok: true, aggiornata: false };
+
+  const mm = Array.isArray(source.misurazioniManuali) ? source.misurazioniManuali : [];
+  const questi = mm.filter((row) => rigaDiQuestoTipo(row, tipo));
+  const altriStrade = mm.filter((row) => isRigaSemiautoStrade(row) && !rigaDiQuestoTipo(row, tipo));
+  if (altriStrade.length > 0 && questi.length === 0) return { ok: true, aggiornata: false };
+
+  const patchRows = (rows) => {
+    for (const row of rows) {
+      const spec = sostituisciNomeInSpecifica(row.specifica, nomeVecchio, nomeNuovo);
+      if (spec.changed) row.specifica = spec.text;
+    }
+  };
+
+  let dest = voci.find((item) => item && item !== source && abbrevKey(item.voceAbbreviata) === keyNew) || null;
+  if (altriStrade.length === 0 && !dest) {
+    source.voceAbbreviata = nomeNuovo;
+    if (abbrevKey(source.voce) === keyOld) source.voce = nomeNuovo;
+    patchRows(questi);
+    try {
+      saveVociArchivio(voci);
+    } catch {
+      return { ok: false, aggiornata: false };
+    }
+    return { ok: true, aggiornata: true };
+  }
+
+  if (!dest) {
+    const idVoce =
+      voci.reduce((max, item) => {
+        const id = typeof item?.idVoce === "number" && Number.isFinite(item.idVoce) ? item.idVoce : 0;
+        return Math.max(max, id);
+      }, 0) + 1;
+    const posizione =
+      voci.reduce((max, item) => {
+        const p = typeof item?.posizione === "number" && Number.isFinite(item.posizione) ? item.posizione : 0;
+        return Math.max(max, p);
+      }, 0) + 1;
+    dest = creaVoceManualeDaVocibreve({
+      idVoce,
+      posizione,
+      voceAbbreviata: nomeNuovo,
+      unitaMisura: typeof source.unitaMisura === "string" ? source.unitaMisura : UNITA_MQ,
+      riferimento: "",
+    });
+    dest.prezzo = typeof source.prezzo === "number" && Number.isFinite(source.prezzo) ? source.prezzo : 0;
+    dest.voce = nomeNuovo;
+    voci.push(dest);
+  }
+  patchRows(questi);
+  source.misurazioniManuali = mm.filter((row) => !questi.includes(row));
+  const destMm = Array.isArray(dest.misurazioniManuali) ? dest.misurazioniManuali : [];
+  dest.misurazioniManuali = [...destMm, ...questi];
+  try {
+    saveVociArchivio(voci);
+  } catch {
+    return { ok: false, aggiornata: false };
+  }
+  return { ok: true, aggiornata: true };
 }

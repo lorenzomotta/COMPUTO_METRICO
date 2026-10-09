@@ -1107,7 +1107,7 @@
         <form id="voce-usa-esistente-form" method="dialog">
           <h3>USA VOCE ESISTENTE</h3>
           <p class="voce-usa-esistente-hint">
-            Scegli il <strong>testo esteso</strong> già scritto nel computo. Testo e prezzo vengono
+            Scegli una voce già presente nel <strong>capitolato</strong>. Testo, unità e prezzo vengono
             copiati su questa voce breve. La voce breve non viene cancellata: più voci brevi possono
             usare lo stesso testo. Poi premi Salva.
           </p>
@@ -1121,7 +1121,7 @@
           />
           <div id="voce-usa-esistente-lista" class="voce-usa-esistente-lista" role="listbox"></div>
           <p id="voce-usa-esistente-vuoto" class="voce-usa-esistente-vuoto" hidden>
-            Nessuna voce estesa già scritta nel computo.
+            Nessuna voce presente nel capitolato.
           </p>
           <div class="formula-dialog-actions">
             <button id="voce-usa-esistente-cancel" type="button" class="btn-action btn-delete">
@@ -2518,10 +2518,10 @@
             <p class="vani-help-inline__p">
               Compila il nome della <strong>strada / tratto</strong>. Il <strong>piano</strong> è facoltativo e non compare nel PDF.
               Poi usa le schede: <strong>Ingombro</strong>, <strong>Marciapiedi</strong>,
-              <strong>Aiuole</strong>, <strong>Parcheggi</strong>, <strong>Manufatti</strong>,
-              <strong>Cordoli</strong>, <strong>Sede stradale</strong>, <strong>Segnaletica</strong>,
+              <strong>Aiuole</strong>, <strong>Parcheggi</strong>, <strong>Cordoli</strong>,
               <strong>Fogna</strong>, <strong>Allacci fogna</strong>, <strong>Luce pubblica</strong>, <strong>Luce privata</strong>,
-              <strong>Gas</strong>, <strong>Acqua</strong>, <strong>Telefonica</strong> e <strong>Varie</strong>.
+              <strong>Gas</strong>, <strong>Acqua</strong>, <strong>Telefonica</strong>, <strong>Segnaletica</strong>,
+              <strong>Varie</strong>, <strong>Manufatti</strong>, <strong>Sede stradale</strong> e <strong>Reinterro</strong>.
               I tre pulsanti a destra (<strong>Aggiungi area</strong>, <strong>strato</strong>,
               <strong>sottrazione</strong>) valgono per la scheda che hai selezionato.
               Le zone con aree hanno una <strong>formula</strong> e un
@@ -2561,6 +2561,8 @@
               scegli il tipo (oppure aggiungine uno nuovo). Ogni tipo diventa una voce a <strong>numero (n.)</strong>:
               il campo <strong>N° pezzi</strong> è la quantità che va nelle VOCI.
               La formula è facoltativa. Queste schede non vengono sottratte dalla Sede.
+              La spunta <strong>Reinterro</strong>, come quella Manufatti, copia la riga nella scheda
+              <strong>Reinterro</strong> (dopo la Sede): tipo, formula e N° pezzi. Quella scheda è in sola lettura.
               La <strong>Sede stradale</strong> calcola da sola l’area:
               Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti) per ogni stesso riferimento.
               Lì puoi solo aggiungere strati: il primo è già «SEDE STRADALE».
@@ -2613,6 +2615,37 @@
                     <button type="button" id="strade-conferma-elimina-conferma" class="btn-action btn-delete">
                       Elimina
                     </button>
+                  </div>
+                </div>
+              </dialog>
+
+              <dialog
+                id="strade-tipologie-dialog"
+                class="formula-dialog vani-conferma-elimina-dialog strade-tipologie-dialog"
+                aria-modal="true"
+                aria-labelledby="strade-tipologie-title"
+              >
+                <div class="vani-conferma-elimina-dialog-inner strade-tipologie-inner">
+                  <h3 id="strade-tipologie-title">Libreria Tipologie</h3>
+                  <div id="strade-tipologie-lista"></div>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="strade-tipologie-chiudi" class="btn-action btn-secondary">Chiudi</button>
+                  </div>
+                </div>
+              </dialog>
+
+              <dialog
+                id="strade-libreria-dialog"
+                class="formula-dialog vani-conferma-elimina-dialog strade-libreria-dialog"
+                aria-modal="true"
+                aria-labelledby="strade-libreria-title"
+              >
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3 id="strade-libreria-title">Libreria</h3>
+                  <p id="strade-libreria-msg" class="vani-conferma-elimina-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="strade-libreria-no" class="btn-action btn-secondary">No</button>
+                    <button type="button" id="strade-libreria-si" class="btn-action btn-secondary">Sì</button>
                   </div>
                 </div>
               </dialog>
