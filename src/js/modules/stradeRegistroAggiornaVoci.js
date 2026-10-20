@@ -6,9 +6,12 @@
  *   per ogni sottrazione di quello strato;
  * - sede stradale: aree automatiche Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti)
  *   per stesso riferimento (niente sottrazioni per-strato; Cordoli esclusi);
+ * - reinterro: aree automatiche Ingombro − Volume occupato, per stesso riferimento;
  * - manufatti: una voce per tipo; quantità = N° pezzi (la formula toglie mq dalla Sede);
- * - fogna, allacci fogna, luci, gas, acqua, telefonica, cordoli, varie:
- *   una voce per tipo; quantità = formula × pezzi; l’unità (ml., mq., mc.) si sceglie in VOCI;
+ * - fogna, allacci fogna, luci, gas, acqua, telefonica:
+ *   una voce per tipo; se la lunghezza è maggiore di 0, la quantità in VOCI è la lunghezza;
+ *   se la lunghezza è vuota, la quantità è il numero scritto in Quantità; l’unità si sceglie in VOCI;
+ * - cordoli, varie: una voce per tipo; quantità = formula × pezzi; l’unità si sceglie in VOCI;
  * - segnaletica: una voce per tipo; quantità = formula × larghezza × pezzi; unità scelta in VOCI;
  */
 
@@ -21,6 +24,7 @@ import {
   parseMoltiplicatoreArea,
   isZonaSedeStradale,
   isZonaReinterro,
+  isZonaReinterroCalcolo,
   isZonaManufatti,
   isZonaComeManufatti,
   isZonaCordoli,
@@ -28,6 +32,7 @@ import {
   isZonaVarie,
   isZonaFormulaUnitaVoce,
   areeVirtualiSede,
+  areeVirtualiReinterro,
   normalizzaTipoManufatto,
   normalizzaTipoImpianto,
   normalizzaTipoCordolo,
@@ -114,7 +119,9 @@ function creaRigaArea({
   const nStrato =
     typeof strato?.n === "number" && Number.isFinite(strato.n) ? String(strato.n) : "";
   const nArea = typeof area?.n === "number" && Number.isFinite(area.n) ? String(area.n) : "";
-  const formulaTxt = String(area?.formula ?? "").trim();
+  const dimensioniTxt = String(area?.dimensioni ?? "").trim();
+  const spessoreAreaTxt = String(area?.spessore ?? "").trim();
+  const formulaTxt = String(area?.formula ?? "").trim() || dimensioniTxt;
   const mol = parseMoltiplicatoreArea(area?.moltiplicatore);
   const specificaParts = [];
   if (nArea) specificaParts.push(`Area ${nArea}`);
@@ -130,6 +137,9 @@ function creaRigaArea({
   if (tipoVar) specificaParts.push(tipoVar);
   if (tipoImp) specificaParts.push(voceBreveDaTipoZona(tipoZona, tipoImp));
   if (formulaTxt) specificaParts.push(formulaTxt);
+  if (spessoreAreaTxt && (isZonaComeManufatti(tipoZona) || isZonaVarie(tipoZona))) {
+    specificaParts.push(`sp. ${spessoreAreaTxt}`);
+  }
   const isSegnaletica = isZonaSegnaletica(tipoZona);
   const lar = isSegnaletica ? larghezzaArea(area) : null;
   if (lar != null) specificaParts.push(`larg. ${lar}`);
@@ -144,6 +154,9 @@ function creaRigaArea({
   const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipoZona) && !isSegnaletica;
   const hasMqFisso = typeof area?.mqFisso === "number" && Number.isFinite(area.mqFisso);
   const formulaVal = hasMqFisso ? Number(Math.abs(area.mqFisso).toFixed(3)) : evalFormulaArea(formulaTxt);
+  const lunghezzaTxt = String(area?.lunghezza ?? "").trim();
+  const lunghezzaVal = isZonaComeManufatti(tipoZona) ? evalFormulaArea(lunghezzaTxt) : null;
+  const usaLunghezza = lunghezzaVal != null && lunghezzaVal > 0;
   let misura1;
   let misura2 = null;
   let misura3 = null;
@@ -168,7 +181,14 @@ function creaRigaArea({
       numero = 1;
     }
     misura2 = lar;
-  } else if (isComeManufatti || isCordoli || isFormulaUnitaVoce || isVarie) {
+  } else if (isComeManufatti) {
+    // Lunghezza > 0: in VOCI va la lunghezza. Lunghezza vuota: va il numero scritto in Quantità.
+    const base = usaLunghezza
+      ? Number(lunghezzaVal.toFixed(3))
+      : Number(parseMoltiplicatoreArea(area?.moltiplicatore).toFixed(3));
+    misura1 = base;
+    numero = 1;
+  } else if (isCordoli || isFormulaUnitaVoce || isVarie) {
     // Formula × pezzi. L’unità (ml., mq., mc.) resta quella scelta in VOCI.
     const base = formulaVal == null ? 0 : Number(formulaVal.toFixed(3));
     if (Number.isInteger(mol) && mol >= 0) {
@@ -184,8 +204,10 @@ function creaRigaArea({
       : formulaVal == null
         ? 0
         : Number((formulaVal * mol).toFixed(3));
-    const spessoreTxt = String(strato?.spessore ?? "").trim();
-    misura3 = spessoreTxt === "" ? null : parseNonNegativeDecimal3OrNull(spessoreTxt);
+    if (!isZonaReinterroCalcolo(tipoZona)) {
+      const spessoreTxt = String(strato?.spessore ?? "").trim();
+      misura3 = spessoreTxt === "" ? null : parseNonNegativeDecimal3OrNull(spessoreTxt);
+    }
   }
   const segno = segnoForzato === true ? true : area?.segno === true;
   const m1 = misura1;
@@ -201,8 +223,16 @@ function creaRigaArea({
     riferimento,
     tipoOggetto: ZONA_TIPO_OGGETTO[tipoZona] || "STRADA_INGOMBRO",
     specifica,
-    formula: formulaTxt,
-    formulaValue: formulaVal,
+    formula: isComeManufatti
+      ? usaLunghezza
+        ? lunghezzaTxt
+        : String(area?.moltiplicatore ?? "").trim() || "1"
+      : formulaTxt,
+    formulaValue: isComeManufatti
+      ? usaLunghezza
+        ? Number(lunghezzaVal.toFixed(3))
+        : Number(parseMoltiplicatoreArea(area?.moltiplicatore).toFixed(3))
+      : formulaVal,
     misura1,
     misura2,
     misura3,
@@ -281,6 +311,8 @@ function raccogliAbbrevDaScheda(snapshot) {
           abbrevs.set(key, { label: vb, unita: UNITA_DA_VOCE });
         } else if (isZonaFormulaUnitaVoce(tipo)) {
           abbrevs.set(key, { label: vb, unita: UNITA_DA_VOCE });
+        } else if (isZonaReinterroCalcolo(tipo)) {
+          abbrevs.set(key, { label: vb, unita: UNITA_MC });
         } else {
           const hasSp = String(st?.spessore ?? "").trim() !== "";
           abbrevs.set(key, { label: vb, unita: hasSp ? UNITA_MC : UNITA_MQ });
@@ -302,7 +334,13 @@ function raccogliRighePerVoce(snapshot, voceKey) {
   for (const tipo of TIPI_ZONA_STRADA) {
     if (isZonaReinterro(tipo)) continue;
     const zona = snapshot?.[tipo];
-    const aree = isZonaSedeStradale(tipo) ? areeVirtualiSede(snapshot) : Array.isArray(zona?.aree) ? zona.aree : [];
+    const aree = isZonaSedeStradale(tipo)
+      ? areeVirtualiSede(snapshot)
+      : isZonaReinterroCalcolo(tipo)
+        ? areeVirtualiReinterro(snapshot)
+        : Array.isArray(zona?.aree)
+          ? zona.aree
+          : [];
     if (isZonaManufatti(tipo)) {
       for (const area of aree) {
         const nome = normalizzaTipoManufatto(area?.tipoManufatto);
@@ -437,7 +475,7 @@ function raccogliRighePerVoce(snapshot, voceKey) {
           }),
         );
       }
-      if (isZonaSedeStradale(tipo)) continue;
+      if (isZonaSedeStradale(tipo) || isZonaReinterroCalcolo(tipo)) continue;
       for (const sott of st?.sottrazioni || []) {
         if (!String(sott?.formula ?? "").trim()) continue;
         const dedupeKey = ["sott", tipo, String(st?.id ?? ""), String(sott?.id ?? "")].join("|");
@@ -473,9 +511,11 @@ function elencoRiferimentiPerVoce(snapshot, voceKey) {
     const zona = snapshot?.[tipo];
     const aree = isZonaSedeStradale(tipo)
       ? areeVirtualiSede(snapshot)
-      : Array.isArray(zona?.aree)
-        ? zona.aree
-        : [];
+      : isZonaReinterroCalcolo(tipo)
+        ? areeVirtualiReinterro(snapshot)
+        : Array.isArray(zona?.aree)
+          ? zona.aree
+          : [];
     if (isZonaManufatti(tipo)) {
       for (const area of aree) {
         const nome = normalizzaTipoManufatto(area?.tipoManufatto);
@@ -517,7 +557,7 @@ function elencoRiferimentiPerVoce(snapshot, voceKey) {
         if (hasMqFisso && area.mqFisso === 0) continue;
         push(area?.riferimento);
       }
-      if (isZonaSedeStradale(tipo)) continue;
+      if (isZonaSedeStradale(tipo) || isZonaReinterroCalcolo(tipo)) continue;
       for (const sott of st?.sottrazioni || []) {
         if (!String(sott?.formula ?? "").trim()) continue;
         push(sott?.riferimento);

@@ -2491,7 +2491,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const tipoOg = String(tipoOggetto ?? "")
       .trim()
       .toUpperCase();
-    if (tipoOg === "STRADA_MANUFATTO" || tipoOg === "STRADA_CORDOLI" || tipoOg === "STRADA_SEGNALETICA" || tipoOg === "STRADA_FOGNA" || tipoOg === "STRADA_ALLACCI_FOGNA" || tipoOg === "STRADA_LUCE_PUBBLICA" || tipoOg === "STRADA_LUCE_PRIVATA" || tipoOg === "STRADA_GAS" || tipoOg === "STRADA_ACQUA" || tipoOg === "STRADA_TELEFONICA" || tipoOg === "STRADA_VARIE") {
+    if (tipoOg === "STRADA_MANUFATTO" || tipoOg === "STRADA_CORDOLI" || tipoOg === "STRADA_SEGNALETICA" || tipoOg === "STRADA_FOGNA" || tipoOg === "STRADA_ALLACCI_FOGNA" || tipoOg === "STRADA_LUCE_PUBBLICA" || tipoOg === "STRADA_LUCE_PRIVATA" || tipoOg === "STRADA_GAS" || tipoOg === "STRADA_ACQUA" || tipoOg === "STRADA_TELEFONICA" || tipoOg === "STRADA_VARIE" || tipoOg === "STRADA_REINTERRO_CALCOLO") {
       const m1 = mmFactorOrOne(misura1);
       const raw = Number((m1 * numero).toFixed(3));
       return segno ? -Math.abs(raw) : raw;
@@ -6216,7 +6216,6 @@ window.addEventListener("DOMContentLoaded", () => {
       cellVoceAbbrev.dataset.idVoce = String(item.idVoce);
       row.appendChild(cellVoceAbbrev);
       row.appendChild(createCell(item.unitaMisura || "-"));
-      row.appendChild(createCell(formatEuro2(item.prezzo ?? 0)));
       {
         const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
         const totaleQuantitaVoce = mm.reduce((sum, m) => sum + Number(m.risultato || 0), 0);
@@ -6227,6 +6226,7 @@ window.addEventListener("DOMContentLoaded", () => {
         cellQta.title = "Quantità totale netta (misurazioni − aperture)";
         row.appendChild(cellQta);
       }
+      row.appendChild(createCell(formatEuro2(item.prezzo ?? 0)));
       row.appendChild(createCell(item.note || "-"));
 
       const actionsCell = document.createElement("td");
@@ -12920,7 +12920,7 @@ window.addEventListener("DOMContentLoaded", () => {
   stradeSidebarButtonEl.type = "button";
   stradeSidebarButtonEl.className = "btn-action btn-secondary";
   stradeSidebarButtonEl.textContent = "STRADE";
-  stradeSidebarButtonEl.title = "Ingombro, marciapiedi, aiuole, parcheggi, manufatti, cordoli, sede, reinterro, segnaletica, fogna, allacci fogna, luci, gas, acqua, telefonica e varie";
+  stradeSidebarButtonEl.title = "Ingombro, marciapiedi, aiuole, parcheggi, manufatti, cordoli, sede, volume occupato, reinterro, segnaletica, fogna, allacci fogna, luci, gas, acqua, telefonica e varie";
   stradeSidebarButtonEl.addEventListener("click", () => {
     openVistaStrade();
   });

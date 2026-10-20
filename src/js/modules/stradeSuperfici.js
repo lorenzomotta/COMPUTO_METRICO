@@ -8,11 +8,12 @@
  * Sede stradale: aree automatiche
  * Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti con area)
  * a parità di riferimento; si possono solo aggiungere strati.
- * Ordine schede: … Cordoli → Fogna → … → Telefonica → Segnaletica → Varie → Manufatti → Sede → Reinterro.
- * Manufatti e Reinterro sono in sola lettura: le righe arrivano dalle spunte nelle altre schede.
+ * Ordine schede: … Varie → Manufatti → Sede → Volume occupato → Reinterro.
+ * Manufatti e Volume occupato sono in sola lettura: le righe arrivano dalle spunte nelle altre schede.
+ * Reinterro (in fondo): aree automatiche Ingombro − Volume occupato, come la Sede. Si aggiungono solo strati.
  */
 
-/** @typedef {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'|'reinterro'} TipoZonaStrada */
+/** @typedef {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'|'reinterro'|'reinterroCalcolo'} TipoZonaStrada */
 
 export const TIPI_ZONA_MANUALE = /** @type {const} */ ([
   "ingombro",
@@ -44,7 +45,10 @@ export const TIPO_ACQUA = "acqua";
 export const TIPO_TELEFONICA = "telefonica";
 export const TIPO_VARIE = "varie";
 export const TIPO_SEDE_STRADALE = "sedeStradale";
+/** Scheda in sola lettura: righe con la spunta Volume occupato. */
 export const TIPO_REINTERRO = "reinterro";
+/** Scheda in fondo: Ingombro − Volume occupato. */
+export const TIPO_REINTERRO_CALCOLO = "reinterroCalcolo";
 
 /** Segnaletica: formula × larghezza × pezzi, fuori dal calcolo Sede. */
 export const TIPI_ZONA_FORMULA_UNITA_VOCE = /** @type {const} */ ([TIPO_SEGNALETICA]);
@@ -60,7 +64,7 @@ export const TIPI_ZONA_COME_MANUFATTI = /** @type {const} */ ([
   TIPO_TELEFONICA,
 ]);
 
-/** Ordine schede UI: superfici → impianti → Segnaletica → Varie → Manufatti → Sede → Reinterro. */
+/** Ordine schede UI: superfici → impianti → Segnaletica → Varie → Manufatti → Sede → Volume occupato → Reinterro. */
 export const TIPI_ZONA_STRADA = /** @type {const} */ ([
   "ingombro",
   "marciapiedi",
@@ -73,9 +77,11 @@ export const TIPI_ZONA_STRADA = /** @type {const} */ ([
   "manufatti",
   TIPO_SEDE_STRADALE,
   TIPO_REINTERRO,
+  TIPO_REINTERRO_CALCOLO,
 ]);
 
 export const VOCE_SEDE_STRADALE = "SEDE STRADALE";
+export const VOCE_REINTERRO = "REINTERRO";
 
 export const TIPI_MANUFATTO_BASE = /** @type {const} */ ([
   "Chiusino",
@@ -101,6 +107,8 @@ const STORAGE_TIPI_CORDOLO_EXTRA = "computo_metrico_strade_tipi_cordolo";
 export const FORMULA_SEDE_STRADALE =
   "Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti)";
 
+export const FORMULA_REINTERRO = "Ingombro − Volume occupato";
+
 export const ZONA_LABELS = {
   ingombro: "Ingombro",
   marciapiedi: "Marciapiedi",
@@ -118,7 +126,8 @@ export const ZONA_LABELS = {
   telefonica: "Telefonica",
   varie: "Varie",
   sedeStradale: "Sede stradale",
-  reinterro: "Reinterro",
+  reinterro: "Volume occupato",
+  reinterroCalcolo: "Reinterro",
 };
 
 /** Valore `tipoOggetto` nelle misurazioni VOCI. */
@@ -140,6 +149,7 @@ export const ZONA_TIPO_OGGETTO = {
   varie: "STRADA_VARIE",
   sedeStradale: "STRADA_SEDE",
   reinterro: "STRADA_REINTERRO",
+  reinterroCalcolo: "STRADA_REINTERRO_CALCOLO",
 };
 
 export function isZonaSedeStradale(tipo) {
@@ -148,6 +158,11 @@ export function isZonaSedeStradale(tipo) {
 
 export function isZonaReinterro(tipo) {
   return tipo === TIPO_REINTERRO;
+}
+
+/** Scheda Reinterro in fondo: calcolo automatico, come la Sede. */
+export function isZonaReinterroCalcolo(tipo) {
+  return tipo === TIPO_REINTERRO_CALCOLO;
 }
 
 export function isZonaManufatti(tipo) {
@@ -913,6 +928,18 @@ function catalogoTipiZona(tipoZona) {
   return null;
 }
 
+/** Scrive Dimensioni e Spessore sul tipo, in libreria o solo in questo computo. */
+export function salvaMisureTipoZona(tipoZona, nome, dati) {
+  const nomePulito = String(nome ?? "").trim();
+  if (!nomePulito) return { ok: false };
+  const cat = catalogoTipiZona(tipoZona);
+  if (!cat) return { ok: false };
+  return cat.salvaMisure(nomePulito, {
+    dimensioni: dati?.dimensioni || "",
+    altezza: dati?.spessore ?? dati?.altezza ?? "",
+  });
+}
+
 /** Se il tipo è in libreria, Dimensioni e Spessore salvati. Altrimenti null. */
 export function misureTipoDaLibreria(tipoZona, nome) {
   const nomePulito = String(nome ?? "").trim();
@@ -1063,6 +1090,40 @@ function testoSpessoreArea(area) {
   return pulisciNomeTipo(area?.spessore || "").slice(0, 40);
 }
 
+function testoLunghezzaArea(area) {
+  return pulisciNomeTipo(area?.lunghezza || "").slice(0, 40);
+}
+
+/**
+ * Formula degli impianti: Lunghezza × (Dimensioni) × Spessore.
+ * Un pezzo vuoto non entra nel conto, così la lunghezza può restare nulla.
+ */
+export function componiFormulaImpianto(lunghezza, dimensioni, spessore) {
+  const parti = [];
+  const lun = String(lunghezza ?? "").trim();
+  const dim = String(dimensioni ?? "").trim();
+  const spe = String(spessore ?? "").trim();
+  if (lun) parti.push(lun);
+  if (dim) parti.push(`(${dim})`);
+  if (spe) parti.push(spe);
+  return parti.join(" * ");
+}
+
+/** In Manufatti entra solo Lunghezza × Dimensioni. Lo spessore resta sulla scheda di partenza. */
+function formulaManufattiDaImpianto(area) {
+  return componiFormulaImpianto(testoLunghezzaArea(area), testoDimensioniArea(area), "");
+}
+
+/** Se c’è almeno un pezzo, usa la formula composta. Altrimenti lascia la formula già scritta. */
+function formulaEffettivaImpianto(area) {
+  const auto = componiFormulaImpianto(
+    testoLunghezzaArea(area),
+    testoDimensioniArea(area),
+    testoSpessoreArea(area),
+  );
+  return auto || formulaArea(area);
+}
+
 /** Risultato = formula × moltiplicatore. Se c’è la larghezza, si moltiplica anche quella (mq). */
 export function mqDiArea(area) {
   const val = evalFormulaArea(formulaArea(area));
@@ -1148,7 +1209,7 @@ export function areeManufattiDaSpunta(scheda) {
         origineId: area.id,
         n: out.length + 1,
         riferimento: typeof area.riferimento === "string" ? area.riferimento : "",
-        formula: formulaArea(area),
+        formula: isZonaComeManufatti(tipo) ? formulaManufattiDaImpianto(area) : formulaArea(area),
         moltiplicatore: testoMoltiplicatore(area.moltiplicatore),
         segno: area.segno === true,
         tipoManufatto: etichettaTipoEstesa(tipo, nome),
@@ -1158,7 +1219,7 @@ export function areeManufattiDaSpunta(scheda) {
   return out;
 }
 
-/** Righe di Fogna, impianti e Varie con la spunta Reinterro. Non sono salvate in una scheda a parte. */
+/** Righe di Fogna, impianti e Varie con la spunta Volume occupato. Non sono salvate in una scheda a parte. */
 export function areeReinterroDaSpunta(scheda) {
   const out = [];
   for (const tipo of ZONE_SPUNTA_MANUFATTI) {
@@ -1173,8 +1234,8 @@ export function areeReinterroDaSpunta(scheda) {
         origineId: area.id,
         n: out.length + 1,
         riferimento: typeof area.riferimento === "string" ? area.riferimento : "",
-        formula: formulaArea(area),
-        moltiplicatore: testoMoltiplicatore(area.moltiplicatore),
+        formula: isZonaComeManufatti(tipo) ? formulaEffettivaImpianto(area) : formulaArea(area),
+        moltiplicatore: isZonaComeManufatti(tipo) ? "1" : testoMoltiplicatore(area.moltiplicatore),
         segno: area.segno === true,
         tipoReinterro: etichettaTipoEstesa(tipo, nome),
         dimensioni: testoDimensioniArea(area),
@@ -1290,6 +1351,76 @@ export function areeVirtualiSede(scheda) {
     }));
 }
 
+function mqVolumeOccupatoPerRiferimento(scheda, rifKey) {
+  let tot = 0;
+  for (const area of areeReinterroDaSpunta(scheda)) {
+    if (chiaveRiferimento(area.riferimento) !== rifKey) continue;
+    const mq = mqDiArea(area);
+    tot += area.segno === true ? -mq : mq;
+  }
+  return Number(tot.toFixed(3));
+}
+
+/**
+ * Una riga per ogni riferimento di Ingombro o di Volume occupato.
+ * mqReinterro = Ingombro − Volume occupato sullo stesso riferimento.
+ */
+export function elencoRiferimentiReinterro(scheda) {
+  /** @type {Map<string, string>} */
+  const labels = new Map();
+  for (const a of scheda?.ingombro?.aree || []) {
+    const key = chiaveRiferimento(a?.riferimento);
+    const label = String(a?.riferimento ?? "").trim();
+    if (!labels.has(key) || label) labels.set(key, label);
+  }
+  for (const a of areeReinterroDaSpunta(scheda)) {
+    const key = chiaveRiferimento(a.riferimento);
+    const label = String(a.riferimento ?? "").trim();
+    if (!labels.has(key)) labels.set(key, label);
+  }
+  let n = 1;
+  const rows = [];
+  for (const [key, riferimento] of labels) {
+    const mqIngombro = mqNettoZonaPerRiferimento(scheda?.ingombro, key);
+    const mqOccupato = mqVolumeOccupatoPerRiferimento(scheda, key);
+    if (mqIngombro === 0 && mqOccupato === 0) continue;
+    rows.push({
+      n: n++,
+      key,
+      riferimento,
+      mqIngombro,
+      mqOccupato,
+      mqReinterro: Number((mqIngombro - mqOccupato).toFixed(3)),
+    });
+  }
+  return rows;
+}
+
+export function totaliReinterro(scheda) {
+  const rows = elencoRiferimentiReinterro(scheda);
+  const somma = (campo) => Number(rows.reduce((s, r) => s + r[campo], 0).toFixed(3));
+  return {
+    rows,
+    mqIngombro: somma("mqIngombro"),
+    mqOccupato: somma("mqOccupato"),
+    mqNetto: somma("mqReinterro"),
+  };
+}
+
+export function areeVirtualiReinterro(scheda) {
+  return elencoRiferimentiReinterro(scheda)
+    .filter((r) => r.mqReinterro !== 0)
+    .map((r) => ({
+      id: r.n,
+      n: r.n,
+      riferimento: r.riferimento,
+      formula: FORMULA_REINTERRO,
+      moltiplicatore: "1",
+      segno: r.mqReinterro < 0,
+      mqFisso: Math.abs(r.mqReinterro),
+    }));
+}
+
 export function calcolaMcDaMqESpessore(mq, spessore) {
   const sp = parseDim(spessore) ?? 0;
   const base = Number.isFinite(mq) ? mq : 0;
@@ -1310,6 +1441,7 @@ export function emptyAreaStrada(nextId, n = 1) {
     tipoVarie: "",
     tipoImpianto: "",
     larghezza: "",
+    lunghezza: "",
     dimensioni: "",
     spessore: "",
     inManufatti: false,
@@ -1342,6 +1474,7 @@ export function duplicaAreaStrada(area, nextId, n) {
     tipoVarie: normalizzaTipoVarie(src.tipoVarie),
     tipoImpianto: typeof src.tipoImpianto === "string" ? src.tipoImpianto.trim().replace(/\s+/g, " ") : "",
     larghezza: typeof src.larghezza === "string" ? src.larghezza : src.larghezza != null ? String(src.larghezza) : "",
+    lunghezza: testoLunghezzaArea(src),
     dimensioni: testoDimensioniArea(src),
     spessore: testoSpessoreArea(src),
     inManufatti: src.inManufatti === true,
@@ -1381,6 +1514,20 @@ export function emptyZonaSedeStradale(nextId) {
   };
 }
 
+export function emptyStratoReinterro(nextId, n = 1) {
+  const st = emptyStratoStrada(nextId, n);
+  st.vocibreve = VOCE_REINTERRO;
+  return st;
+}
+
+export function emptyZonaReinterroCalcolo(nextId) {
+  return {
+    note: "",
+    aree: [],
+    strati: [emptyStratoReinterro(nextId, 1)],
+  };
+}
+
 export function emptySchedaStrade(nextId) {
   return {
     ingombro: emptyZonaStrada(nextId),
@@ -1399,6 +1546,7 @@ export function emptySchedaStrade(nextId) {
     telefonica: emptyZonaStrada(nextId),
     varie: emptyZonaStrada(nextId),
     sedeStradale: emptyZonaSedeStradale(nextId),
+    reinterroCalcolo: emptyZonaReinterroCalcolo(nextId),
   };
 }
 
@@ -1430,7 +1578,7 @@ function sanificaArea(row, nextId, n, tipoZona) {
     id,
     n,
     riferimento: typeof src.riferimento === "string" ? src.riferimento : "",
-    formula: formulaArea(src),
+    formula: isZonaComeManufatti(tipoZona) ? formulaEffettivaImpianto(src) : formulaArea(src),
     moltiplicatore: testoMoltiplicatore(src.moltiplicatore),
     segno: src.segno === true,
     tipoManufatto: normalizzaTipoManufatto(src.tipoManufatto),
@@ -1439,6 +1587,7 @@ function sanificaArea(row, nextId, n, tipoZona) {
     tipoVarie: normalizzaTipoVarie(src.tipoVarie),
     tipoImpianto: normalizzaTipoImpianto(tipoZona, src.tipoImpianto),
     larghezza: typeof src.larghezza === "string" ? src.larghezza : src.larghezza != null ? String(src.larghezza) : "",
+    lunghezza: testoLunghezzaArea(src),
     dimensioni: testoDimensioniArea(src),
     spessore: testoSpessoreArea(src),
     inManufatti: src.inManufatti === true,
@@ -1518,7 +1667,28 @@ export function sanificaSchedaStrade(raw, nextId) {
     out[tipo] = sanificaZonaStrada(src[tipo], nextId, tipo);
   }
   out.sedeStradale = sanificaZonaSedeStradale(src.sedeStradale, nextId);
+  out.reinterroCalcolo = sanificaZonaReinterroCalcolo(src.reinterroCalcolo, nextId);
   return out;
+}
+
+export function sanificaZonaReinterroCalcolo(raw, nextId) {
+  const base = emptyZonaReinterroCalcolo(nextId);
+  if (!raw || typeof raw !== "object") return base;
+  const src = /** @type {Record<string, unknown>} */ (raw);
+  base.note = typeof src.note === "string" ? src.note : "";
+  base.aree = [];
+  const stratSrc = Array.isArray(src.strati)
+    ? src.strati.filter((x) => x && typeof x === "object")
+    : [];
+  base.strati =
+    stratSrc.length === 0
+      ? [emptyStratoReinterro(nextId, 1)]
+      : stratSrc.map((st, i) => {
+          const clean = sanificaStrato(st, nextId, i + 1);
+          clean.spessore = "";
+          return clean;
+        });
+  return base;
 }
 
 export function cloneZonaPerSnapshot(zona, tipoZona) {
@@ -1531,7 +1701,7 @@ export function cloneZonaPerSnapshot(zona, tipoZona) {
       id: typeof a?.id === "number" ? a.id : 0,
       n: typeof a?.n === "number" && Number.isFinite(a.n) ? a.n : i + 1,
       riferimento: typeof a?.riferimento === "string" ? a.riferimento : "",
-      formula: formulaArea(a),
+      formula: isZonaComeManufatti(tipoZona) ? formulaEffettivaImpianto(a) : formulaArea(a),
       moltiplicatore: testoMoltiplicatore(a?.moltiplicatore),
       segno: a?.segno === true,
       tipoManufatto: normalizzaTipoManufatto(a?.tipoManufatto),
@@ -1540,6 +1710,7 @@ export function cloneZonaPerSnapshot(zona, tipoZona) {
       tipoVarie: normalizzaTipoVarie(a?.tipoVarie),
       tipoImpianto: normalizzaTipoImpianto(tipoZona, a?.tipoImpianto),
       larghezza: typeof a?.larghezza === "string" ? a.larghezza : a?.larghezza != null ? String(a.larghezza) : "",
+      lunghezza: testoLunghezzaArea(a),
       dimensioni: testoDimensioniArea(a),
       spessore: testoSpessoreArea(a),
       inManufatti: a?.inManufatti === true,
@@ -1549,7 +1720,12 @@ export function cloneZonaPerSnapshot(zona, tipoZona) {
       id: typeof st?.id === "number" ? st.id : 0,
       n: typeof st?.n === "number" && Number.isFinite(st.n) ? st.n : i + 1,
       vocibreve: typeof st?.vocibreve === "string" ? st.vocibreve : "",
-      spessore: st?.spessore != null && st.spessore !== "" ? String(st.spessore) : "",
+      spessore:
+        isZonaReinterroCalcolo(tipoZona)
+          ? ""
+          : st?.spessore != null && st.spessore !== ""
+            ? String(st.spessore)
+            : "",
       sottrazioni: (Array.isArray(st?.sottrazioni) ? st.sottrazioni : []).map((s, j) => ({
         id: typeof s?.id === "number" ? s.id : 0,
         n: typeof s?.n === "number" && Number.isFinite(s.n) ? s.n : j + 1,
@@ -1577,6 +1753,9 @@ export function zonaHaVoceStrato(zona) {
 export function zonaHaMisuraCompilata(tipo, zona, schedaCompleta) {
   if (isZonaSedeStradale(tipo)) {
     return areeVirtualiSede(schedaCompleta).length > 0;
+  }
+  if (isZonaReinterroCalcolo(tipo)) {
+    return areeVirtualiReinterro(schedaCompleta).length > 0;
   }
   if (isZonaReinterro(tipo)) return false;
   const aree = Array.isArray(zona?.aree) ? zona.aree : [];
@@ -1751,7 +1930,15 @@ function appendFormulaEMoltiplicatore(
   item,
   classPrefix,
   ariaBase,
-  { pezzi = false, lineare = false, primaMoltiplicatore = null, multilinea = false, sottraeSede = true } = {},
+  {
+    pezzi = false,
+    quantita = false,
+    lineare = false,
+    primaMoltiplicatore = null,
+    multilinea = false,
+    sottraeSede = true,
+    formulaAutomatica = false,
+  } = {},
 ) {
   const tdF = document.createElement("td");
   tdF.className = "strade-formula-cell";
@@ -1759,17 +1946,27 @@ function appendFormulaEMoltiplicatore(
   if (inpF instanceof HTMLTextAreaElement) inpF.rows = 1;
   else inpF.type = "text";
   inpF.className = `${classPrefix}-formula`;
-  inpF.placeholder = pezzi
-    ? sottraeSede
-      ? "opz. area 1 pezzo"
-      : "es. 12,5 oppure 2*3"
-    : lineare
-      ? "es. 12,5"
-      : "es. 12,5 * 3,2";
+  inpF.placeholder = formulaAutomatica
+    ? "Lunghezza × Dimensioni × Spessore"
+    : pezzi
+      ? sottraeSede
+        ? "opz. area 1 pezzo"
+        : "es. 12,5 oppure 2*3"
+      : lineare
+        ? "es. 12,5"
+        : "es. 12,5 * 3,2";
   inpF.setAttribute(
     "aria-label",
-    pezzi && sottraeSede ? `Formula area di un pezzo ${ariaBase}` : `Formula ${ariaBase}`,
+    formulaAutomatica
+      ? "Formula calcolata: Lunghezza × Dimensioni × Spessore"
+      : pezzi && sottraeSede
+        ? `Formula area di un pezzo ${ariaBase}`
+        : `Formula ${ariaBase}`,
   );
+  if (formulaAutomatica) {
+    inpF.readOnly = true;
+    inpF.title = "Si calcola da sola. Se Lunghezza o Spessore sono vuoti, quel pezzo non entra nel conto.";
+  }
   inpF.autocomplete = "off";
   inpF.spellcheck = false;
   inpF.value = formulaArea(item);
@@ -1788,19 +1985,32 @@ function appendFormulaEMoltiplicatore(
   inpM.className = `${classPrefix}-moltiplicatore vani-in-num`;
   inpM.inputMode = "decimal";
   inpM.placeholder = "1";
+  const lunTxt = String(testoLunghezzaArea(item) ?? "").trim();
+  const lunVal = evalFormulaArea(lunTxt);
+  const daLunghezza = quantita && lunVal != null && lunVal > 0;
+  const quantitaManuale = testoMoltiplicatore(item?.moltiplicatore);
   inpM.setAttribute(
     "aria-label",
-    pezzi ? `Numero pezzi ${ariaBase}` : `Moltiplicatore ${ariaBase}`,
+    quantita ? "Quantità" : pezzi ? `Numero pezzi ${ariaBase}` : `Moltiplicatore ${ariaBase}`,
   );
-  inpM.title = pezzi
-    ? sottraeSede
-      ? "Quanti pezzi contare nelle VOCI (vuoto = 1). Se c’è una formula, quell’area × pezzi si toglie dalla Sede."
-      : "Moltiplica il risultato della formula (vuoto = 1). In VOCI la quantità è formula × pezzi."
-    : lineare
-      ? "Ripete il risultato della formula (vuoto = 1)"
-      : "Moltiplica il risultato della formula (vuoto = 1)";
+  inpM.title = daLunghezza
+    ? "È la Lunghezza, perché è maggiore di 0. Per scrivere un numero tuo, svuota la Lunghezza."
+    : quantita
+      ? "Lunghezza vuota: scrivi qui il numero che va nelle VOCI (vuoto = 1)."
+      : pezzi
+        ? sottraeSede
+          ? "Quanti pezzi contare nelle VOCI (vuoto = 1). Se c’è una formula, quell’area × pezzi si toglie dalla Sede."
+          : "Moltiplica il risultato della formula (vuoto = 1). In VOCI la quantità è formula × pezzi."
+        : lineare
+          ? "Ripete il risultato della formula (vuoto = 1)"
+          : "Moltiplica il risultato della formula (vuoto = 1)";
   inpM.autocomplete = "off";
-  inpM.value = testoMoltiplicatore(item?.moltiplicatore);
+  inpM.value = daLunghezza ? lunTxt : quantitaManuale;
+  inpM.readOnly = daLunghezza;
+  if (quantita) {
+    inpM.dataset.quantitaImpianto = "1";
+    inpM.dataset.quantitaManuale = quantitaManuale;
+  }
   tdM.appendChild(inpM);
   tr.appendChild(tdM);
 }
@@ -1916,8 +2126,8 @@ function appendSpuntaManufatti(tr, area) {
   chk.className = "strade-area-in-manufatti";
   chk.checked = area?.inManufatti === true;
   chk.setAttribute("aria-label", "Copia questa riga in Manufatti");
-  lbl.title = "Se la spunti, la riga compare in Manufatti con il nome della voce, la stessa formula e gli stessi pezzi.";
-  lbl.append(chk, document.createTextNode(" Manufatti"));
+  lbl.title = "Se la spunti, la riga compare in Manufatti con Lunghezza × Dimensioni. Se la lunghezza è vuota, usa solo le Dimensioni. Lo spessore non viene copiato.";
+  lbl.append(chk);
   td.appendChild(lbl);
   tr.appendChild(td);
 }
@@ -1931,10 +2141,57 @@ function appendSpuntaReinterro(tr, area) {
   chk.type = "checkbox";
   chk.className = "strade-area-in-reinterro";
   chk.checked = area?.inReinterro === true;
-  chk.setAttribute("aria-label", "Copia questa riga in Reinterro");
-  lbl.title = "Se la spunti, la riga compare in Reinterro con il nome della voce, Dimensioni, Spessore, la stessa formula e gli stessi pezzi.";
-  lbl.append(chk, document.createTextNode(" Reinterro"));
+  chk.setAttribute("aria-label", "Copia questa riga in Volume occupato");
+  lbl.title = "Se la spunti, la riga compare in Volume occupato con il nome della voce, Dimensioni, Spessore, la stessa formula e gli stessi pezzi.";
+  lbl.append(chk);
   td.appendChild(lbl);
+  tr.appendChild(td);
+}
+
+/** La formula sta sotto le colonne delle misure, larga quanto quelle colonne. */
+function spostaFormulaSottoMisure(tr, areaId, colonne) {
+  const formulaCell = tr.querySelector(":scope > .strade-formula-cell");
+  if (!(formulaCell instanceof HTMLTableCellElement)) return null;
+  for (const cell of [...tr.children]) {
+    if (!(cell instanceof HTMLTableCellElement) || cell === formulaCell) continue;
+    const eMisura = cell.querySelector(".strade-area-lunghezza, .strade-area-dimensioni, .strade-area-spessore");
+    if (eMisura) continue;
+    cell.rowSpan = 2;
+  }
+  formulaCell.colSpan = colonne;
+  formulaCell.classList.add("strade-formula-sotto");
+  const etichetta = document.createElement("span");
+  etichetta.className = "strade-formula-sotto-label";
+  etichetta.textContent = "Formula";
+  formulaCell.prepend(etichetta);
+  const formulaRow = document.createElement("tr");
+  formulaRow.className = "strade-area-formula-row";
+  formulaRow.dataset.areaId = String(areaId);
+  formulaRow.appendChild(formulaCell);
+  return formulaRow;
+}
+
+function campoFormulaVicino(row) {
+  const qui = row.querySelector(":scope > .strade-formula-cell .strade-area-formula");
+  if (qui instanceof HTMLInputElement || qui instanceof HTMLTextAreaElement) return qui;
+  const sotto = row.nextElementSibling;
+  if (!(sotto instanceof HTMLTableRowElement) || !sotto.classList.contains("strade-area-formula-row")) return null;
+  const campo = sotto.querySelector(".strade-area-formula");
+  if (campo instanceof HTMLInputElement || campo instanceof HTMLTextAreaElement) return campo;
+  return null;
+}
+
+function appendLunghezza(tr, area) {
+  const td = document.createElement("td");
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "strade-area-lunghezza";
+  inp.placeholder = "vuota";
+  inp.setAttribute("aria-label", "Lunghezza");
+  inp.title = "Lunghezza in metri. Lasciala vuota se non serve.";
+  inp.autocomplete = "off";
+  inp.value = testoLunghezzaArea(area);
+  td.appendChild(inp);
   tr.appendChild(td);
 }
 
@@ -1972,7 +2229,7 @@ function appendTipoReinterroTesto(tr, testo, origineTipo) {
   inp.value = testo || "";
   const da = ZONA_LABELS[origineTipo] || "un'altra scheda";
   inp.title = `Arriva da ${da}. È lo stesso nome che va in VOCI.`;
-  inp.setAttribute("aria-label", "Tipo reinterro");
+  inp.setAttribute("aria-label", "Tipo volume occupato");
   td.appendChild(inp);
   tr.appendChild(td);
 }
@@ -2077,8 +2334,11 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
   const isSegnaletica = isZonaSegnaletica(tipo);
   const isVarie = isZonaVarie(tipo);
   const conSpuntaManufatti = isImpianto || isVarie;
+  const conLunghezza = isImpianto;
   const conDimensioni = isImpianto || isVarie || isReinterro;
+  const colLunghezza = `<col class="strade-col-lunghezza">`;
   const colDimensioni = `<col class="strade-col-dimensioni"><col class="strade-col-spessore">`;
+  const thLunghezza = `<th>Lunghezza</th>`;
   const thDimensioni = `<th>Dimensioni</th><th>Spessore</th>`;
   const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipo) && !isSegnaletica;
   const unitaCol = isCordoli ? "Ml" : isFormulaUnitaVoce || isVarie ? "Ris." : "Mq";
@@ -2106,13 +2366,14 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
   table.innerHTML = comeManufatti
     ? `<colgroup>
     <col class="strade-col-n"><col class="strade-col-rif"><col class="strade-col-tipo">
-    ${isImpianto ? `<col class="strade-col-spunta"><col class="strade-col-spunta">` : ""}
+    ${isImpianto ? `<col class="strade-col-spunta"><col class="strade-col-spunta strade-col-volume">` : ""}
+    ${conLunghezza ? colLunghezza : ""}
     ${isImpianto || isReinterro ? colDimensioni : ""}
-    <col class="strade-col-formula"><col class="strade-col-mol"><col class="strade-col-mq">
+    ${isImpianto ? "" : `<col class="strade-col-formula">`}<col class="strade-col-mol"><col class="strade-col-mq">
     ${isManufatti ? "" : `<col class="strade-col-sottrai">`}<col class="strade-col-act">
   </colgroup>
   <thead><tr>
-    <th>N°</th><th>Rif.</th><th>${escapeHtml(isManufatti ? "Tipo manufatto" : isReinterro ? "Tipo reinterro" : `Tipo ${etichettaTipo.toLocaleLowerCase("it-IT")}`)}</th>${isImpianto ? "<th>Manufatti</th><th>Reinterro</th>" : ""}${isImpianto || isReinterro ? thDimensioni : ""}<th>Formula</th><th>N° pezzi</th><th>${isManufatti ? "Mq" : "Ris."}</th>${isManufatti ? "" : "<th>Sottrai</th>"}<th></th>
+    <th>N°</th><th>Rif.</th><th>${escapeHtml(isManufatti ? "Tipo manufatto" : isReinterro ? "Tipo" : `Tipo ${etichettaTipo.toLocaleLowerCase("it-IT")}`)}</th>${isImpianto ? `<th class="strade-th-spunta">Manufatti</th><th class="strade-th-spunta">Volume occupato</th>` : ""}${conLunghezza ? thLunghezza : ""}${isImpianto || isReinterro ? thDimensioni : ""}${isImpianto ? "" : "<th>Formula</th>"}${isImpianto ? "<th>Quantità</th>" : "<th>N° pezzi</th>"}<th>${isManufatti ? "Mq" : "Ris."}</th>${isManufatti ? "" : "<th>Sottrai</th>"}<th></th>
   </tr></thead>`
     : isCordoli
       ? `<colgroup>
@@ -2135,13 +2396,13 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
         : isVarie
           ? `<colgroup>
     <col class="strade-col-n"><col class="strade-col-rif"><col class="strade-col-tipo">
-    <col class="strade-col-spunta"><col class="strade-col-spunta">
+    <col class="strade-col-spunta"><col class="strade-col-spunta strade-col-volume">
     ${colDimensioni}
-    <col class="strade-col-formula"><col class="strade-col-mol"><col class="strade-col-mq">
+    <col class="strade-col-mol"><col class="strade-col-mq">
     <col class="strade-col-sottrai"><col class="strade-col-act">
   </colgroup>
   <thead><tr>
-    <th>N°</th><th>Rif.</th><th>Tipo varie</th><th>Manufatti</th><th>Reinterro</th>${thDimensioni}<th>Formula</th><th>×</th><th>Ris.</th><th>Sottrai</th><th></th>
+    <th>N°</th><th>Rif.</th><th>Tipo varie</th><th class="strade-th-spunta">Manufatti</th><th class="strade-th-spunta">Volume occupato</th>${thDimensioni}<th>×</th><th>Ris.</th><th>Sottrai</th><th></th>
   </tr></thead>`
           : `<colgroup>
     <col class="strade-col-n"><col class="strade-col-rif">
@@ -2201,23 +2462,27 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
       appendSpuntaManufatti(tr, area);
       appendSpuntaReinterro(tr, area);
     }
+    if (conLunghezza) appendLunghezza(tr, area);
     if (conDimensioni) appendDimensioniSpessore(tr, area);
 
+    const areaVista = isImpianto ? { ...area, formula: formulaEffettivaImpianto(area) } : area;
     appendFormulaEMoltiplicatore(
       tr,
-      area,
+      areaVista,
       "strade-area",
       isCordoli ? "lunghezza" : isSegnaletica ? "segnaletica" : isVarie || isFormulaUnitaVoce ? "calcolo" : "area",
       {
         pezzi: comeManufatti,
+        quantita: isImpianto,
         lineare: isCordoli || isSegnaletica || isVarie || isFormulaUnitaVoce || isReinterro,
         multilinea: conTipo,
         sottraeSede: isManufatti,
+        formulaAutomatica: isImpianto && !derivata,
         primaMoltiplicatore: isSegnaletica ? () => appendLarghezza(tr, area) : null,
       },
     );
 
-    const mqInfo = testoMqRiga(area, area.segno === true);
+    const mqInfo = testoMqRiga(areaVista, area.segno === true);
     appendCellettaMq(tr, mqInfo.text, mqInfo.err, "area-mq");
 
     if (!isManufatti) {
@@ -2275,16 +2540,36 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
     }
 
     tbody.appendChild(tr);
+    if (isImpianto || isVarie) {
+      const formulaRow = spostaFormulaSottoMisure(tr, area.id, isImpianto ? 3 : 2);
+      if (formulaRow) tbody.appendChild(formulaRow);
+    }
   }
 
   table.appendChild(tbody);
 
+  const zonaPerTotali = isImpianto
+    ? {
+        ...zona,
+        aree: (zona.aree || []).map((a) => ({
+          ...a,
+          formula: formulaEffettivaImpianto(a),
+          moltiplicatore: "1",
+        })),
+      }
+    : isReinterro
+      ? { aree: [] }
+      : zona;
   const t = totaliAreeConDerivate(
-    isReinterro ? { aree: [] } : zona,
+    zonaPerTotali,
     isReinterro ? areeReinterroDaSpunta(schedaCompleta) : isManufatti ? areeManufattiDaSpunta(schedaCompleta) : [],
   );
   const labelColspan =
-    (isSegnaletica ? 6 : conTipo ? 5 : 4) + (conSpuntaManufatti ? 2 : 0) + (conDimensioni ? 2 : 0);
+    (isSegnaletica ? 6 : conTipo ? 5 : 4) +
+    (conSpuntaManufatti ? 2 : 0) +
+    (conLunghezza ? 1 : 0) +
+    (conDimensioni ? 2 : 0) -
+    (isImpianto || isVarie ? 1 : 0);
   const labelPos = isCordoli
     ? "Totale lunghezze positive"
     : isSegnaletica
@@ -2310,7 +2595,7 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
         : isReinterro
           ? "Risultato netto (formula × pezzi, copiato dalle schede di partenza)"
           : isImpianto
-          ? "Risultato netto (formula × pezzi; unità in VOCI; non entra nella Sede)"
+          ? "Risultato netto (lunghezza × dimensioni × spessore)"
       : "Mq netto zona (base per gli strati)";
   const codaColspan = isManufatti ? 1 : 2;
   const tfoot = document.createElement("tfoot");
@@ -2441,7 +2726,7 @@ function renderElencoTipiModificabili(nomi, actionSalva, actionElimina, tipoZona
   const hint = document.createElement("p");
   hint.className = "strade-tipi-esistenti-hint";
   hint.textContent =
-    "In Dimensioni scrivi una formula, per esempio 0,40 x 0,40. Area è il risultato. Volume è Area × Spessore. Se lo Spessore è vuoto, Volume resta vuoto. Questi numeri si salvano da soli con il tipo.";
+    "In Dimensioni scrivi una formula, per esempio 0,40 x 0,40. Area è il risultato. Volume è Area × Spessore. Se lo Spessore è vuoto, Volume resta vuoto. Premi Salva: i numeri vanno sulle righe che usano questo tipo e, se la strada è già registrata, anche nel computo.";
   box.append(title, hint);
   if (!nomi.length) {
     const empty = document.createElement("p");
@@ -2508,7 +2793,7 @@ function renderElencoTipiModificabili(nomi, actionSalva, actionElimina, tipoZona
     salva.className = "btn-action btn-secondary";
     salva.dataset.action = actionSalva;
     if (tipoZona) salva.dataset.tipoZona = tipoZona;
-    salva.textContent = "Salva nome";
+    salva.textContent = "Salva";
     const elim = document.createElement("button");
     elim.type = "button";
     elim.className = "btn-action btn-delete";
@@ -2740,7 +3025,7 @@ function renderSottrazioniStrato(tipo, strato) {
 function renderStratiCards(tipo, zona, datalistId, opts = {}) {
   const wrap = document.createElement("div");
   wrap.className = "vani-sup-section";
-  const senzaSpessore = isZonaEsclusaDaSede(tipo);
+  const senzaSpessore = isZonaEsclusaDaSede(tipo) || isZonaReinterroCalcolo(tipo);
   const isCordoli = isZonaCordoli(tipo);
   const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipo);
 
@@ -2755,6 +3040,15 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
       : totaliAreeZona(zona).mqNetto;
   const nascondiSottrazioni = opts.nascondiSottrazioni === true;
 
+  if (nascondiSottrazioni) {
+    const nota = document.createElement("p");
+    nota.className = "vani-sup-hint";
+    nota.textContent = isZonaReinterroCalcolo(tipo)
+      ? "Ogni strato usa gli stessi mc del totale Reinterro, quello della tabella. È già un volume: lo spessore non serve."
+      : "Ogni strato usa gli stessi mq del totale Sede, quello della tabella. Se scrivi lo spessore, compare il volume in mc: mq × spessore.";
+    wrap.appendChild(nota);
+  }
+
   for (const st of zona.strati || []) {
     const mqSott = nascondiSottrazioni ? 0 : mqSottrazioniStrato(st);
     const mqNetto = nascondiSottrazioni
@@ -2767,6 +3061,7 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
     const card = document.createElement("div");
     card.className = "strade-strato-card";
     card.dataset.stratoId = String(st.id);
+    if (nascondiSottrazioni) card.dataset.stratoAuto = "1";
 
     const row = document.createElement("div");
     row.className = "strade-strato-head";
@@ -2812,7 +3107,9 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
     }
 
     const labelBase = nascondiSottrazioni
-      ? "Mq sede"
+      ? isZonaReinterroCalcolo(tipo)
+        ? "Mc reinterro"
+        : "Mq sede"
       : isCordoli
         ? "Ml zona"
         : isFormulaUnitaVoce
@@ -2831,22 +3128,29 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
       row.appendChild(mqSottEl);
     }
 
-    const mqNettoEl = document.createElement("div");
-    mqNettoEl.className = "strade-strato-metric";
-    const labelNetto = isCordoli ? "Ml netto" : isFormulaUnitaVoce ? "Ris. netto" : "Mq netto";
-    mqNettoEl.innerHTML = `<span>${labelNetto}</span><strong data-role="strato-mq-netto">${fmtDim(mqNetto)}</strong>`;
-    row.appendChild(mqNettoEl);
+    if (!nascondiSottrazioni) {
+      const mqNettoEl = document.createElement("div");
+      mqNettoEl.className = "strade-strato-metric";
+      const labelNetto = isCordoli ? "Ml netto" : isFormulaUnitaVoce ? "Ris. netto" : "Mq netto";
+      mqNettoEl.innerHTML = `<span>${labelNetto}</span><strong data-role="strato-mq-netto">${fmtDim(mqNetto)}</strong>`;
+      row.appendChild(mqNettoEl);
+    }
 
-    const calcTitle = isCordoli
-      ? "Lunghezza (ml netto)"
-      : isFormulaUnitaVoce
-        ? "Risultato formula × moltiplicatore (unità dalla voce)"
-        : hasSp
-          ? "Volume (mq netto × spessore)"
-          : "Area (mq netto, senza spessore)";
+    const calcTitle = nascondiSottrazioni
+      ? "Volume: mq dello strato × spessore"
+      : isCordoli
+        ? "Lunghezza (ml netto)"
+        : isFormulaUnitaVoce
+          ? "Risultato formula × moltiplicatore (unità dalla voce)"
+          : hasSp
+            ? "Volume (mq netto × spessore)"
+            : "Area (mq netto, senza spessore)";
+    const calcLabel = nascondiSottrazioni ? "Mc" : "Calcolo";
     const calcEl = document.createElement("div");
     calcEl.className = "strade-strato-metric";
-    calcEl.innerHTML = `<span>Calcolo</span><strong data-role="strato-calcolo" title="${calcTitle}">${fmtDim(calcolo)}</strong>`;
+    calcEl.dataset.role = "strato-mc-wrap";
+    if (nascondiSottrazioni && !hasSp) calcEl.hidden = true;
+    calcEl.innerHTML = `<span>${calcLabel}</span><strong data-role="strato-calcolo" title="${calcTitle}">${fmtDim(calcolo)}</strong>`;
     row.appendChild(calcEl);
 
     const btnRm = document.createElement("button");
@@ -2932,15 +3236,81 @@ function renderAreeSedeTable(scheda) {
   return wrap;
 }
 
+function renderAreeReinterroTable(scheda) {
+  const wrap = document.createElement("div");
+  wrap.className = "vani-sup-section";
+
+  const head = document.createElement("div");
+  head.className = "vani-sup-section-head";
+  head.innerHTML = `<span class="vani-sup-section-title">Aree automatiche</span>`;
+  wrap.appendChild(head);
+
+  const { rows, mqIngombro, mqOccupato, mqNetto } = totaliReinterro(scheda);
+
+  if (rows.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "vani-sup-hint strade-sede-empty";
+    empty.textContent =
+      "Nessuna area ancora. Usa lo stesso riferimento (es. «tratto A») sull’Ingombro e sulla spunta Volume occupato: qui comparirà Ingombro − Volume occupato.";
+    wrap.appendChild(empty);
+    return wrap;
+  }
+
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "vani-sup-table-wrap";
+  const table = document.createElement("table");
+  table.className = "vani-sup-aree-table strade-sede-table";
+  table.innerHTML = `<thead><tr>
+    <th>N°</th><th>Rif.</th><th>Ingombro</th><th>Volume occupato</th><th>Reinterro mc</th>
+  </tr></thead>`;
+  const tbody = document.createElement("tbody");
+
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.className = "strade-sede-row";
+    const rifLabel = r.riferimento ? r.riferimento : "(senza rif.)";
+    tr.innerHTML = `
+      <td class="vani-sup-strato-num">${escapeHtml(String(r.n))}</td>
+      <td>${escapeHtml(rifLabel)}</td>
+      <td class="vani-sup-calc">${escapeHtml(fmtDimSegno(r.mqIngombro))}</td>
+      <td class="vani-sup-calc">${escapeHtml(fmtDimSegno(r.mqOccupato))}</td>
+      <td class="vani-sup-calc strade-sede-mq">${escapeHtml(fmtDimSegno(r.mqReinterro))}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  const tfoot = document.createElement("tfoot");
+  tfoot.innerHTML = `
+    <tr class="vani-sup-totale-row vani-sup-totale-row--netto">
+      <td colspan="2">Totali</td>
+      <td class="vani-sup-calc">${escapeHtml(fmtDimSegno(mqIngombro))}</td>
+      <td class="vani-sup-calc vani-sup-totale-mq-netto">${escapeHtml(fmtDimSegno(mqOccupato))}</td>
+      <td class="vani-sup-calc vani-sup-totale-mq-netto" title="Mc reinterro, base per gli strati">${escapeHtml(fmtDimSegno(mqNetto))}</td>
+    </tr>`;
+  table.appendChild(tfoot);
+  tableWrap.appendChild(table);
+  wrap.appendChild(tableWrap);
+  return wrap;
+}
+
 /**
- * Pannello di una zona. Per la sede serve la scheda intera (aree automatiche).
+ * Pannello di una zona. Per la sede e il reinterro serve la scheda intera (aree automatiche).
  * @param {{ tipo: TipoZonaStrada, zona: object, datalistId: string, schedaCompleta?: object }} opts
  */
 export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }) {
   const isSede = isZonaSedeStradale(tipo);
-  const data = zona && typeof zona === "object" ? zona : (isSede ? emptyZonaSedeStradale(() => 0) : emptyZonaStrada(() => 0));
+  const isReinterroCalcolo = isZonaReinterroCalcolo(tipo);
+  const data =
+    zona && typeof zona === "object"
+      ? zona
+      : isSede
+        ? emptyZonaSedeStradale(() => 0)
+        : isReinterroCalcolo
+          ? emptyZonaReinterroCalcolo(() => 0)
+          : emptyZonaStrada(() => 0);
   const label = ZONA_LABELS[tipo] || tipo;
   const mqSede = isSede ? totaliSedeStradale(schedaCompleta).mqNetto : null;
+  const mqReinterro = isReinterroCalcolo ? totaliReinterro(schedaCompleta).mqNetto : null;
 
   const block = document.createElement("div");
   block.className = "vani-sup-block strade-sup-block";
@@ -2959,18 +3329,20 @@ export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }
   hint.className = "vani-sup-hint";
   hint.textContent = isSede
     ? "Le aree si calcolano da sole: per ogni riferimento, Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti). I manufatti senza area non vengono sottratti. Cordoli e le schede impianti (Segnaletica, Fogna, Allacci fogna, Luci, Gas, Acqua, Telefonica) non entrano in questo calcolo. Qui puoi solo aggiungere strati. Il primo strato è già «SEDE STRADALE»."
+    : isReinterroCalcolo
+      ? "Le aree si calcolano da sole: per ogni riferimento, Ingombro − Volume occupato. Il risultato è già in metri cubi, lo spessore non serve. Qui puoi solo aggiungere strati. Il primo strato è già «REINTERRO»."
     : isZonaManufatti(tipo)
       ? "Questa scheda è in sola lettura. Le righe arrivano dalla spunta Manufatti in Fogna, negli impianti o in Varie. Il tipo è il nome della voce, per esempio Pozzetto ispezione (Fogna). Formula e N° pezzi sono quelli della scheda di partenza. L’icona della lente apre la scheda da cui arriva la riga."
       : isZonaReinterro(tipo)
-        ? "Questa scheda è in sola lettura. Le righe arrivano dalla spunta Reintero in Fogna, negli impianti o in Varie. Il tipo è il nome della voce, per esempio Pozzetto ispezione (Fogna). Dimensioni, Spessore, formula e N° pezzi sono quelli della scheda di partenza."
+        ? "Questa scheda è in sola lettura. Le righe arrivano dalla spunta Volume occupato in Fogna, negli impianti o in Varie. Il tipo è il nome della voce, per esempio Pozzetto ispezione (Fogna). Dimensioni, Spessore, formula e N° pezzi sono quelli della scheda di partenza. Questi valori si tolgono dall’Ingombro nella scheda Reinterro."
       : isZonaCordoli(tipo)
         ? "Scegli il tipo di cordolo (Retto, Curvo, oppure aggiungine uno nuovo). Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × pezzi. Se la formula è vuota, la quantità è 0. I Cordoli non vengono sottratti dalla Sede stradale."
         : isZonaSegnaletica(tipo)
           ? "Scegli il tipo di segnaletica, oppure aggiungine uno nuovo. Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × larghezza × pezzi. Se manca la larghezza, conta come 1. Se la formula è vuota, la quantità è 0. Non viene sottratta dalla Sede."
           : isZonaVarie(tipo)
-            ? "Scegli il tipo (per ora Reinterro, oppure aggiungine uno nuovo). Se il tipo è in libreria, Dimensioni e Spessore si compilano da soli. Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × pezzi. Se la formula è vuota, la quantità è 0. La spunta Manufatti copia la riga nella scheda Manufatti. La spunta Reinterro copia anche Dimensioni e Spessore. Varie non entra nella Sede stradale."
+            ? "Scegli il tipo (per ora Reinterro, oppure aggiungine uno nuovo). Se il tipo è in libreria, Dimensioni e Spessore si compilano da soli. Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × pezzi. Se la formula è vuota, la quantità è 0. La spunta Manufatti copia la riga nella scheda Manufatti. La spunta Volume occupato copia anche Dimensioni e Spessore. Varie non entra nella Sede stradale."
             : isZonaComeManufatti(tipo)
-              ? "Scegli il tipo, oppure aggiungine uno nuovo nel campo in alto. Se il tipo è in libreria, Dimensioni e Spessore si compilano da soli. Nella casella resta solo il nome, per esempio Pozzetto ispezione. In VOCI la voce breve diventa «Pozzetto ispezione (Luce pubblica)»: tra parentesi c’è questa scheda, così lo stesso tipo in un’altra sezione non si mescola. La spunta Manufatti copia la riga nella scheda Manufatti. La spunta Reinterro copia anche Dimensioni e Spessore, con la stessa formula e gli stessi pezzi. Lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × pezzi. Se la formula è vuota, la quantità è 0. Questa scheda non viene sottratta dalla Sede stradale."
+              ? "Scegli il tipo, oppure aggiungine uno nuovo nel campo in alto. Se il tipo è in libreria, Dimensioni e Spessore si compilano da soli. Nella casella resta solo il nome, per esempio Pozzetto ispezione. In VOCI la voce breve diventa «Pozzetto ispezione (Luce pubblica)»: tra parentesi c’è questa scheda, così lo stesso tipo in un’altra sezione non si mescola. Se la Lunghezza è maggiore di 0, la colonna Quantità mostra la lunghezza e non si modifica. Se la Lunghezza è vuota, scrivi tu il numero in Quantità: quello va nelle VOCI. La spunta Volume occupato usa sempre lunghezza × dimensioni × spessore. Lì scegli ml., mq. o mc. e il prezzo. Questa scheda non viene sottratta dalla Sede stradale."
             : isZonaFormulaUnitaVoce(tipo)
           ? "In Formula scrivi il calcolo (es. 2 oppure 1,2*3). Il moltiplicatore ripete quel risultato. L’unità di misura (n., ml., mq., a corpo…) la decide la Voce dello strato nelle VOCI. Questa scheda non viene sottratta dalla Sede stradale."
           : "In Formula puoi scrivere un’espressione (es. 12,5 * 3,2 oppure (10+2)/2). Il moltiplicatore (default 1) ripete quel risultato: 4, 1,5, 10… quello che ti serve. Il segno «sottrai» toglie quell’area da tutta la zona. Ogni strato parte da quel mq netto: puoi togliere altre aree solo da quello strato.";
@@ -2978,11 +3350,11 @@ export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }
   if (zonaHaLibreriaTipi(tipo) && !isZonaManufatti(tipo)) block.appendChild(renderBarraTipologie(tipo));
   block.appendChild(head);
   block.appendChild(hint);
-  if (isSede) {
-    block.appendChild(renderAreeSedeTable(schedaCompleta));
+  if (isSede || isReinterroCalcolo) {
+    block.appendChild(isSede ? renderAreeSedeTable(schedaCompleta) : renderAreeReinterroTable(schedaCompleta));
     block.appendChild(
       renderStratiCards(tipo, data, datalistId, {
-        mqBaseOverride: mqSede,
+        mqBaseOverride: isSede ? mqSede : mqReinterro,
         nascondiSottrazioni: true,
       }),
     );
@@ -3019,7 +3391,7 @@ export function syncZonaDaBlock(block, zona) {
     const area = zona.aree.find((x) => x.id === aid);
     if (!area) return;
     const rif = row.querySelector(".vani-sup-area-rif");
-    const formula = row.querySelector(".strade-area-formula");
+    const formula = campoFormulaVicino(row);
     const mol = row.querySelector(".strade-area-moltiplicatore");
     const segno = row.querySelector(".vani-sup-area-segno");
     const tipoMan = row.querySelector(".strade-area-tipo-manufatto");
@@ -3032,7 +3404,7 @@ export function syncZonaDaBlock(block, zona) {
     if (formula instanceof HTMLInputElement || formula instanceof HTMLTextAreaElement) {
       area.formula = formula.value;
     }
-    if (mol instanceof HTMLInputElement) area.moltiplicatore = mol.value;
+    if (mol instanceof HTMLInputElement && !mol.readOnly) area.moltiplicatore = mol.value;
     if (segno instanceof HTMLInputElement) area.segno = segno.checked;
     if (tipoMan instanceof HTMLSelectElement) area.tipoManufatto = normalizzaTipoManufatto(tipoMan.value);
     if (tipoCor instanceof HTMLSelectElement) area.tipoCordolo = normalizzaTipoCordolo(tipoCor.value);
@@ -3047,8 +3419,23 @@ export function syncZonaDaBlock(block, zona) {
     if (spuntaRei instanceof HTMLInputElement) area.inReinterro = spuntaRei.checked;
     const dimArea = row.querySelector(".strade-area-dimensioni");
     const speArea = row.querySelector(".strade-area-spessore");
+    const lunArea = row.querySelector(".strade-area-lunghezza");
     if (dimArea instanceof HTMLInputElement) area.dimensioni = testoDimensioniArea({ dimensioni: dimArea.value });
     if (speArea instanceof HTMLInputElement) area.spessore = testoSpessoreArea({ spessore: speArea.value });
+    if (lunArea instanceof HTMLInputElement) area.lunghezza = testoLunghezzaArea({ lunghezza: lunArea.value });
+    if (lunArea instanceof HTMLInputElement) {
+      const haParti = Boolean(area.lunghezza || area.dimensioni || area.spessore);
+      if (haParti) {
+        area.formula = componiFormulaImpianto(area.lunghezza, area.dimensioni, area.spessore);
+        if (formula instanceof HTMLInputElement || formula instanceof HTMLTextAreaElement) {
+          formula.value = area.formula;
+          if (formula instanceof HTMLTextAreaElement) {
+            formula.style.height = "auto";
+            formula.style.height = `${Math.min(Math.max(formula.scrollHeight, 28), 160)}px`;
+          }
+        }
+      }
+    }
     if (lar instanceof HTMLInputElement) area.larghezza = lar.value;
   });
 
@@ -3083,7 +3470,28 @@ export function aggiornaCalcoliZonaBlock(block, zona, mqBaseOverride) {
     const aid = Number(row.dataset.areaId);
     const area = (zona.aree || []).find((x) => x.id === aid);
     if (!area) return;
-    const mqInfo = testoMqRiga(area, area.segno === true);
+    const lun = row.querySelector(".strade-area-lunghezza");
+    const mol = row.querySelector(".strade-area-moltiplicatore");
+    if (lun instanceof HTMLInputElement && mol instanceof HTMLInputElement && mol.dataset.quantitaImpianto === "1") {
+      const lunVal = evalFormulaArea(lun.value);
+      const daLunghezza = lunVal != null && lunVal > 0;
+      if (daLunghezza) {
+        mol.readOnly = true;
+        mol.value = lun.value.trim();
+        mol.title = "È la Lunghezza, perché è maggiore di 0. Per scrivere un numero tuo, svuota la Lunghezza.";
+      } else {
+        const eraBloccato = mol.readOnly;
+        mol.readOnly = false;
+        if (eraBloccato) mol.value = mol.dataset.quantitaManuale || "1";
+        else mol.dataset.quantitaManuale = mol.value;
+        mol.title = "Lunghezza vuota: scrivi qui il numero che va nelle VOCI (vuoto = 1).";
+      }
+    }
+    const areaRis =
+      lun instanceof HTMLInputElement
+        ? { ...area, formula: formulaEffettivaImpianto(area), moltiplicatore: "1" }
+        : area;
+    const mqInfo = testoMqRiga(areaRis, area.segno === true);
     const tdMq = row.querySelector('[data-role="area-mq"]');
     if (tdMq) {
       tdMq.textContent = mqInfo.text;
@@ -3149,12 +3557,21 @@ export function aggiornaCalcoliZonaBlock(block, zona, mqBaseOverride) {
     const elSott = card.querySelector('[data-role="strato-mq-sott"]');
     const elNetto = card.querySelector('[data-role="strato-mq-netto"]');
     const elCalc = card.querySelector('[data-role="strato-calcolo"]');
+    const elMcWrap = card.querySelector('[data-role="strato-mc-wrap"]');
     if (elBase) elBase.textContent = fmtDim(mqBase);
     if (elSott) elSott.textContent = fmtTotaleNegativo(mqSott);
     if (elNetto) elNetto.textContent = fmtDim(mqNetto);
+    if (elMcWrap instanceof HTMLElement && card.dataset.stratoAuto === "1") {
+      elMcWrap.hidden = !hasSp;
+    }
     if (elCalc) {
       elCalc.textContent = fmtDim(calcolo);
-      elCalc.title = hasSp ? "Volume (mq netto × spessore)" : "Area (mq netto, senza spessore)";
+      elCalc.title =
+        card.dataset.stratoAuto === "1"
+          ? "Volume: mq dello strato × spessore"
+          : hasSp
+            ? "Volume (mq netto × spessore)"
+            : "Area (mq netto, senza spessore)";
     }
   });
 }

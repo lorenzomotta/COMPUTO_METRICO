@@ -34,6 +34,8 @@ import {
   renderElencoLibreriaTipologie,
   zonaHaLibreriaTipi,
   misureTipoDaLibreria,
+  salvaMisureTipoZona,
+  componiFormulaImpianto,
   syncZonaDaBlock,
   aggiornaCalcoliZonaBlock,
   schedaStradeHaDatiRegistrabili,
@@ -41,6 +43,7 @@ import {
   maxIdNelloScheda,
   isZonaSedeStradale,
   isZonaReinterro,
+  isZonaReinterroCalcolo,
   isZonaManufatti,
   isZonaComeManufatti,
   isZonaCordoli,
@@ -78,6 +81,7 @@ import {
   tipoSegnaleticaInLibreria,
   tipoVarieInLibreria,
   totaliSedeStradale,
+  totaliReinterro,
 } from "./modules/stradeSuperfici.js";
 
 const STORAGE_STRADE_REGISTRATI_KEY = "computo_metrico_strade_registrati";
@@ -86,7 +90,7 @@ const DATALIST_VOCI = "strade-vocibrevi-datalist";
 let nextId = 1;
 let pianoNome = "";
 let descrizione = "";
-/** @type {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'|'reinterro'} */
+/** @type {'ingombro'|'marciapiedi'|'aiuole'|'parcheggi'|'manufatti'|'cordoli'|'segnaletica'|'fogna'|'allacciFogna'|'lucePubblica'|'lucePrivata'|'gas'|'acqua'|'telefonica'|'varie'|'sedeStradale'|'reinterro'|'reinterroCalcolo'} */
 let schedaAttiva = "ingombro";
 let scheda = emptySchedaStrade(() => nextId++);
 /** @type {{ id: string, pianoNome: string, descrizione: string }[]} */
@@ -323,20 +327,21 @@ function aggiornaSidebarAzioniAttive() {
   const nomeZona = ZONA_LABELS[schedaAttiva] || schedaAttiva;
   if (label) label.textContent = nomeZona;
   const sede = isZonaSedeStradale(schedaAttiva);
+  const reinterroCalcolo = isZonaReinterroCalcolo(schedaAttiva);
   const manufatti = isZonaManufatti(schedaAttiva);
-  const reinterro = isZonaReinterro(schedaAttiva);
+  const volumeOccupato = isZonaReinterro(schedaAttiva);
   const cordoli = isZonaCordoli(schedaAttiva);
   const segnaletica = isZonaSegnaletica(schedaAttiva);
   const varie = isZonaVarie(schedaAttiva);
   const impianto = isZonaComeManufatti(schedaAttiva);
-  const senzaStrati = manufatti || reinterro || cordoli || segnaletica || varie || impianto;
+  const senzaStrati = manufatti || volumeOccupato || cordoli || segnaletica || varie || impianto;
   nav.querySelectorAll("button.vani-sidebar-azione").forEach((btn) => {
     if (!(btn instanceof HTMLButtonElement)) return;
     const azione = btn.getAttribute("data-sidebar-azione");
     const disabilita =
-      (sede && (azione === "aggiungi-area" || azione === "aggiungi-sottrazione")) ||
+      ((sede || reinterroCalcolo) && (azione === "aggiungi-area" || azione === "aggiungi-sottrazione")) ||
       (manufatti && (azione === "aggiungi-area" || azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
-      (reinterro && (azione === "aggiungi-area" || azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
+      (volumeOccupato && (azione === "aggiungi-area" || azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
       (cordoli && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
       (segnaletica && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
       (varie && (azione === "aggiungi-strato" || azione === "aggiungi-sottrazione")) ||
@@ -346,10 +351,12 @@ function aggiornaSidebarAzioniAttive() {
     if (azione === "aggiungi-area") {
       btn.title = sede
         ? "Nella Sede stradale le aree si calcolano da sole"
+        : reinterroCalcolo
+          ? "Nel Reinterro le aree si calcolano da sole"
         : manufatti
           ? "Manufatti è in sola lettura: le righe arrivano dalla spunta nelle altre schede"
-          : reinterro
-            ? "Reinterro è in sola lettura: le righe arrivano dalla spunta nelle altre schede"
+          : volumeOccupato
+            ? "Volume occupato è in sola lettura: le righe arrivano dalla spunta nelle altre schede"
         : isZonaCordoli(schedaAttiva)
           ? `Aggiunge una lunghezza in ${nomeZona}`
           : isZonaComeManufatti(schedaAttiva)
@@ -361,8 +368,8 @@ function aggiornaSidebarAzioniAttive() {
       btn.title = senzaStrati
         ? manufatti
           ? "Nei Manufatti la voce è il tipo, non lo strato"
-          : reinterro
-            ? "In Reinterro la voce è il tipo, non lo strato"
+          : volumeOccupato
+            ? "In Volume occupato la voce è il tipo, non lo strato"
           : cordoli
             ? "Nei Cordoli la voce è il tipo, non lo strato"
             : segnaletica
@@ -374,11 +381,13 @@ function aggiornaSidebarAzioniAttive() {
     } else if (azione === "aggiungi-sottrazione") {
       btn.title = sede
         ? "Nella Sede stradale non si aggiungono sottrazioni per strato"
+        : reinterroCalcolo
+          ? "Nel Reinterro non si aggiungono sottrazioni per strato"
         : senzaStrati
           ? manufatti
             ? "Nei Manufatti non ci sono strati"
-            : reinterro
-              ? "In Reinterro non ci sono strati"
+            : volumeOccupato
+              ? "In Volume occupato non ci sono strati"
             : cordoli
               ? "Nei Cordoli non ci sono strati"
               : segnaletica
@@ -586,7 +595,11 @@ function onHostInput(e) {
   const tipo = String(block.dataset.tipoZona || "");
   if (!TIPI_ZONA_STRADA.includes(/** @type {typeof TIPI_ZONA_STRADA[number]} */ (tipo))) return;
   syncZonaDaBlock(block, scheda[tipo]);
-  const mqOverride = isZonaSedeStradale(tipo) ? totaliSedeStradale(scheda).mqNetto : undefined;
+  const mqOverride = isZonaSedeStradale(tipo)
+    ? totaliSedeStradale(scheda).mqNetto
+    : isZonaReinterroCalcolo(tipo)
+      ? totaliReinterro(scheda).mqNetto
+      : undefined;
   aggiornaCalcoliZonaBlock(block, scheda[tipo], mqOverride);
 }
 
@@ -627,7 +640,11 @@ function onHostChange(e) {
     }
   }
   syncZonaDaBlock(block, scheda[tipo]);
-  const mqOverride = isZonaSedeStradale(tipo) ? totaliSedeStradale(scheda).mqNetto : undefined;
+  const mqOverride = isZonaSedeStradale(tipo)
+    ? totaliSedeStradale(scheda).mqNetto
+    : isZonaReinterroCalcolo(tipo)
+      ? totaliReinterro(scheda).mqNetto
+      : undefined;
   aggiornaCalcoliZonaBlock(block, scheda[tipo], mqOverride);
 }
 
@@ -652,6 +669,64 @@ function applicaNomeAlleSchede(tipoZona, campo, vecchio, nuovo) {
   tocca(scheda);
   for (const rec of registrati) tocca(rec);
   saveRegistrati();
+}
+
+function leggiMisureDallaRigaTipo(row) {
+  const dim = row?.querySelector(".strade-tipo-dimensioni");
+  const alt = row?.querySelector(".strade-tipo-spessore");
+  return {
+    dimensioni: dim instanceof HTMLInputElement ? dim.value.trim() : "",
+    spessore: alt instanceof HTMLInputElement ? alt.value.trim() : "",
+  };
+}
+
+/** Copia Dimensioni nella formula (e Spessore, dove c’è la colonna) e aggiorna le VOCI già registrate. */
+function applicaMisureTipoAlleSchede(tipoZona, campo, nome, misure) {
+  const dim = String(misure?.dimensioni ?? "").trim();
+  const spe = String(misure?.spessore ?? "").trim();
+  const conSpessore = isZonaComeManufatti(tipoZona) || isZonaVarie(tipoZona);
+  if (!dim && !(spe && conSpessore)) return { righe: 0, voci: 0 };
+  const tocca = (s) => {
+    let n = 0;
+    for (const area of s?.[tipoZona]?.aree || []) {
+      if (!stessoNomeTipo(area?.[campo], nome)) continue;
+      if (dim) {
+        if (isZonaComeManufatti(tipoZona)) area.dimensioni = dim;
+        else {
+          area.formula = dim;
+          if (conSpessore) area.dimensioni = dim;
+        }
+      }
+      if (spe && conSpessore) area.spessore = spe;
+      if (isZonaComeManufatti(tipoZona)) {
+        const auto = componiFormulaImpianto(area.lunghezza, area.dimensioni, area.spessore);
+        if (auto) area.formula = auto;
+      }
+      n += 1;
+    }
+    return n;
+  };
+  const righe = tocca(scheda);
+  let voci = 0;
+  let toccatiRegistrati = false;
+  for (const rec of registrati) {
+    if (!tocca(rec)) continue;
+    toccatiRegistrati = true;
+    const esito = aggiornaVociDaSnapshotStrade(rec);
+    voci += esito?.righe || 0;
+  }
+  if (toccatiRegistrati) saveRegistrati();
+  return { righe, voci };
+}
+
+function messaggioMisureAggiornate(misure, esito) {
+  const haNumeri = Boolean(String(misure?.dimensioni ?? "").trim() || String(misure?.spessore ?? "").trim());
+  if (!haNumeri) return "Il nome è già quello.";
+  if (esito.voci > 0) return "Dimensioni e spessore aggiornati. Ora li vedi anche nel computo.";
+  if (esito.righe > 0) {
+    return "Dimensioni e spessore copiati nelle righe. Premi REGISTRA STRADA per mandarli nel computo.";
+  }
+  return "Dimensioni e spessore salvati in libreria. Scegli questo tipo in una riga e registra la strada.";
 }
 
 function cfgModificaTipo(action, btn) {
@@ -802,6 +877,7 @@ async function onHostClick(e) {
     const row = btn.closest(".strade-tipo-riga");
     const inp = row?.querySelector(".strade-tipo-nome-edit");
     const originale = inp instanceof HTMLInputElement ? inp.dataset.nomeOriginale || "" : "";
+    const misureRiga = leggiMisureDallaRigaTipo(row);
     if (action.startsWith("salva-tipo-")) {
       const nuovo = inp instanceof HTMLInputElement ? inp.value : "";
       const check = cfg.controllaRinomina(originale, nuovo);
@@ -810,7 +886,10 @@ async function onHostClick(e) {
         return;
       }
       if (check.invariato) {
-        mostraFeedback("Il nome è già quello.");
+        salvaMisureTipoZona(cfg.zona, check.nome, misureRiga);
+        const esitoMisure = applicaMisureTipoAlleSchede(cfg.zona, cfg.campo, check.nome, misureRiga);
+        renderForm();
+        mostraFeedback(messaggioMisureAggiornate(misureRiga, esitoMisure));
         return;
       }
       const giaInLibreria = cfg.inLibreria(originale);
@@ -826,17 +905,25 @@ async function onHostClick(e) {
         return;
       }
       applicaNomeAlleSchede(cfg.zona, cfg.campo, originale, esito.nome);
+      salvaMisureTipoZona(cfg.zona, esito.nome, misureRiga);
       const vocePrima = voceBreveDaTipoZona(cfg.zona, originale);
       const voceDopo = voceBreveDaTipoZona(cfg.zona, esito.nome);
       const vociNuove = rinominaVoceTipoStrade(vocePrima, voceDopo, cfg.tipoOggetto);
       const vociVecchie = rinominaVoceTipoStrade(originale, voceDopo, cfg.tipoOggetto);
       const voci = { aggiornata: Boolean(vociNuove.aggiornata || vociVecchie.aggiornata) };
+      const esitoMisure = applicaMisureTipoAlleSchede(cfg.zona, cfg.campo, esito.nome, misureRiga);
       renderForm();
       const dove = si ? "La libreria è aggiornata." : "Il nome resta solo in questo computo.";
+      const misureTxt =
+        esitoMisure.voci > 0
+          ? " Dimensioni e spessore sono nel computo."
+          : esitoMisure.righe > 0
+            ? " Dimensioni e spessore sono sulle righe."
+            : "";
       mostraFeedback(
         voci.aggiornata
-          ? `Tipo aggiornato in «${esito.nome}». Anche le VOCI usano questo nome. ${dove}`
-          : `Tipo aggiornato in «${esito.nome}». ${dove}`,
+          ? `Tipo aggiornato in «${esito.nome}». Anche le VOCI usano questo nome. ${dove}${misureTxt}`
+          : `Tipo aggiornato in «${esito.nome}». ${dove}${misureTxt}`,
       );
       return;
     }
@@ -931,7 +1018,7 @@ async function onHostClick(e) {
   const zona = scheda[tipo];
 
   if (action === "rimuovi-area-strada") {
-    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaReinterroCalcolo(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo)) return;
     const aid = Number(btn.getAttribute("data-area-id"));
     if ((zona.aree || []).length <= 1) return;
     zona.aree = zona.aree.filter((a) => a.id !== aid);
@@ -940,7 +1027,7 @@ async function onHostClick(e) {
     return;
   }
   if (action === "duplica-area-strada") {
-    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaReinterroCalcolo(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo)) return;
     const aid = Number(btn.getAttribute("data-area-id"));
     const idx = (zona.aree || []).findIndex((a) => a.id === aid);
     if (idx < 0) return;
@@ -949,7 +1036,10 @@ async function onHostClick(e) {
     rinumeraAreeZona(zona);
     renderForm();
     queueMicrotask(() => {
-      const row = document.querySelector(`.vani-sup-area-row[data-area-id="${copia.id}"] .strade-area-formula`);
+      const rigaNuova = document.querySelector(`.vani-sup-area-row[data-area-id="${copia.id}"]`);
+      const row =
+        rigaNuova?.querySelector(".strade-area-formula") ||
+        rigaNuova?.nextElementSibling?.querySelector(".strade-area-formula");
       if (row instanceof HTMLInputElement || row instanceof HTMLTextAreaElement) row.focus();
     });
     return;
@@ -963,7 +1053,7 @@ async function onHostClick(e) {
     return;
   }
   if (action === "aggiungi-sottrazione-strato") {
-    if (isZonaSedeStradale(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaReinterroCalcolo(tipo)) return;
     const sid = Number(btn.getAttribute("data-strato-id"));
     const st = (zona.strati || []).find((x) => x.id === sid);
     if (!st) return;
@@ -974,7 +1064,7 @@ async function onHostClick(e) {
     return;
   }
   if (action === "rimuovi-sottrazione-strato") {
-    if (isZonaSedeStradale(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaReinterroCalcolo(tipo)) return;
     const sid = Number(btn.getAttribute("data-strato-id"));
     const sottId = Number(btn.getAttribute("data-sott-id"));
     const st = (zona.strati || []).find((x) => x.id === sid);
@@ -995,7 +1085,7 @@ function onSidebarAzioniClick(e) {
   if (!zona) return;
 
   if (azione === "aggiungi-area") {
-    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaReinterroCalcolo(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo)) return;
     zona.aree.push(emptyAreaStrada(() => nextId++, zona.aree.length + 1));
     rinumeraAreeZona(zona);
     renderForm();
@@ -1009,7 +1099,7 @@ function onSidebarAzioniClick(e) {
     return;
   }
   if (azione === "aggiungi-sottrazione") {
-    if (isZonaSedeStradale(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo) || isZonaComeManufatti(tipo) || isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return;
+    if (isZonaSedeStradale(tipo) || isZonaReinterroCalcolo(tipo) || isZonaManufatti(tipo) || isZonaReinterro(tipo) || isZonaComeManufatti(tipo) || isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return;
     const st = zona.strati[zona.strati.length - 1];
     if (!st) return;
     if (!Array.isArray(st.sottrazioni)) st.sottrazioni = [];

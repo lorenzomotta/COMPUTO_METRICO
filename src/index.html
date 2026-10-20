@@ -860,8 +860,8 @@
                       <th>POSIZIONE</th>
                       <th>VOCE ABBREVIATA</th>
                       <th>UNITA' MISURA</th>
-                      <th>PREZZO</th>
                       <th>QUANTITÀ NETTA</th>
+                      <th>PREZZO</th>
                       <th>NOTE</th>
                       <th>AZIONI</th>
                     </tr>
@@ -2521,7 +2521,8 @@
               <strong>Aiuole</strong>, <strong>Parcheggi</strong>, <strong>Cordoli</strong>,
               <strong>Fogna</strong>, <strong>Allacci fogna</strong>, <strong>Luce pubblica</strong>, <strong>Luce privata</strong>,
               <strong>Gas</strong>, <strong>Acqua</strong>, <strong>Telefonica</strong>, <strong>Segnaletica</strong>,
-              <strong>Varie</strong>, <strong>Manufatti</strong>, <strong>Sede stradale</strong> e <strong>Reinterro</strong>.
+              <strong>Varie</strong>, <strong>Manufatti</strong>, <strong>Sede stradale</strong>,
+              <strong>Volume occupato</strong> e <strong>Reinterro</strong>.
               I tre pulsanti a destra (<strong>Aggiungi area</strong>, <strong>strato</strong>,
               <strong>sottrazione</strong>) valgono per la scheda che hai selezionato.
               Le zone con aree hanno una <strong>formula</strong> e un
@@ -2558,14 +2559,17 @@
               La quantità è il risultato della <strong>formula</strong>.
               Nella <strong>Fogna</strong>, <strong>Allacci fogna</strong>, <strong>Luce pubblica</strong>,
               <strong>Luce privata</strong>, <strong>Gas</strong>, <strong>Acqua</strong> e <strong>Telefonica</strong>
-              scegli il tipo (oppure aggiungine uno nuovo). Ogni tipo diventa una voce a <strong>numero (n.)</strong>:
-              il campo <strong>N° pezzi</strong> è la quantità che va nelle VOCI.
-              La formula è facoltativa. Queste schede non vengono sottratte dalla Sede.
-              La spunta <strong>Reinterro</strong>, come quella Manufatti, copia la riga nella scheda
-              <strong>Reinterro</strong> (dopo la Sede): tipo, formula e N° pezzi. Quella scheda è in sola lettura.
+              scegli il tipo (oppure aggiungine uno nuovo). Se la <strong>Lunghezza</strong> è maggiore di 0,
+              la colonna <strong>Quantità</strong> mostra la lunghezza. Se la Lunghezza è vuota, scrivi tu il numero
+              in Quantità: quello va nelle VOCI. Queste schede non vengono sottratte dalla Sede.
+              La spunta <strong>Volume occupato</strong>, come quella Manufatti, copia la riga nella scheda
+              <strong>Volume occupato</strong> (dopo la Sede): tipo, formula e N° pezzi. Quella scheda è in sola lettura.
               La <strong>Sede stradale</strong> calcola da sola l’area:
               Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti) per ogni stesso riferimento.
               Lì puoi solo aggiungere strati: il primo è già «SEDE STRADALE».
+              Il <strong>Reinterro</strong>, in fondo, calcola da solo Ingombro − Volume occupato
+              per ogni stesso riferimento. Il risultato è già in <strong>metri cubi</strong>: lo spessore non serve.
+              Puoi solo aggiungere strati: il primo è già «REINTERRO».
               Premi <strong>REGISTRA STRADA</strong> per salvare e aggiornare le VOCI.
             </p>
           </div>
