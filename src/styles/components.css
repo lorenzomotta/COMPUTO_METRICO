@@ -181,42 +181,47 @@
 
 .table-voci th:nth-child(1),
 .table-voci td:nth-child(1) {
-  width: 7%;
+  width: 6%;
 }
 
 .table-voci th:nth-child(2),
 .table-voci td:nth-child(2) {
-  width: 8%;
+  width: 6%;
 }
 
 .table-voci th:nth-child(3),
 .table-voci td:nth-child(3) {
-  width: 18%;
+  width: 16%;
 }
 
 .table-voci th:nth-child(4),
 .table-voci td:nth-child(4) {
-  width: 11%;
+  width: 9%;
 }
 
 .table-voci th:nth-child(5),
 .table-voci td:nth-child(5) {
-  width: 10%;
+  width: 9%;
 }
 
 .table-voci th:nth-child(6),
 .table-voci td:nth-child(6) {
-  width: 10%;
+  width: 8%;
 }
 
 .table-voci th:nth-child(7),
 .table-voci td:nth-child(7) {
-  width: 14%;
+  width: 12%;
 }
 
 .table-voci th:nth-child(8),
 .table-voci td:nth-child(8) {
-  width: 22%;
+  width: 16%;
+}
+
+.table-voci th:nth-child(9),
+.table-voci td:nth-child(9) {
+  width: 18%;
 }
 
 .table-voci .actions-cell {
@@ -229,9 +234,14 @@
   margin-left: auto;
 }
 
-.table-voci td:nth-child(8) {
+.table-voci td:nth-child(9) {
   text-align: right;
   padding-right: 8px;
+}
+
+.table-voci td.voci-cell-zero {
+  color: #c62828;
+  font-weight: 700;
 }
 
 .table-voci td.voci-cell-from-vani {
@@ -310,9 +320,15 @@
 }
 
 .table-voci td:nth-child(3),
-.table-voci td:nth-child(7) {
+.table-voci td:nth-child(7),
+.table-voci td:nth-child(8) {
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.table-voci td.voci-cell-strada {
+  font-size: 0.75rem;
+  line-height: 1.2;
 }
 
 .cell-netto-rowspan {

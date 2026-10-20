@@ -1,6 +1,6 @@
 /**
  * Dopo «REGISTRA STRADA»:
- * - crea voci MANUALE se manca la voce breve dello strato;
+ * - crea una voce MANUALE per ogni voce breve dello strato e per ogni strada/tratto;
  * - scrive misurazioni SEMIAUTOMATICA con marker `stradeSchedaId`;
  * - per ogni strato: una riga per ogni area della zona + una riga negativa
  *   per ogni sottrazione di quello strato;
@@ -82,7 +82,15 @@ function isRigaSemiautoStrade(row) {
   return tipo === VOCE_MM_TIPO_SEMIAUTOMATICA && TIPI_OGGETTO.has(tipoOggetto);
 }
 
-function creaVoceManualeDaVocibreve({ idVoce, posizione, voceAbbreviata, unitaMisura, riferimento }) {
+function creaVoceManualeDaVocibreve({
+  idVoce,
+  posizione,
+  voceAbbreviata,
+  unitaMisura,
+  riferimento,
+  stradaTratto,
+  stradeSchedaId,
+}) {
   const ab = String(voceAbbreviata ?? "").trim();
   // Se unitaMisura è stringa (anche vuota), rispettala; altrimenti default mq.
   const unita =
@@ -98,7 +106,86 @@ function creaVoceManualeDaVocibreve({ idVoce, posizione, voceAbbreviata, unitaMi
     voce: ab,
     note: "",
     misurazioniManuali: [],
+    stradaTratto: typeof stradaTratto === "string" ? stradaTratto.trim() : "",
+    stradeSchedaId: typeof stradeSchedaId === "string" ? stradeSchedaId.trim() : "",
   };
+}
+
+/** Vero se la voce ha già misure di un'altra strada. */
+function schedaDiversaNellaVoce(item, schedaId) {
+  const mm = Array.isArray(item?.misurazioniManuali) ? item.misurazioniManuali : [];
+  for (const row of mm) {
+    if (!isRigaSemiautoStrade(row)) continue;
+    const oldSid = typeof row?.stradeSchedaId === "string" ? row.stradeSchedaId.trim() : "";
+    if (oldSid && oldSid !== schedaId) return true;
+  }
+  return false;
+}
+
+/**
+ * Stessa voce breve può esistere una volta per ogni strada/tratto.
+ * Prima cerca la voce già legata a questa scheda, poi una voce vecchia
+ * che non mescola un'altra strada (così resta il capitolo già scelto).
+ */
+function trovaVocePerStratoStrada(voci, labelKey, schedaId, stradaTratto) {
+  const stesse = voci.filter((item) => item && abbrevKey(item.voceAbbreviata) === labelKey);
+  const perScheda = stesse.find((item) => {
+    const sid = String(item.stradeSchedaId || "").trim();
+    return Boolean(schedaId) && sid === schedaId;
+  });
+  if (perScheda) return perScheda;
+
+  const nomeKey = abbrevKey(stradaTratto);
+  if (nomeKey) {
+    const perNome = stesse.find((item) => {
+      const sid = String(item.stradeSchedaId || "").trim();
+      if (sid) return false;
+      return abbrevKey(item.stradaTratto) === nomeKey && !schedaDiversaNellaVoce(item, schedaId);
+    });
+    if (perNome) return perNome;
+  }
+
+  return (
+    stesse.find((item) => {
+      const sid = String(item.stradeSchedaId || "").trim();
+      const st = String(item.stradaTratto || "").trim();
+      if (sid || st) return false;
+      return !schedaDiversaNellaVoce(item, schedaId);
+    }) || null
+  );
+}
+
+function descrizioneSchedaRegistrata(schedaId) {
+  const sid = String(schedaId || "").trim();
+  if (!sid) return "";
+  try {
+    const raw = localStorage.getItem(STORAGE_STRADE_REGISTRATI_KEY);
+    const data = raw ? JSON.parse(raw) : null;
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const snap = items.find((item) => item && String(item.id || "").trim() === sid);
+    return typeof snap?.descrizione === "string" ? snap.descrizione.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Se in una voce è rimasta una sola strada, scrive il suo nome nella colonna. */
+function etichettaStradaSeUnaScheda(item) {
+  if (!item || String(item.stradaTratto || "").trim()) return false;
+  const ids = new Set();
+  const mm = Array.isArray(item.misurazioniManuali) ? item.misurazioniManuali : [];
+  for (const row of mm) {
+    if (!isRigaSemiautoStrade(row)) continue;
+    const sid = typeof row?.stradeSchedaId === "string" ? row.stradeSchedaId.trim() : "";
+    if (sid) ids.add(sid);
+  }
+  if (ids.size !== 1) return false;
+  const sid = [...ids][0];
+  const nome = descrizioneSchedaRegistrata(sid);
+  if (!nome) return false;
+  item.stradaTratto = nome;
+  if (!String(item.stradeSchedaId || "").trim()) item.stradeSchedaId = sid;
+  return true;
 }
 
 function creaRigaArea({
@@ -666,12 +753,6 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
 
   let changed = false;
   let righeScritte = 0;
-  const keysGiaPresenti = new Set();
-  for (const item of voci) {
-    if (item == null || typeof item !== "object") continue;
-    const ab = typeof item.voceAbbreviata === "string" ? item.voceAbbreviata.trim() : "";
-    if (ab) keysGiaPresenti.add(abbrevKey(ab));
-  }
 
   let nextId =
     voci.reduce((max, item) => {
@@ -715,31 +796,38 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
     }
   }
 
+  const stradaTratto =
+    typeof snapshot.descrizione === "string" ? snapshot.descrizione.trim() : "";
+
   for (const [key, meta] of abbrevs) {
-    if (keysGiaPresenti.has(key)) continue;
-    // Fogna, cordoli, segnaletica, varie: voce nuova parte da mq.; se esiste già, l’unità scelta resta.
-    const unitaNuova = meta.unita == null ? UNITA_MQ : meta.unita;
-    voci.push(
-      creaVoceManualeDaVocibreve({
+    let item = trovaVocePerStratoStrada(voci, key, schedaId, stradaTratto);
+    if (!item) {
+      // Fogna, cordoli, segnaletica, varie: voce nuova parte da mq.; se esiste già, l’unità scelta resta.
+      const unitaNuova = meta.unita == null ? UNITA_MQ : meta.unita;
+      item = creaVoceManualeDaVocibreve({
         idVoce: nextId,
         posizione: nextPos,
         voceAbbreviata: meta.label,
         unitaMisura: unitaNuova,
         riferimento: testoRiferimentiUnici(elencoRiferimentiPerVoce(snapshot, key)),
-      }),
-    );
-    keysGiaPresenti.add(key);
-    nextId += 1;
-    nextPos += 1;
-    changed = true;
-  }
+        stradaTratto,
+        stradeSchedaId: schedaId,
+      });
+      voci.push(item);
+      nextId += 1;
+      nextPos += 1;
+      changed = true;
+    } else {
+      if (String(item.stradaTratto || "") !== stradaTratto) {
+        item.stradaTratto = stradaTratto;
+        changed = true;
+      }
+      if (schedaId && String(item.stradeSchedaId || "") !== schedaId) {
+        item.stradeSchedaId = schedaId;
+        changed = true;
+      }
+    }
 
-  for (const item of voci) {
-    if (item == null || typeof item !== "object") continue;
-    const ab = typeof item.voceAbbreviata === "string" ? item.voceAbbreviata.trim() : "";
-    if (!ab || !abbrevs.has(abbrevKey(ab))) continue;
-
-    const meta = abbrevs.get(abbrevKey(ab));
     // Non sovrascrivere l’unità se proviene dalla voce (impianti / formula-unita-voce).
     if (meta?.unita === UNITA_N) {
       const u = String(item.unitaMisura || "")
@@ -769,7 +857,7 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
         changed = true;
       }
     }
-    const nuoveRigheMm = raccogliRighePerVoce(snapshot, abbrevKey(ab));
+    const nuoveRigheMm = raccogliRighePerVoce(snapshot, key);
     righeScritte += nuoveRigheMm.length;
     const mmCorrenti = Array.isArray(item.misurazioniManuali) ? item.misurazioniManuali : [];
     const mmSenzaQuestaScheda = mmCorrenti.filter((old) => {
@@ -783,11 +871,15 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
       changed = true;
       item.misurazioniManuali = mmAggiornate;
     }
-    const rifAuto = testoRiferimentiUnici(elencoRiferimentiPerVoce(snapshot, abbrevKey(ab)));
+    const rifAuto = testoRiferimentiUnici(elencoRiferimentiPerVoce(snapshot, key));
     if (rifAuto && !String(item.riferimento ?? "").trim()) {
       item.riferimento = rifAuto;
       changed = true;
     }
+  }
+
+  for (const item of voci) {
+    if (etichettaStradaSeUnaScheda(item)) changed = true;
   }
 
   if (!changed) return { righe: righeScritte, vociAggiornate: abbrevs.size };
@@ -907,6 +999,13 @@ export function tipoStradeUsatoNelComputo(nome, tipoOggetto) {
  * Aggiorna il nome della voce e la dicitura dentro le misurazioni di quella scheda.
  * Se la stessa voce contiene anche misurazioni di un’altra scheda, sposta solo queste.
  */
+function stessaStradaDellaVoce(a, b) {
+  const sa = String(a?.stradeSchedaId || "").trim();
+  const sb = String(b?.stradeSchedaId || "").trim();
+  if (sa || sb) return sa === sb;
+  return abbrevKey(a?.stradaTratto) === abbrevKey(b?.stradaTratto);
+}
+
 export function rinominaVoceTipoStrade(nomeVecchio, nomeNuovo, tipoOggetto) {
   const keyOld = abbrevKey(nomeVecchio);
   const keyNew = abbrevKey(nomeNuovo);
@@ -914,13 +1013,8 @@ export function rinominaVoceTipoStrade(nomeVecchio, nomeNuovo, tipoOggetto) {
   if (!keyOld || !keyNew || keyOld === keyNew || !tipo) return { ok: true, aggiornata: false };
   const voci = loadVociArchivio();
   if (!Array.isArray(voci)) return { ok: false, aggiornata: false };
-  const source = voci.find((item) => item && abbrevKey(item.voceAbbreviata) === keyOld);
-  if (!source) return { ok: true, aggiornata: false };
-
-  const mm = Array.isArray(source.misurazioniManuali) ? source.misurazioniManuali : [];
-  const questi = mm.filter((row) => rigaDiQuestoTipo(row, tipo));
-  const altriStrade = mm.filter((row) => isRigaSemiautoStrade(row) && !rigaDiQuestoTipo(row, tipo));
-  if (altriStrade.length > 0 && questi.length === 0) return { ok: true, aggiornata: false };
+  const sources = voci.filter((item) => item && abbrevKey(item.voceAbbreviata) === keyOld);
+  if (sources.length === 0) return { ok: true, aggiornata: false };
 
   const patchRows = (rows) => {
     for (const row of rows) {
@@ -929,45 +1023,65 @@ export function rinominaVoceTipoStrade(nomeVecchio, nomeNuovo, tipoOggetto) {
     }
   };
 
-  let dest = voci.find((item) => item && item !== source && abbrevKey(item.voceAbbreviata) === keyNew) || null;
-  if (altriStrade.length === 0 && !dest) {
-    source.voceAbbreviata = nomeNuovo;
-    if (abbrevKey(source.voce) === keyOld) source.voce = nomeNuovo;
-    patchRows(questi);
-    try {
-      saveVociArchivio(voci);
-    } catch {
-      return { ok: false, aggiornata: false };
+  let nextId =
+    voci.reduce((max, item) => {
+      const id = typeof item?.idVoce === "number" && Number.isFinite(item.idVoce) ? item.idVoce : 0;
+      return Math.max(max, id);
+    }, 0) + 1;
+  let nextPos =
+    voci.reduce((max, item) => {
+      const p = typeof item?.posizione === "number" && Number.isFinite(item.posizione) ? item.posizione : 0;
+      return Math.max(max, p);
+    }, 0) + 1;
+  let aggiornata = false;
+
+  for (const source of sources) {
+    const mm = Array.isArray(source.misurazioniManuali) ? source.misurazioniManuali : [];
+    const questi = mm.filter((row) => rigaDiQuestoTipo(row, tipo));
+    const altriStrade = mm.filter((row) => isRigaSemiautoStrade(row) && !rigaDiQuestoTipo(row, tipo));
+    if (questi.length === 0) continue;
+
+    let dest =
+      voci.find(
+        (item) =>
+          item &&
+          item !== source &&
+          abbrevKey(item.voceAbbreviata) === keyNew &&
+          stessaStradaDellaVoce(item, source),
+      ) || null;
+    if (altriStrade.length === 0 && !dest) {
+      source.voceAbbreviata = nomeNuovo;
+      if (abbrevKey(source.voce) === keyOld) source.voce = nomeNuovo;
+      patchRows(questi);
+      aggiornata = true;
+      continue;
     }
-    return { ok: true, aggiornata: true };
+
+    if (!dest) {
+      dest = creaVoceManualeDaVocibreve({
+        idVoce: nextId,
+        posizione: nextPos,
+        voceAbbreviata: nomeNuovo,
+        unitaMisura: typeof source.unitaMisura === "string" ? source.unitaMisura : UNITA_MQ,
+        riferimento: "",
+        stradaTratto: typeof source.stradaTratto === "string" ? source.stradaTratto : "",
+        stradeSchedaId: typeof source.stradeSchedaId === "string" ? source.stradeSchedaId : "",
+      });
+      dest.prezzo = typeof source.prezzo === "number" && Number.isFinite(source.prezzo) ? source.prezzo : 0;
+      dest.voce = nomeNuovo;
+      if (typeof source.capitoloId === "string") dest.capitoloId = source.capitoloId;
+      voci.push(dest);
+      nextId += 1;
+      nextPos += 1;
+    }
+    patchRows(questi);
+    source.misurazioniManuali = mm.filter((row) => !questi.includes(row));
+    const destMm = Array.isArray(dest.misurazioniManuali) ? dest.misurazioniManuali : [];
+    dest.misurazioniManuali = [...destMm, ...questi];
+    aggiornata = true;
   }
 
-  if (!dest) {
-    const idVoce =
-      voci.reduce((max, item) => {
-        const id = typeof item?.idVoce === "number" && Number.isFinite(item.idVoce) ? item.idVoce : 0;
-        return Math.max(max, id);
-      }, 0) + 1;
-    const posizione =
-      voci.reduce((max, item) => {
-        const p = typeof item?.posizione === "number" && Number.isFinite(item.posizione) ? item.posizione : 0;
-        return Math.max(max, p);
-      }, 0) + 1;
-    dest = creaVoceManualeDaVocibreve({
-      idVoce,
-      posizione,
-      voceAbbreviata: nomeNuovo,
-      unitaMisura: typeof source.unitaMisura === "string" ? source.unitaMisura : UNITA_MQ,
-      riferimento: "",
-    });
-    dest.prezzo = typeof source.prezzo === "number" && Number.isFinite(source.prezzo) ? source.prezzo : 0;
-    dest.voce = nomeNuovo;
-    voci.push(dest);
-  }
-  patchRows(questi);
-  source.misurazioniManuali = mm.filter((row) => !questi.includes(row));
-  const destMm = Array.isArray(dest.misurazioniManuali) ? dest.misurazioniManuali : [];
-  dest.misurazioniManuali = [...destMm, ...questi];
+  if (!aggiornata) return { ok: true, aggiornata: false };
   try {
     saveVociArchivio(voci);
   } catch {

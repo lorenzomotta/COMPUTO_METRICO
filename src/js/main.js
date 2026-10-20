@@ -2911,6 +2911,8 @@ window.addEventListener("DOMContentLoaded", () => {
         misurazioniManuali: normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura),
         voce: typeof item?.voce === "string" ? item.voce : "",
         note: typeof item?.note === "string" ? item.note : "",
+        stradaTratto: typeof item?.stradaTratto === "string" ? item.stradaTratto : "",
+        stradeSchedaId: typeof item?.stradeSchedaId === "string" ? item.stradeSchedaId : "",
       })).filter((item) => item.voce !== "");
       voci.forEach((item) => {
         if (
@@ -5873,6 +5875,7 @@ window.addEventListener("DOMContentLoaded", () => {
       posizione: original.posizione + 1,
       voceAbbreviata: voceAbbreviataCopia,
       misurazioniManuali: mmCopy,
+      stradeSchedaId: "",
     };
     voci.push(copy);
     spostaVoceAPosizione(newIdVoce, original.posizione + 1);
@@ -6155,7 +6158,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (voci.length === 0) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 8;
+      cell.colSpan = 9;
       cell.className = "empty-cell";
       cell.textContent = "Nessuna voce inserita.";
       row.appendChild(cell);
@@ -6196,7 +6199,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (filtratePerAbbrev.length === 0) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 8;
+      cell.colSpan = 9;
       cell.className = "empty-cell";
       cell.textContent = "Nessuna voce corrisponde alla ricerca (voce abbreviata).";
       row.appendChild(cell);
@@ -6228,7 +6231,7 @@ window.addEventListener("DOMContentLoaded", () => {
         trCap.dataset.action = "toggle-capitolo";
         trCap.dataset.capitoloKey = g.key;
         const tdCap = document.createElement("td");
-        tdCap.colSpan = 8;
+        tdCap.colSpan = 9;
         const toggle = entry.collapsed ? "▶" : "▼";
         const titolo =
           g.capitolo != null
@@ -6271,11 +6274,26 @@ window.addEventListener("DOMContentLoaded", () => {
         const totaleQuantitaVoceNetto = totaleQuantitaVoce - detrazioneAperture;
         const cellQta = createCell(formatTotaleMisurazioniManualiIt(totaleQuantitaVoceNetto));
         cellQta.classList.add("voci-cell-qta-netta");
+        if (!Number.isFinite(totaleQuantitaVoceNetto) || totaleQuantitaVoceNetto === 0) {
+          cellQta.classList.add("voci-cell-zero");
+        }
         cellQta.title = "Quantità totale netta (misurazioni − aperture)";
         row.appendChild(cellQta);
       }
-      row.appendChild(createCell(formatEuro2(item.prezzo ?? 0)));
+      const prezzoVoce = item.prezzo == null || item.prezzo === "" ? null : Number(item.prezzo);
+      const cellPrezzo = createCell(formatEuro2(prezzoVoce ?? 0));
+      if (prezzoVoce == null || !Number.isFinite(prezzoVoce) || prezzoVoce === 0) {
+        cellPrezzo.classList.add("voci-cell-zero");
+      }
+      row.appendChild(cellPrezzo);
       row.appendChild(createCell(item.note || "-"));
+      const cellStrada = createCell(String(item.stradaTratto || "").trim() || "-");
+      cellStrada.classList.add("voci-cell-strada");
+      const nomeStrada = String(item.stradaTratto || "").trim();
+      if (nomeStrada) {
+        cellStrada.title = "Strada o tratto di questa voce. In Modifica puoi assegnarla a un capitolo.";
+      }
+      row.appendChild(cellStrada);
 
       const actionsCell = document.createElement("td");
       actionsCell.className = "actions-cell";
@@ -6400,7 +6418,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const subTr = document.createElement("tr");
         subTr.className = "voci-row-mm-nested";
         const subTd = document.createElement("td");
-        subTd.colSpan = 8;
+        subTd.colSpan = 9;
 
         const wrap = document.createElement("div");
         wrap.className = "voci-mm-nested-wrap";
@@ -9934,6 +9952,8 @@ window.addEventListener("DOMContentLoaded", () => {
       misurazioniManuali: normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura),
       voce: item.voce,
       note: typeof item?.note === "string" ? item.note : "",
+      stradaTratto: typeof item?.stradaTratto === "string" ? item.stradaTratto : "",
+      stradeSchedaId: typeof item?.stradeSchedaId === "string" ? item.stradeSchedaId : "",
     }));
 
     const importedUnita = Array.isArray(payload.vociUnitaMisuraOptions)
