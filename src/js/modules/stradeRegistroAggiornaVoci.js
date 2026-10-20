@@ -8,11 +8,9 @@
  *   per stesso riferimento (niente sottrazioni per-strato; Cordoli esclusi);
  * - reinterro: aree automatiche Ingombro − Volume occupato, per stesso riferimento;
  * - manufatti: una voce per tipo; quantità = N° pezzi (la formula toglie mq dalla Sede);
- * - fogna, allacci fogna, luci, gas, acqua, telefonica:
- *   una voce per tipo; se la lunghezza è maggiore di 0, la quantità in VOCI è la lunghezza;
- *   se la lunghezza è vuota, la quantità è il numero scritto in Quantità; l’unità si sceglie in VOCI;
- * - cordoli, varie: una voce per tipo; quantità = formula × pezzi; l’unità si sceglie in VOCI;
- * - segnaletica: una voce per tipo; quantità = formula × larghezza × pezzi; unità scelta in VOCI;
+ * - fogna, allacci fogna, luci, gas, acqua, telefonica, cordoli e segnaletica:
+ *   spunta USA accesa → in VOCI entra la Quantità; spenta → entra il Risultato;
+ * - varie: una voce per tipo; quantità = formula × pezzi; l’unità si sceglie in VOCI;
  */
 
 import { STORAGE_VOCI_ARCHIVIO_KEY } from "./archivioVociVocibrevi.js";
@@ -31,6 +29,7 @@ import {
   isZonaSegnaletica,
   isZonaVarie,
   isZonaFormulaUnitaVoce,
+  areaUsaQuantitaInVoci,
   areeVirtualiSede,
   areeVirtualiReinterro,
   normalizzaTipoManufatto,
@@ -406,32 +405,47 @@ function creaRigaArea({
       numero = 1;
     }
   } else if (isSegnaletica) {
-    const base = formulaVal == null ? 0 : Number(formulaVal.toFixed(3));
-    const q = lar == null ? base : Number((base * lar).toFixed(3));
-    if (Number.isInteger(mol) && mol >= 0) {
-      misura1 = q;
-      numero = mol;
-    } else {
-      misura1 = Number((q * (Number.isFinite(mol) && mol >= 0 ? mol : 1)).toFixed(3));
+    if (areaUsaQuantitaInVoci(tipoZona, area)) {
+      misura1 = Number((Number.isFinite(mol) && mol >= 0 ? mol : 1).toFixed(3));
       numero = 1;
+    } else {
+      const base = formulaVal == null ? 0 : Number(formulaVal.toFixed(3));
+      const q = lar == null ? base : Number((base * lar).toFixed(3));
+      if (Number.isInteger(mol) && mol >= 0) {
+        misura1 = q;
+        numero = mol;
+      } else {
+        misura1 = Number((q * (Number.isFinite(mol) && mol >= 0 ? mol : 1)).toFixed(3));
+        numero = 1;
+      }
     }
     misura2 = lar;
   } else if (isComeManufatti) {
-    // Lunghezza > 0: in VOCI va la lunghezza. Lunghezza vuota: va il numero scritto in Quantità.
-    const base = usaLunghezza
-      ? Number(lunghezzaVal.toFixed(3))
-      : Number(parseMoltiplicatoreArea(area?.moltiplicatore).toFixed(3));
-    misura1 = base;
-    numero = 1;
-  } else if (isCordoli || isFormulaUnitaVoce || isVarie) {
-    // Formula × pezzi. L’unità (ml., mq., mc.) resta quella scelta in VOCI.
-    const base = formulaVal == null ? 0 : Number(formulaVal.toFixed(3));
-    if (Number.isInteger(mol) && mol >= 0) {
-      misura1 = base;
-      numero = mol;
-    } else {
-      misura1 = Number((base * (Number.isFinite(mol) && mol >= 0 ? mol : 1)).toFixed(3));
+    if (!areaUsaQuantitaInVoci(tipoZona, area)) {
+      misura1 = formulaVal == null ? 0 : Number(Math.abs(formulaVal).toFixed(3));
       numero = 1;
+    } else {
+      // Lunghezza > 0: in VOCI va la lunghezza. Lunghezza vuota: va il numero scritto in Quantità.
+      const base = usaLunghezza
+        ? Number(lunghezzaVal.toFixed(3))
+        : Number(parseMoltiplicatoreArea(area?.moltiplicatore).toFixed(3));
+      misura1 = base;
+      numero = 1;
+    }
+  } else if (isCordoli || isFormulaUnitaVoce || isVarie) {
+    if (isCordoli && areaUsaQuantitaInVoci(tipoZona, area)) {
+      misura1 = Number((Number.isFinite(mol) && mol >= 0 ? mol : 1).toFixed(3));
+      numero = 1;
+    } else {
+      // Formula × pezzi. L’unità (ml., mq., mc.) resta quella scelta in VOCI.
+      const base = formulaVal == null ? 0 : Number(formulaVal.toFixed(3));
+      if (Number.isInteger(mol) && mol >= 0) {
+        misura1 = base;
+        numero = mol;
+      } else {
+        misura1 = Number((base * (Number.isFinite(mol) && mol >= 0 ? mol : 1)).toFixed(3));
+        numero = 1;
+      }
     }
   } else {
     misura1 = hasMqFisso
@@ -483,6 +497,24 @@ function creaRigaArea({
   };
 }
 
+/** Spunta USA accesa: la voce di quel tipo usa l’unità n. */
+function segnaUnitaDaSpuntaUsa(abbrevs, key, label, tipo, area) {
+  const usa = areaUsaQuantitaInVoci(tipo, area);
+  const attuale = abbrevs.get(key);
+  if (!attuale) {
+    abbrevs.set(key, {
+      label,
+      unita: usa ? UNITA_N : UNITA_DA_VOCE,
+      forzaUnita: usa,
+    });
+    return;
+  }
+  if (usa) {
+    attuale.unita = UNITA_N;
+    attuale.forzaUnita = true;
+  }
+}
+
 function raccogliAbbrevDaScheda(snapshot) {
   /** @type {Map<string, { label: string, unita: string }>} */
   const abbrevs = new Map();
@@ -503,8 +535,7 @@ function raccogliAbbrevDaScheda(snapshot) {
         const nome = normalizzaTipoImpianto(tipo, area?.tipoImpianto);
         if (!nome) continue;
         const voceBreve = voceBreveDaTipoZona(tipo, nome);
-        const key = abbrevKey(voceBreve);
-        if (!abbrevs.has(key)) abbrevs.set(key, { label: voceBreve, unita: UNITA_DA_VOCE });
+        segnaUnitaDaSpuntaUsa(abbrevs, abbrevKey(voceBreve), voceBreve, tipo, area);
       }
       continue;
     }
@@ -512,8 +543,7 @@ function raccogliAbbrevDaScheda(snapshot) {
       for (const area of zona?.aree || []) {
         const nome = normalizzaTipoCordolo(area?.tipoCordolo);
         if (!nome) continue;
-        const key = abbrevKey(nome);
-        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_DA_VOCE });
+        segnaUnitaDaSpuntaUsa(abbrevs, abbrevKey(nome), nome, tipo, area);
       }
       continue;
     }
@@ -521,8 +551,7 @@ function raccogliAbbrevDaScheda(snapshot) {
       for (const area of zona?.aree || []) {
         const nome = normalizzaTipoSegnaletica(area?.tipoSegnaletica);
         if (!nome) continue;
-        const key = abbrevKey(nome);
-        if (!abbrevs.has(key)) abbrevs.set(key, { label: nome, unita: UNITA_DA_VOCE });
+        segnaUnitaDaSpuntaUsa(abbrevs, abbrevKey(nome), nome, tipo, area);
       }
       continue;
     }
@@ -978,8 +1007,13 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
       }
     }
 
-    // Non sovrascrivere l’unità se proviene dalla voce (impianti / formula-unita-voce).
-    if (meta?.unita === UNITA_N) {
+    // Spunta USA: l’unità diventa n. Anche se in VOCI era già mq., ml. o mc.
+    if (meta?.forzaUnita === true && meta.unita === UNITA_N) {
+      if (String(item.unitaMisura || "").trim() !== UNITA_N) {
+        item.unitaMisura = UNITA_N;
+        changed = true;
+      }
+    } else if (meta?.unita === UNITA_N) {
       const u = String(item.unitaMisura || "")
         .trim()
         .toLowerCase()

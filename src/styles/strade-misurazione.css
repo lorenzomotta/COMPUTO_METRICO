@@ -428,6 +428,24 @@
   width: 6.2rem;
 }
 
+#vista-strade .strade-col-usa {
+  width: 2.8rem;
+}
+
+#vista-strade .strade-th-usa,
+#vista-strade .strade-usa-cell {
+  text-align: center;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+#vista-strade .strade-usa-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
 #vista-strade .strade-col-mq {
   width: 5.8rem;
 }
