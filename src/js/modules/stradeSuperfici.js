@@ -189,7 +189,7 @@ export function isZonaComeManufatti(tipo) {
 }
 
 /**
- * Spunta USA: accesa = in VOCI entra la Quantità, spenta = entra il Risultato.
+ * Spunta USA: accesa = in VOCI entra la Quantità, spenta = entra formula × Quantità.
  * Sugli impianti parte accesa (come prima). Su Cordoli e Segnaletica parte spenta.
  */
 export function areaUsaQuantitaInVoci(tipo, area) {
@@ -1133,6 +1133,21 @@ function formulaEffettivaImpianto(area) {
   return auto || formulaArea(area);
 }
 
+/** Numero scritto nella colonna Quantità. La Lunghezza non lo cambia. */
+export function quantitaPerRisultatoImpianto(area) {
+  const mol = parseMoltiplicatoreArea(area?.moltiplicatore);
+  return Number.isFinite(mol) && mol >= 0 ? mol : 1;
+}
+
+/** Risultato impianti = formula × Quantità. */
+function areaPerRisultatoImpianto(area) {
+  return {
+    ...area,
+    formula: formulaEffettivaImpianto(area),
+    moltiplicatore: String(quantitaPerRisultatoImpianto(area)),
+  };
+}
+
 /** Risultato = formula × moltiplicatore. Se c’è la larghezza, si moltiplica anche quella (mq). */
 export function mqDiArea(area) {
   const val = evalFormulaArea(formulaArea(area));
@@ -1244,7 +1259,9 @@ export function areeReinterroDaSpunta(scheda) {
         n: out.length + 1,
         riferimento: typeof area.riferimento === "string" ? area.riferimento : "",
         formula: isZonaComeManufatti(tipo) ? formulaEffettivaImpianto(area) : formulaArea(area),
-        moltiplicatore: isZonaComeManufatti(tipo) ? "1" : testoMoltiplicatore(area.moltiplicatore),
+        moltiplicatore: isZonaComeManufatti(tipo)
+          ? String(quantitaPerRisultatoImpianto(area)).replace(".", ",")
+          : testoMoltiplicatore(area.moltiplicatore),
         segno: area.segno === true,
         tipoReinterro: etichettaTipoEstesa(tipo, nome),
         dimensioni: testoDimensioniArea(area),
@@ -1999,32 +2016,22 @@ function appendFormulaEMoltiplicatore(
   inpM.className = `${classPrefix}-moltiplicatore vani-in-num`;
   inpM.inputMode = "decimal";
   inpM.placeholder = "1";
-  const lunTxt = String(testoLunghezzaArea(item) ?? "").trim();
-  const lunVal = evalFormulaArea(lunTxt);
-  const daLunghezza = quantita && lunVal != null && lunVal > 0;
   const quantitaManuale = testoMoltiplicatore(item?.moltiplicatore);
   inpM.setAttribute(
     "aria-label",
     quantita ? "Quantità" : pezzi ? `Numero pezzi ${ariaBase}` : `Moltiplicatore ${ariaBase}`,
   );
-  inpM.title = daLunghezza
-    ? "È la Lunghezza, perché è maggiore di 0. Per scrivere un numero tuo, svuota la Lunghezza."
-    : quantita
-      ? "Lunghezza vuota: scrivi qui la Quantità. Se USA è spuntata, questo numero va nelle VOCI."
-      : pezzi
-        ? sottraeSede
-          ? "Quanti pezzi contare nelle VOCI (vuoto = 1). Se c’è una formula, quell’area × pezzi si toglie dalla Sede."
-          : "Moltiplica il risultato della formula (vuoto = 1). In VOCI la quantità è formula × pezzi."
-        : lineare
-          ? "Ripete il risultato della formula (vuoto = 1)"
-          : "Moltiplica il risultato della formula (vuoto = 1)";
+  inpM.title = quantita
+    ? "Scrivi qui la Quantità. La Lunghezza non la cambia. Se USA è spuntata, questo numero va nelle VOCI. Se USA è spenta, in VOCI entra il Risultato."
+    : pezzi
+      ? sottraeSede
+        ? "Quanti pezzi contare nelle VOCI (vuoto = 1). Se c’è una formula, quell’area × pezzi si toglie dalla Sede."
+        : "Moltiplica il risultato della formula (vuoto = 1). In VOCI la quantità è formula × pezzi."
+      : lineare
+        ? "Ripete il risultato della formula (vuoto = 1)"
+        : "Moltiplica il risultato della formula (vuoto = 1)";
   inpM.autocomplete = "off";
-  inpM.value = daLunghezza ? lunTxt : quantitaManuale;
-  inpM.readOnly = daLunghezza;
-  if (quantita) {
-    inpM.dataset.quantitaImpianto = "1";
-    inpM.dataset.quantitaManuale = quantitaManuale;
-  }
+  inpM.value = quantitaManuale;
   tdM.appendChild(inpM);
   tr.appendChild(tdM);
 }
@@ -2034,7 +2041,7 @@ function appendSpuntaUsa(tr, tipo, area) {
   td.className = "strade-usa-cell";
   const lbl = document.createElement("label");
   lbl.className = "strade-usa-label";
-  lbl.title = "Spuntata: in VOCI entra la Quantità e l’unità diventa n. Non spuntata: in VOCI entra il Risultato.";
+  lbl.title = "Spuntata: in VOCI entra la Quantità e l’unità diventa n. Non spuntata: in VOCI entra il Risultato, cioè formula × Quantità.";
   const chk = document.createElement("input");
   chk.type = "checkbox";
   chk.className = "strade-area-usa-quantita";
@@ -2172,7 +2179,7 @@ function appendSpuntaReinterro(tr, area) {
   chk.className = "strade-area-in-reinterro";
   chk.checked = area?.inReinterro === true;
   chk.setAttribute("aria-label", "Copia questa riga in Volume occupato");
-  lbl.title = "Se la spunti, la riga compare in Volume occupato con il nome della voce, Dimensioni, Spessore, la stessa formula e gli stessi pezzi.";
+  lbl.title = "Se la spunti, la riga compare in Volume occupato con il nome della voce, Dimensioni, Spessore, la stessa formula e, come N° pezzi, la Quantità di questa riga.";
   lbl.append(chk);
   td.appendChild(lbl);
   tr.appendChild(td);
@@ -2403,7 +2410,7 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
     ${isManufatti ? "" : `<col class="strade-col-sottrai">`}<col class="strade-col-act">
   </colgroup>
   <thead><tr>
-    <th>N°</th><th>Rif.</th><th>${escapeHtml(isManufatti ? "Tipo manufatto" : isReinterro ? "Tipo" : `Tipo ${etichettaTipo.toLocaleLowerCase("it-IT")}`)}</th>${isImpianto ? `<th class="strade-th-spunta">Manufatti</th><th class="strade-th-spunta">Volume occupato</th>` : ""}${conLunghezza ? thLunghezza : ""}${isImpianto || isReinterro ? thDimensioni : ""}${isImpianto ? "" : "<th>Formula</th>"}${isImpianto ? "<th>Quantità</th>" : "<th>N° pezzi</th>"}${isImpianto ? `<th class="strade-th-usa" title="Spuntata: in VOCI entra la Quantità e l’unità diventa n. Non spuntata: entra il Risultato.">USA</th>` : ""}<th>${isManufatti ? "Mq" : "Ris."}</th>${isManufatti ? "" : "<th>Sottrai</th>"}<th></th>
+    <th>N°</th><th>Rif.</th><th>${escapeHtml(isManufatti ? "Tipo manufatto" : isReinterro ? "Tipo" : `Tipo ${etichettaTipo.toLocaleLowerCase("it-IT")}`)}</th>${isImpianto ? `<th class="strade-th-spunta">Manufatti</th><th class="strade-th-spunta">Volume occupato</th>` : ""}${conLunghezza ? thLunghezza : ""}${isImpianto || isReinterro ? thDimensioni : ""}${isImpianto ? "" : "<th>Formula</th>"}${isImpianto ? "<th>Quantità</th>" : "<th>N° pezzi</th>"}${isImpianto ? `<th class="strade-th-usa" title="Spuntata: in VOCI entra la Quantità e l’unità diventa n. Non spuntata: entra il Risultato, cioè formula × Quantità.">USA</th>` : ""}<th>${isManufatti ? "Mq" : "Ris."}</th>${isManufatti ? "" : "<th>Sottrai</th>"}<th></th>
   </tr></thead>`
     : isCordoli
       ? `<colgroup>
@@ -2412,7 +2419,7 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
     <col class="strade-col-sottrai"><col class="strade-col-act">
   </colgroup>
   <thead><tr>
-    <th>N°</th><th>Rif.</th><th>Tipo cordolo</th><th>Formula</th><th>×</th><th class="strade-th-usa" title="Spuntata: in VOCI entra la Quantità (il numero ×) e l’unità diventa n. Non spuntata: entra il Risultato.">USA</th><th>Ris.</th><th>Sottrai</th><th></th>
+    <th>N°</th><th>Rif.</th><th>Tipo cordolo</th><th>Formula</th><th>×</th><th class="strade-th-usa" title="Spuntata: in VOCI entra la Quantità (il numero ×) e l’unità diventa n. Non spuntata: entra il Risultato, cioè formula × Quantità.">USA</th><th>Ris.</th><th>Sottrai</th><th></th>
   </tr></thead>`
       : isSegnaletica
         ? `<colgroup>
@@ -2421,7 +2428,7 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
     <col class="strade-col-sottrai"><col class="strade-col-act">
   </colgroup>
   <thead><tr>
-    <th>N°</th><th>Rif.</th><th>Tipo segnaletica</th><th>Formula</th><th>Larghezza</th><th>×</th><th class="strade-th-usa" title="Spuntata: in VOCI entra la Quantità (il numero ×) e l’unità diventa n. Non spuntata: entra il Risultato.">USA</th><th>Ris.</th><th>Sottrai</th><th></th>
+    <th>N°</th><th>Rif.</th><th>Tipo segnaletica</th><th>Formula</th><th>Larghezza</th><th>×</th><th class="strade-th-usa" title="Spuntata: in VOCI entra la Quantità (il numero ×) e l’unità diventa n. Non spuntata: entra il Risultato, cioè formula × larghezza × Quantità.">USA</th><th>Ris.</th><th>Sottrai</th><th></th>
   </tr></thead>`
         : isVarie
           ? `<colgroup>
@@ -2495,7 +2502,7 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
     if (conLunghezza) appendLunghezza(tr, area);
     if (conDimensioni) appendDimensioniSpessore(tr, area);
 
-    const areaVista = isImpianto ? { ...area, formula: formulaEffettivaImpianto(area) } : area;
+    const areaVista = isImpianto ? areaPerRisultatoImpianto(area) : area;
     appendFormulaEMoltiplicatore(
       tr,
       areaVista,
@@ -2583,11 +2590,7 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
   const zonaPerTotali = isImpianto
     ? {
         ...zona,
-        aree: (zona.aree || []).map((a) => ({
-          ...a,
-          formula: formulaEffettivaImpianto(a),
-          moltiplicatore: "1",
-        })),
+        aree: (zona.aree || []).map((a) => areaPerRisultatoImpianto(a)),
       }
     : isReinterro
       ? { aree: [] }
@@ -2627,7 +2630,7 @@ function renderAreeTable(tipo, zona, schedaCompleta) {
         : isReinterro
           ? "Risultato netto (formula × pezzi, copiato dalle schede di partenza)"
           : isImpianto
-          ? "Risultato netto (lunghezza × dimensioni × spessore)"
+          ? "Risultato netto (formula × quantità)"
       : "Mq netto zona (base per gli strati)";
   const codaColspan = isManufatti ? 1 : 2;
   const tfoot = document.createElement("tfoot");
@@ -3369,15 +3372,15 @@ export function renderZonaStradaPanel({ tipo, zona, datalistId, schedaCompleta }
     : isZonaManufatti(tipo)
       ? "Questa scheda è in sola lettura. Le righe arrivano dalla spunta Manufatti in Fogna, negli impianti o in Varie. Il tipo è il nome della voce, per esempio Pozzetto ispezione (Fogna). Formula e N° pezzi sono quelli della scheda di partenza. L’icona della lente apre la scheda da cui arriva la riga."
       : isZonaReinterro(tipo)
-        ? "Questa scheda è in sola lettura. Le righe arrivano dalla spunta Volume occupato in Fogna, negli impianti o in Varie. Il tipo è il nome della voce, per esempio Pozzetto ispezione (Fogna). Dimensioni, Spessore, formula e N° pezzi sono quelli della scheda di partenza. Questi valori si tolgono dall’Ingombro nella scheda Reinterro."
+        ? "Questa scheda è in sola lettura. Le righe arrivano dalla spunta Volume occupato in Fogna, negli impianti o in Varie. Il tipo è il nome della voce, per esempio Pozzetto ispezione (Fogna). Dimensioni, Spessore e formula sono quelli della scheda di partenza. Il N° pezzi è la Quantità di quella riga. Questi valori si tolgono dall’Ingombro nella scheda Reinterro."
       : isZonaCordoli(tipo)
-        ? "Scegli il tipo di cordolo (Retto, Curvo, oppure aggiungine uno nuovo). Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La colonna USA sta tra il numero × e il Risultato: spuntata, in VOCI entra il numero × e l’unità diventa n.; non spuntata, entra il Risultato. I Cordoli non vengono sottratti dalla Sede stradale."
+        ? "Scegli il tipo di cordolo (Retto, Curvo, oppure aggiungine uno nuovo). Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La colonna USA sta tra il numero × e il Risultato: spuntata, in VOCI entra il numero × e l’unità diventa n.; non spuntata, entra il Risultato, cioè formula × Quantità. I Cordoli non vengono sottratti dalla Sede stradale."
         : isZonaSegnaletica(tipo)
-          ? "Scegli il tipo di segnaletica, oppure aggiungine uno nuovo. Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La colonna USA sta tra il numero × e il Risultato: spuntata, in VOCI entra il numero × e l’unità diventa n.; non spuntata, entra il Risultato (formula × larghezza × pezzi). Non viene sottratta dalla Sede."
+          ? "Scegli il tipo di segnaletica, oppure aggiungine uno nuovo. Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La colonna USA sta tra il numero × e il Risultato: spuntata, in VOCI entra il numero × e l’unità diventa n.; non spuntata, entra il Risultato (formula × larghezza × Quantità). Non viene sottratta dalla Sede."
           : isZonaVarie(tipo)
             ? "Scegli il tipo (per ora Reinterro, oppure aggiungine uno nuovo). Se il tipo è in libreria, Dimensioni e Spessore si compilano da soli. Ogni tipo diventa una voce nelle VOCI: lì scegli ml., mq. o mc. e il prezzo. La quantità è formula × pezzi. Se la formula è vuota, la quantità è 0. La spunta Manufatti copia la riga nella scheda Manufatti. La spunta Volume occupato copia anche Dimensioni e Spessore. Varie non entra nella Sede stradale."
             : isZonaComeManufatti(tipo)
-              ? "Scegli il tipo, oppure aggiungine uno nuovo nel campo in alto. Se il tipo è in libreria, Dimensioni e Spessore si compilano da soli. Nella casella resta solo il nome, per esempio Pozzetto ispezione. In VOCI la voce breve diventa «Pozzetto ispezione (Luce pubblica)»: tra parentesi c’è questa scheda, così lo stesso tipo in un’altra sezione non si mescola. La colonna USA sta tra Quantità e Risultato: spuntata, in VOCI entra la Quantità e l’unità diventa n.; non spuntata, entra il Risultato. Se la Lunghezza è maggiore di 0, Quantità mostra la lunghezza. La spunta Volume occupato usa sempre lunghezza × dimensioni × spessore. Lì scegli ml., mq. o mc. e il prezzo. Questa scheda non viene sottratta dalla Sede stradale."
+              ? "Scegli il tipo, oppure aggiungine uno nuovo nel campo in alto. Se il tipo è in libreria, Dimensioni e Spessore si compilano da soli. Nella casella resta solo il nome, per esempio Pozzetto ispezione. In VOCI la voce breve diventa «Pozzetto ispezione (Luce pubblica)»: tra parentesi c’è questa scheda, così lo stesso tipo in un’altra sezione non si mescola. La Lunghezza entra solo nella formula. La Quantità resta un numero tuo, anche se la Lunghezza è piena. La colonna USA sta tra Quantità e Risultato: spuntata, in VOCI entra la Quantità e l’unità diventa n.; non spuntata, entra il Risultato, cioè formula × Quantità. La spunta Volume occupato copia la formula e, come N° pezzi, la Quantità di questa riga. Lì scegli ml., mq. o mc. e il prezzo. Questa scheda non viene sottratta dalla Sede stradale."
             : isZonaFormulaUnitaVoce(tipo)
           ? "In Formula scrivi il calcolo (es. 2 oppure 1,2*3). Il moltiplicatore ripete quel risultato. L’unità di misura (n., ml., mq., a corpo…) la decide la Voce dello strato nelle VOCI. Questa scheda non viene sottratta dalla Sede stradale."
           : "In Formula puoi scrivere un’espressione (es. 12,5 * 3,2 oppure (10+2)/2). Il moltiplicatore (default 1) ripete quel risultato: 4, 1,5, 10… quello che ti serve. Il segno «sottrai» toglie quell’area da tutta la zona. Ogni strato parte da quel mq netto: puoi togliere altre aree solo da quello strato.";
@@ -3508,26 +3511,7 @@ export function aggiornaCalcoliZonaBlock(block, zona, mqBaseOverride) {
     const area = (zona.aree || []).find((x) => x.id === aid);
     if (!area) return;
     const lun = row.querySelector(".strade-area-lunghezza");
-    const mol = row.querySelector(".strade-area-moltiplicatore");
-    if (lun instanceof HTMLInputElement && mol instanceof HTMLInputElement && mol.dataset.quantitaImpianto === "1") {
-      const lunVal = evalFormulaArea(lun.value);
-      const daLunghezza = lunVal != null && lunVal > 0;
-      if (daLunghezza) {
-        mol.readOnly = true;
-        mol.value = lun.value.trim();
-        mol.title = "È la Lunghezza, perché è maggiore di 0. Per scrivere un numero tuo, svuota la Lunghezza.";
-      } else {
-        const eraBloccato = mol.readOnly;
-        mol.readOnly = false;
-        if (eraBloccato) mol.value = mol.dataset.quantitaManuale || "1";
-        else mol.dataset.quantitaManuale = mol.value;
-        mol.title = "Lunghezza vuota: scrivi qui la Quantità. Se USA è spuntata, questo numero va nelle VOCI.";
-      }
-    }
-    const areaRis =
-      lun instanceof HTMLInputElement
-        ? { ...area, formula: formulaEffettivaImpianto(area), moltiplicatore: "1" }
-        : area;
+    const areaRis = lun instanceof HTMLInputElement ? areaPerRisultatoImpianto(area) : area;
     const mqInfo = testoMqRiga(areaRis, area.segno === true);
     const tdMq = row.querySelector('[data-role="area-mq"]');
     if (tdMq) {

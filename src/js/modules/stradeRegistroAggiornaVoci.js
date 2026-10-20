@@ -9,7 +9,7 @@
  * - reinterro: aree automatiche Ingombro − Volume occupato, per stesso riferimento;
  * - manufatti: una voce per tipo; quantità = N° pezzi (la formula toglie mq dalla Sede);
  * - fogna, allacci fogna, luci, gas, acqua, telefonica, cordoli e segnaletica:
- *   spunta USA accesa → in VOCI entra la Quantità; spenta → entra il Risultato;
+ *   spunta USA accesa → in VOCI entra la Quantità; spenta → entra formula × Quantità;
  * - varie: una voce per tipo; quantità = formula × pezzi; l’unità si sceglie in VOCI;
  */
 
@@ -30,6 +30,7 @@ import {
   isZonaVarie,
   isZonaFormulaUnitaVoce,
   areaUsaQuantitaInVoci,
+  quantitaPerRisultatoImpianto,
   areeVirtualiSede,
   areeVirtualiReinterro,
   normalizzaTipoManufatto,
@@ -388,9 +389,6 @@ function creaRigaArea({
   const isFormulaUnitaVoce = isZonaFormulaUnitaVoce(tipoZona) && !isSegnaletica;
   const hasMqFisso = typeof area?.mqFisso === "number" && Number.isFinite(area.mqFisso);
   const formulaVal = hasMqFisso ? Number(Math.abs(area.mqFisso).toFixed(3)) : evalFormulaArea(formulaTxt);
-  const lunghezzaTxt = String(area?.lunghezza ?? "").trim();
-  const lunghezzaVal = isZonaComeManufatti(tipoZona) ? evalFormulaArea(lunghezzaTxt) : null;
-  const usaLunghezza = lunghezzaVal != null && lunghezzaVal > 0;
   let misura1;
   let misura2 = null;
   let misura3 = null;
@@ -422,14 +420,14 @@ function creaRigaArea({
     misura2 = lar;
   } else if (isComeManufatti) {
     if (!areaUsaQuantitaInVoci(tipoZona, area)) {
-      misura1 = formulaVal == null ? 0 : Number(Math.abs(formulaVal).toFixed(3));
+      // USA spenta: in VOCI entra formula × Quantità.
+      const q = quantitaPerRisultatoImpianto(area);
+      const base = formulaVal == null ? 0 : Math.abs(formulaVal);
+      misura1 = Number((base * q).toFixed(3));
       numero = 1;
     } else {
-      // Lunghezza > 0: in VOCI va la lunghezza. Lunghezza vuota: va il numero scritto in Quantità.
-      const base = usaLunghezza
-        ? Number(lunghezzaVal.toFixed(3))
-        : Number(parseMoltiplicatoreArea(area?.moltiplicatore).toFixed(3));
-      misura1 = base;
+      // USA spuntata: in VOCI entra solo la Quantità scritta, non la Lunghezza.
+      misura1 = Number(parseMoltiplicatoreArea(area?.moltiplicatore).toFixed(3));
       numero = 1;
     }
   } else if (isCordoli || isFormulaUnitaVoce || isVarie) {
@@ -466,6 +464,7 @@ function creaRigaArea({
       : Number((m1 * numero).toFixed(3));
   const risultato = segno ? -Math.abs(raw) : raw;
   const sid = typeof schedaId === "string" ? schedaId.trim() : "";
+  const impiantoUsaQuantita = isComeManufatti && areaUsaQuantitaInVoci(tipoZona, area);
   return {
     tipo: VOCE_MM_TIPO_SEMIAUTOMATICA,
     piano,
@@ -473,14 +472,14 @@ function creaRigaArea({
     tipoOggetto: ZONA_TIPO_OGGETTO[tipoZona] || "STRADA_INGOMBRO",
     specifica,
     formula: isComeManufatti
-      ? usaLunghezza
-        ? lunghezzaTxt
-        : String(area?.moltiplicatore ?? "").trim() || "1"
+      ? impiantoUsaQuantita
+        ? String(area?.moltiplicatore ?? "").trim() || "1"
+        : formulaTxt
       : formulaTxt,
     formulaValue: isComeManufatti
-      ? usaLunghezza
-        ? Number(lunghezzaVal.toFixed(3))
-        : Number(parseMoltiplicatoreArea(area?.moltiplicatore).toFixed(3))
+      ? impiantoUsaQuantita
+        ? Number(parseMoltiplicatoreArea(area?.moltiplicatore).toFixed(3))
+        : formulaVal
       : formulaVal,
     misura1,
     misura2,
