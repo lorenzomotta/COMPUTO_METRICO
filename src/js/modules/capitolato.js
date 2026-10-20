@@ -49,6 +49,7 @@ export function elencoCapitolato(voci) {
         nBrevi: soloCapitolato ? 0 : 1,
         posizione,
         haVoceBreve: !soloCapitolato,
+        forzaVisibile: soloCapitolato,
       });
       continue;
     }
@@ -64,9 +65,10 @@ export function elencoCapitolato(voci) {
       prev.prezzo = Number.isFinite(prezzo) ? prezzo : prev.prezzo;
     }
     if (!soloCapitolato) prev.haVoceBreve = true;
+    if (soloCapitolato) prev.forzaVisibile = true;
   }
   return [...groups.values()]
-    .filter((item) => item.voce.length >= LUNGHEZZA_MINIMA_TESTO)
+    .filter((item) => item.forzaVisibile === true || item.voce.length >= LUNGHEZZA_MINIMA_TESTO)
     .sort((a, b) => a.voce.localeCompare(b.voce, "it"));
 }
 
@@ -336,7 +338,44 @@ export function initCapitolato({ getVoci, getUnitaOptions, onSalva, onEliminaSen
       unita: unitaCompatibile(riga?.unita),
       prezzo: String(riga?.prezzo ?? "0"),
     }));
-    apriConBozza({ perChiave, nuove });
+    const righeSalva = [...perChiave.entries()].map(([chiave, riga]) => ({
+      chiaveOriginale: chiave,
+      voce: String(riga?.voce ?? ""),
+      unitaMisura: String(riga?.unita ?? ""),
+      prezzo: riga?.prezzo,
+    }));
+    const nuoveSalva = nuove.map((riga) => ({
+      voce: riga.voce,
+      unitaMisura: riga.unita,
+      prezzo: riga.prezzo,
+    }));
+    onSalva?.(righeSalva, nuoveSalva);
+    const giaSalvate = new Set((getVoci?.() || []).map((item) => chiaveTesto(item?.voce)));
+    const ancoraDaMostrare = nuove.filter((riga) => !giaSalvate.has(chiaveTesto(riga.voce)));
+    apriConBozza({ perChiave, nuove: ancoraDaMostrare });
+  }
+
+  function leggiModificheAperte() {
+    if (!bodyEl || bodyEl.querySelectorAll("tr").length === 0) return null;
+    /** @type {{ chiaveOriginale: string, voce: string, unitaMisura: string, prezzo: string }[]} */
+    const righe = [];
+    /** @type {{ voce: string, unitaMisura: string, prezzo: string }[]} */
+    const nuove = [];
+    for (const tr of bodyEl.querySelectorAll("tr")) {
+      const voce = testoPulito(tr.querySelector(".capitolato-voce")?.value);
+      const unitaMisura = String(tr.querySelector(".capitolato-unita")?.value ?? "").trim();
+      const prezzo = String(tr.querySelector(".capitolato-prezzo")?.value ?? "");
+      if (!voce) continue;
+      if (tr.dataset.nuova === "1") {
+        nuove.push({ voce, unitaMisura, prezzo });
+        continue;
+      }
+      const chiaveOriginale = String(tr.dataset.chiave ?? "");
+      if (!chiaveOriginale) continue;
+      righe.push({ chiaveOriginale, voce, unitaMisura, prezzo });
+    }
+    if (righe.length === 0 && nuove.length === 0) return null;
+    return { righe, nuove };
   }
 
   function applicaFiltro() {
@@ -489,5 +528,5 @@ export function initCapitolato({ getVoci, getUnitaOptions, onSalva, onEliminaSen
     renderRighe(leggiBozzaRighe());
   }
 
-  return { aggiornaSeAperto, apriDaSessioneCerca };
+  return { aggiornaSeAperto, apriDaSessioneCerca, leggiModificheAperte };
 }

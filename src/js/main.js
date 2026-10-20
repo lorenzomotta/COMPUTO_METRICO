@@ -1857,7 +1857,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("computo-voci-storage-externally-updated", () => {
     loadVoci();
-    loadCapitolatoLibere();
     // Stesse voci speciali che si aggiornano dopo VANI / aperture:
     // DAVANZALI, SOGLIE, CANALI, FALSI TELAI + voci per tipologia apertura.
     syncVociDerivateDaApertureMaster();
@@ -2928,6 +2927,65 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function testoCapitolatoDaItem(item) {
+    const raw =
+      typeof item?.voce === "string"
+        ? item.voce
+        : typeof item?.testo === "string"
+          ? item.testo
+          : typeof item?.descrizione === "string"
+            ? item.descrizione
+            : "";
+    return String(raw).replace(/\s+/g, " ").trim();
+  }
+
+  function normalizzaCapitolatoLibere(raw) {
+    const lista = Array.isArray(raw) ? raw : [];
+    return lista
+      .map((item, index) => ({
+        id: typeof item?.id === "number" && item.id > 0 ? item.id : index + 1,
+        voce: testoCapitolatoDaItem(item),
+        unitaMisura:
+          typeof item?.unitaMisura === "string" && item.unitaMisura.trim() !== ""
+            ? item.unitaMisura.trim()
+            : UNITA_MISURA_DEFAULT_OPTIONS[0],
+        prezzo: parseNonNegativeDecimal2(item?.prezzo) ?? 0,
+      }))
+      .filter((item) => item.voce !== "");
+  }
+
+  function unisciCapitolatoLibere(base, extra) {
+    const out = [];
+    const visti = new Set();
+    for (const item of [...(Array.isArray(base) ? base : []), ...(Array.isArray(extra) ? extra : [])]) {
+      const voce = testoCapitolatoDaItem(item);
+      const chiave = voce.toLocaleLowerCase("it-IT");
+      if (!chiave || visti.has(chiave)) continue;
+      visti.add(chiave);
+      out.push({
+        id: typeof item?.id === "number" && item.id > 0 ? item.id : out.length + 1,
+        voce,
+        unitaMisura:
+          typeof item?.unitaMisura === "string" && item.unitaMisura.trim() !== ""
+            ? item.unitaMisura.trim()
+            : UNITA_MISURA_DEFAULT_OPTIONS[0],
+        prezzo: parseNonNegativeDecimal2(item?.prezzo) ?? 0,
+      });
+    }
+    return out;
+  }
+
+  function leggiCapitolatoLibereDaStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_CAPITOLATO_LIBERE);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return normalizzaCapitolatoLibere(parsed);
+    } catch {
+      return [];
+    }
+  }
+
   function loadCapitolatoLibere() {
     try {
       const raw = localStorage.getItem(STORAGE_CAPITOLATO_LIBERE);
@@ -2942,18 +3000,7 @@ window.addEventListener("DOMContentLoaded", () => {
         capitolatoLibereId = 1;
         return;
       }
-      capitolatoLibere = parsed
-        .filter((item) => item && typeof item.voce === "string")
-        .map((item, index) => ({
-          id: typeof item.id === "number" && item.id > 0 ? item.id : index + 1,
-          voce: String(item.voce).replace(/\s+/g, " ").trim(),
-          unitaMisura:
-            typeof item.unitaMisura === "string" && item.unitaMisura.trim() !== ""
-              ? item.unitaMisura.trim()
-              : UNITA_MISURA_DEFAULT_OPTIONS[0],
-          prezzo: parseNonNegativeDecimal2(item.prezzo) ?? 0,
-        }))
-        .filter((item) => item.voce.length >= 50);
+      capitolatoLibere = normalizzaCapitolatoLibere(parsed);
       capitolatoLibereId =
         capitolatoLibere.reduce((max, item) => Math.max(max, item.id), 0) + 1;
     } catch {
@@ -8420,7 +8467,7 @@ window.addEventListener("DOMContentLoaded", () => {
       camminamentiEsterni,
       misurazioniVarie,
       voci,
-      capitolatoLibere,
+      capitolatoLibere: unisciCapitolatoLibere(capitolatoLibere, leggiCapitolatoLibereDaStorage()),
       apertureMaster,
       archivioPianiMisura: [...archivioPianiMisura],
       archivioCapitoli: [...archivioCapitoli],
@@ -8743,6 +8790,8 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   async function exportJson() {
+    const aperte = capitolatoUi?.leggiModificheAperte?.();
+    if (aperte) applicaModificheCapitolato(aperte.righe, aperte.nuove);
     const data = buildComputoDataPayload();
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -9918,20 +9967,12 @@ window.addEventListener("DOMContentLoaded", () => {
     camminamentiEsterni = importedCamminamenti;
     misurazioniVarie = importedMisurazioni;
     voci = importedVoci;
-    capitolatoLibere = Array.isArray(payload.capitolatoLibere)
+    const capitolatoDalFile = Array.isArray(payload.capitolatoLibere)
       ? payload.capitolatoLibere
-          .filter((item) => item && typeof item.voce === "string")
-          .map((item, index) => ({
-            id: typeof item.id === "number" && item.id > 0 ? item.id : index + 1,
-            voce: String(item.voce).replace(/\s+/g, " ").trim(),
-            unitaMisura:
-              typeof item.unitaMisura === "string" && item.unitaMisura.trim() !== ""
-                ? item.unitaMisura.trim()
-                : UNITA_MISURA_DEFAULT_OPTIONS[0],
-            prezzo: parseNonNegativeDecimal2(item.prezzo) ?? 0,
-          }))
-          .filter((item) => item.voce.length >= 50)
-      : [];
+      : Array.isArray(payload.capitolato)
+        ? payload.capitolato
+        : [];
+    capitolatoLibere = normalizzaCapitolatoLibere(capitolatoDalFile);
     capitolatoLibereId = capitolatoLibere.reduce((max, item) => Math.max(max, item.id), 0) + 1;
     apertureMaster = importedApertureMaster;
 
@@ -10026,6 +10067,8 @@ window.addEventListener("DOMContentLoaded", () => {
     saveApertureMaster();
     saveVoci();
     saveCapitolatoLibere();
+    const testiVoceImportati = new Map(importedVoci.map((item) => [item.idVoce, item.voce]));
+    const capitolatoImportati = capitolatoLibere.map((item) => ({ ...item }));
     saveVociUnitaOptions();
     if (payload.strade && typeof payload.strade === "object") {
       applicaStradeDaImport(payload.strade);
@@ -10075,6 +10118,18 @@ window.addEventListener("DOMContentLoaded", () => {
     renderMisurazioniVarie();
     renderVoci();
     syncEsterniVersoVoci();
+    voci = voci.map((item) => {
+      const testo = testiVoceImportati.get(item.idVoce);
+      if (typeof testo !== "string" || testo.trim() === "") return item;
+      const attuale = String(item.voce ?? "");
+      if (testo.replace(/\s+/g, " ").trim().length > attuale.replace(/\s+/g, " ").trim().length) {
+        return { ...item, voce: testo };
+      }
+      return item;
+    });
+    capitolatoLibere = unisciCapitolatoLibere(capitolatoImportati, capitolatoLibere);
+    saveVoci();
+    saveCapitolatoLibere();
 
     let ifcAutoLoaded = false;
     let ifcAutoLoadMessage = "";
@@ -11367,9 +11422,13 @@ window.addEventListener("DOMContentLoaded", () => {
         );
         continue;
       }
-      const unita = String(riga.unitaMisura ?? "").trim();
-      const prezzo = parseNonNegativeDecimal2(riga.prezzo);
-      if (testo.length < 50 || !unita || prezzo === null) continue;
+      const unita =
+        String(riga.unitaMisura ?? "").trim() ||
+        vociUnitaMisuraOptions[0] ||
+        UNITA_MISURA_DEFAULT_OPTIONS[0];
+      const prezzoLetto = parseNonNegativeDecimal2(riga.prezzo);
+      const prezzo = prezzoLetto === null ? 0 : prezzoLetto;
+      if (testo.length < 50 || !unita) continue;
       registraUnita(unita);
       libereAgg.push({
         id: capitolatoLibereId++,
