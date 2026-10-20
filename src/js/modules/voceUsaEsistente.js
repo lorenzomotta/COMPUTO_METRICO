@@ -1,5 +1,5 @@
 /**
- * «USA VOCE ESISTENTE» dal popup ASSOCIA VOCE E PREZZO:
+ * «USA VOCE ESISTENTE» dai popup MODIFICA VOCE e ASSOCIA VOCE E PREZZO:
  * elenco delle voci già presenti in CAPITOLATO.
  * La scelta copia testo, unità e prezzo sulla voce breve attuale, senza eliminarla.
  * Più voci brevi possono così usare lo stesso testo esteso.

@@ -4,7 +4,8 @@
   display: none;
 }
 
-#voce-dialog.voce-dialog--solo-unita #voce-btn-usa-esistente {
+#voce-dialog.voce-dialog--solo-unita #voce-btn-usa-esistente,
+#voce-dialog.voce-dialog--modifica #voce-btn-usa-esistente {
   display: inline-flex;
 }
 

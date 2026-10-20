@@ -528,8 +528,18 @@
   color: #10233f;
 }
 
-.strade-sott-add {
-  margin-top: 6px;
+.strade-strato-azioni {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.strade-sott-add-icon {
+  min-width: 1.7rem;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 #vista-strade .vani-schede-tabs {

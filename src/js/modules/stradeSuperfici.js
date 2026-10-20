@@ -2925,6 +2925,9 @@ function renderNuovoTipoImpianto(tipo) {
 }
 
 function renderSottrazioniStrato(tipo, strato) {
+  const list = strato.sottrazioni || [];
+  if (list.length === 0) return null;
+
   const wrap = document.createElement("div");
   wrap.className = "strade-sott-wrap";
   const isCordoli = isZonaCordoli(tipo);
@@ -2942,20 +2945,11 @@ function renderSottrazioniStrato(tipo, strato) {
   }</span>`;
   wrap.appendChild(head);
 
-  const list = strato.sottrazioni || [];
-  if (list.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "strade-sott-empty";
-    empty.textContent = isCordoli || isFormulaUnitaVoce
-      ? "Nessuna sottrazione. Usa «Aggiungi sottrazione» per togliere un valore solo da questo strato."
-      : "Nessuna sottrazione. Usa «Aggiungi sottrazione» per togliere un’area solo da questo strato.";
-    wrap.appendChild(empty);
-  } else {
-    const tableWrap = document.createElement("div");
-    tableWrap.className = "vani-sup-table-wrap";
-    const table = document.createElement("table");
-    table.className = "strade-sott-table";
-    table.innerHTML = `<colgroup>
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "vani-sup-table-wrap";
+  const table = document.createElement("table");
+  table.className = "strade-sott-table";
+  table.innerHTML = `<colgroup>
       <col class="strade-col-n"><col class="strade-col-rif">
       <col class="strade-col-formula"><col class="strade-col-mol"><col class="strade-col-mq">
       <col class="strade-col-act">
@@ -2963,62 +2957,52 @@ function renderSottrazioniStrato(tipo, strato) {
     <thead><tr>
       <th>N°</th><th>Rif.</th><th>Formula</th><th>×</th><th>${unitaCol}</th><th></th>
     </tr></thead>`;
-    const tbody = document.createElement("tbody");
-    for (const s of list) {
-      const tr = document.createElement("tr");
-      tr.className = "strade-sott-row";
-      tr.dataset.sottId = String(s.id);
+  const tbody = document.createElement("tbody");
+  for (const s of list) {
+    const tr = document.createElement("tr");
+    tr.className = "strade-sott-row";
+    tr.dataset.sottId = String(s.id);
 
-      const tdN = document.createElement("td");
-      tdN.className = "vani-sup-strato-num";
-      tdN.textContent = String(s.n ?? "");
-      tr.appendChild(tdN);
+    const tdN = document.createElement("td");
+    tdN.className = "vani-sup-strato-num";
+    tdN.textContent = String(s.n ?? "");
+    tr.appendChild(tdN);
 
-      const tdRif = document.createElement("td");
-      const inpRif = document.createElement("input");
-      inpRif.type = "text";
-      inpRif.className = "strade-sott-rif";
-      inpRif.placeholder = "rif.";
-      inpRif.setAttribute("aria-label", "Riferimento sottrazione");
-      inpRif.value = typeof s.riferimento === "string" ? s.riferimento : "";
-      tdRif.appendChild(inpRif);
-      tr.appendChild(tdRif);
+    const tdRif = document.createElement("td");
+    const inpRif = document.createElement("input");
+    inpRif.type = "text";
+    inpRif.className = "strade-sott-rif";
+    inpRif.placeholder = "rif.";
+    inpRif.setAttribute("aria-label", "Riferimento sottrazione");
+    inpRif.value = typeof s.riferimento === "string" ? s.riferimento : "";
+    tdRif.appendChild(inpRif);
+    tr.appendChild(tdRif);
 
-      appendFormulaEMoltiplicatore(tr, s, "strade-sott", "sottrazione", {
-        lineare: isCordoli || isFormulaUnitaVoce,
-      });
+    appendFormulaEMoltiplicatore(tr, s, "strade-sott", "sottrazione", {
+      lineare: isCordoli || isFormulaUnitaVoce,
+    });
 
-      const mqInfo = testoMqRiga(s, true);
-      appendCellettaMq(tr, mqInfo.text, mqInfo.err, "sott-mq");
+    const mqInfo = testoMqRiga(s, true);
+    appendCellettaMq(tr, mqInfo.text, mqInfo.err, "sott-mq");
 
-      const tdAct = document.createElement("td");
-      const btnRm = document.createElement("button");
-      btnRm.type = "button";
-      btnRm.className = "btn-action btn-delete vani-btn-micro";
-      btnRm.dataset.action = "rimuovi-sottrazione-strato";
-      btnRm.dataset.tipoZona = tipo;
-      btnRm.dataset.stratoId = String(strato.id);
-      btnRm.dataset.sottId = String(s.id);
-      btnRm.textContent = "✕";
-      btnRm.title = "Rimuovi sottrazione";
-      tdAct.appendChild(btnRm);
-      tr.appendChild(tdAct);
+    const tdAct = document.createElement("td");
+    const btnRm = document.createElement("button");
+    btnRm.type = "button";
+    btnRm.className = "btn-action btn-delete vani-btn-micro";
+    btnRm.dataset.action = "rimuovi-sottrazione-strato";
+    btnRm.dataset.tipoZona = tipo;
+    btnRm.dataset.stratoId = String(strato.id);
+    btnRm.dataset.sottId = String(s.id);
+    btnRm.textContent = "✕";
+    btnRm.title = "Rimuovi sottrazione";
+    tdAct.appendChild(btnRm);
+    tr.appendChild(tdAct);
 
-      tbody.appendChild(tr);
-    }
-    table.appendChild(tbody);
-    tableWrap.appendChild(table);
-    wrap.appendChild(tableWrap);
+    tbody.appendChild(tr);
   }
-
-  const btnAdd = document.createElement("button");
-  btnAdd.type = "button";
-  btnAdd.className = "btn-action btn-secondary vani-btn-mini strade-sott-add";
-  btnAdd.dataset.action = "aggiungi-sottrazione-strato";
-  btnAdd.dataset.tipoZona = tipo;
-  btnAdd.dataset.stratoId = String(strato.id);
-  btnAdd.textContent = "Aggiungi sottrazione";
-  wrap.appendChild(btnAdd);
+  table.appendChild(tbody);
+  tableWrap.appendChild(table);
+  wrap.appendChild(tableWrap);
   return wrap;
 }
 
@@ -3153,6 +3137,20 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
     calcEl.innerHTML = `<span>${calcLabel}</span><strong data-role="strato-calcolo" title="${calcTitle}">${fmtDim(calcolo)}</strong>`;
     row.appendChild(calcEl);
 
+    const azioni = document.createElement("div");
+    azioni.className = "strade-strato-azioni";
+    if (!nascondiSottrazioni) {
+      const btnAddSott = document.createElement("button");
+      btnAddSott.type = "button";
+      btnAddSott.className = "btn-action btn-secondary vani-btn-micro strade-sott-add-icon";
+      btnAddSott.dataset.action = "aggiungi-sottrazione-strato";
+      btnAddSott.dataset.tipoZona = tipo;
+      btnAddSott.dataset.stratoId = String(st.id);
+      btnAddSott.textContent = "−";
+      btnAddSott.title = "Aggiungi sottrazione a questo strato";
+      btnAddSott.setAttribute("aria-label", "Aggiungi sottrazione");
+      azioni.appendChild(btnAddSott);
+    }
     const btnRm = document.createElement("button");
     btnRm.type = "button";
     btnRm.className = "btn-action btn-delete vani-btn-micro";
@@ -3161,11 +3159,16 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
     btnRm.dataset.stratoId = String(st.id);
     btnRm.textContent = "✕";
     btnRm.title = "Rimuovi strato";
+    btnRm.setAttribute("aria-label", "Rimuovi strato");
     btnRm.disabled = (zona.strati || []).length <= 1;
-    row.appendChild(btnRm);
+    azioni.appendChild(btnRm);
+    row.appendChild(azioni);
 
     card.appendChild(row);
-    if (!nascondiSottrazioni) card.appendChild(renderSottrazioniStrato(tipo, st));
+    if (!nascondiSottrazioni) {
+      const sott = renderSottrazioniStrato(tipo, st);
+      if (sott) card.appendChild(sott);
+    }
     wrap.appendChild(card);
   }
 

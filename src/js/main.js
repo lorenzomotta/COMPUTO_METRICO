@@ -5921,6 +5921,7 @@ window.addEventListener("DOMContentLoaded", () => {
   function setVoceDialogModalitaSoloUnitaMisura(attiva) {
     editingVoceSoloUnitaMisura = attiva;
     voceDialogEl?.classList.toggle("voce-dialog--solo-unita", attiva);
+    voceDialogEl?.classList.toggle("voce-dialog--modifica", !attiva && editingVoceId !== null);
     if (voceDialogSoloUnitaHintEl) voceDialogSoloUnitaHintEl.hidden = !attiva;
     if (voceDialogSaveEl) voceDialogSaveEl.textContent = attiva ? "Salva associazione" : "Salva voce";
     if (voceDialogTitleEl) {
