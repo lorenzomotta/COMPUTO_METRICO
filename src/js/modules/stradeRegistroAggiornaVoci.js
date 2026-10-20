@@ -155,6 +155,154 @@ function trovaVocePerStratoStrada(voci, labelKey, schedaId, stradaTratto) {
   );
 }
 
+/** Strato n di una zona → nome voce breve attuale. Serve a riconoscere un cambio di nome. */
+function mappaNomeStratoCorrente(snapshot) {
+  const map = new Map();
+  for (const tipo of TIPI_ZONA_STRADA) {
+    if (isZonaReinterro(tipo)) continue;
+    const tipoOggetto = ZONA_TIPO_OGGETTO[tipo];
+    if (!tipoOggetto) continue;
+    for (const st of snapshot?.[tipo]?.strati || []) {
+      const vb = typeof st?.vocibreve === "string" ? st.vocibreve.trim() : "";
+      const n = typeof st?.n === "number" && Number.isFinite(st.n) ? st.n : null;
+      if (!vb || n == null) continue;
+      map.set(`${tipoOggetto}|${n}`, vb);
+    }
+  }
+  return map;
+}
+
+function voceSoloDiQuestaScheda(item, schedaId) {
+  const sidVoce = String(item?.stradeSchedaId || "").trim();
+  if (sidVoce && sidVoce !== schedaId) return false;
+  const mm = Array.isArray(item?.misurazioniManuali) ? item.misurazioniManuali : [];
+  let haQuesta = sidVoce === schedaId;
+  for (const row of mm) {
+    if (!isRigaSemiautoStrade(row)) continue;
+    const sid = String(row?.stradeSchedaId || "").trim();
+    if (sid && sid !== schedaId) return false;
+    if (sid === schedaId) haQuesta = true;
+  }
+  return haQuesta;
+}
+
+function voceConStessoNomeNellaScheda(voci, labelKey, schedaId, eccetto) {
+  return voci.some((item) => {
+    if (!item || item === eccetto) return false;
+    if (abbrevKey(item.voceAbbreviata) !== labelKey) return false;
+    return String(item.stradeSchedaId || "").trim() === schedaId;
+  });
+}
+
+function voceHaDatiUtente(voce) {
+  const prezzo = Number(voce?.prezzo);
+  const testo = String(voce?.voce || "").trim();
+  const ab = String(voce?.voceAbbreviata || "").trim();
+  const note = String(voce?.note || "").trim();
+  const cap = String(voce?.capitoloId || "").trim();
+  return (
+    (Number.isFinite(prezzo) && prezzo !== 0) ||
+    (testo !== "" && abbrevKey(testo) !== abbrevKey(ab)) ||
+    note !== "" ||
+    cap !== ""
+  );
+}
+function applicaNuovoNomeVoce(voce, nuovo) {
+  const vecchio = String(voce.voceAbbreviata || "").trim();
+  if (abbrevKey(voce.voce) === abbrevKey(vecchio)) voce.voce = nuovo;
+  voce.voceAbbreviata = nuovo;
+}
+
+function togliRigheDiScheda(item, schedaId) {
+  const mm = Array.isArray(item?.misurazioniManuali) ? item.misurazioniManuali : [];
+  const filtrati = mm.filter((row) => {
+    if (!isRigaSemiautoStrade(row)) return true;
+    return String(row?.stradeSchedaId || "").trim() !== schedaId;
+  });
+  if (filtrati.length === mm.length) return false;
+  item.misurazioniManuali = filtrati;
+  return true;
+}
+
+/**
+ * Se in Misurazione strade cambi il nome di uno strato, la voce già creata
+ * per quella strada viene rinominata. Non ne nasce una seconda.
+ */
+function sistemaNomiStratoCambiati(voci, snapshot, schedaId, abbrevs) {
+  if (!schedaId) return false;
+  const perStrato = mappaNomeStratoCorrente(snapshot);
+  const orfane = () =>
+    voci.filter((item) => {
+      if (!item || !voceSoloDiQuestaScheda(item, schedaId)) return false;
+      const ab = abbrevKey(item.voceAbbreviata);
+      return ab !== "" && !abbrevs.has(ab);
+    });
+
+  let changed = false;
+  const giaRinominate = new Set();
+
+  for (const voce of orfane()) {
+    const mm = Array.isArray(voce.misurazioniManuali) ? voce.misurazioniManuali : [];
+    const nomi = new Set();
+    for (const row of mm) {
+      if (!isRigaSemiautoStrade(row)) continue;
+      if (String(row?.stradeSchedaId || "").trim() !== schedaId) continue;
+      const n = typeof row?.stratoNumero === "number" ? row.stratoNumero : null;
+      const tipo = String(row?.tipoOggetto || "").trim().toUpperCase();
+      if (n == null || !tipo) continue;
+      const label = perStrato.get(`${tipo}|${n}`);
+      if (label) nomi.add(label);
+    }
+    if (nomi.size !== 1) continue;
+    const nuovo = [...nomi][0];
+    const keyNuovo = abbrevKey(nuovo);
+    if (!abbrevs.has(keyNuovo)) continue;
+    const gia = voci.find(
+      (item) =>
+        item &&
+        item !== voce &&
+        abbrevKey(item.voceAbbreviata) === keyNuovo &&
+        String(item.stradeSchedaId || "").trim() === schedaId,
+    );
+    if (gia && voceHaDatiUtente(gia)) continue;
+    if (gia) {
+      const idx = voci.indexOf(gia);
+      if (idx >= 0) voci.splice(idx, 1);
+    }
+    applicaNuovoNomeVoce(voce, nuovo);
+    giaRinominate.add(voce);
+    changed = true;
+  }
+
+  const ancoraOrfane = orfane().filter((voce) => !giaRinominate.has(voce));
+  const nomiSenzaVoce = [];
+  for (const [key, meta] of abbrevs) {
+    if (trovaVocePerStratoStrada(voci, key, schedaId, "")) continue;
+    nomiSenzaVoce.push(meta.label);
+  }
+  if (ancoraOrfane.length === 1 && nomiSenzaVoce.length === 1) {
+    const nuovo = nomiSenzaVoce[0];
+    if (!voceConStessoNomeNellaScheda(voci, abbrevKey(nuovo), schedaId, ancoraOrfane[0])) {
+      applicaNuovoNomeVoce(ancoraOrfane[0], nuovo);
+      giaRinominate.add(ancoraOrfane[0]);
+      changed = true;
+    }
+  }
+
+  for (let i = voci.length - 1; i >= 0; i -= 1) {
+    const voce = voci[i];
+    if (!voce || giaRinominate.has(voce) || !voceSoloDiQuestaScheda(voce, schedaId)) continue;
+    if (abbrevs.has(abbrevKey(voce.voceAbbreviata))) continue;
+    togliRigheDiScheda(voce, schedaId);
+    const mm = Array.isArray(voce.misurazioniManuali) ? voce.misurazioniManuali : [];
+    if (mm.length === 0 && !voceHaDatiUtente(voce)) {
+      voci.splice(i, 1);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function descrizioneSchedaRegistrata(schedaId) {
   const sid = String(schedaId || "").trim();
   if (!sid) return "";
@@ -798,6 +946,8 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
 
   const stradaTratto =
     typeof snapshot.descrizione === "string" ? snapshot.descrizione.trim() : "";
+
+  if (sistemaNomiStratoCambiati(voci, snapshot, schedaId, abbrevs)) changed = true;
 
   for (const [key, meta] of abbrevs) {
     let item = trovaVocePerStratoStrada(voci, key, schedaId, stradaTratto);
