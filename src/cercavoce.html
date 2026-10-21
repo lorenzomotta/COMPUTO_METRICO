@@ -496,6 +496,57 @@
             .filter(Boolean).length;
         }
 
+        function testoPrimoTag(el, tag) {
+          const n = el.getElementsByTagName(tag)[0];
+          return n ? String(n.textContent || "").replace(/\s+/g, " ").trim() : "";
+        }
+
+        /**
+         * Prezzario Regione Lombardia 2026: ogni voce è un dettaglio_voce
+         * (codice_voce, declaratoria_voce, prezzo_voce, unita_misura_voce).
+         * Ogni riga è una voce a sé: non ha le sottovoci del prezzario vecchio.
+         */
+        function loadVociRegioneLombardia(doc) {
+          const nodes = doc.getElementsByTagName("dettaglio_voce");
+          const list = [];
+          const mains = new Set();
+          const unitaMap = new Map();
+          const usati = new Map();
+          for (let i = 0; i < nodes.length; i++) {
+            const el = nodes[i];
+            const codice = String(el.getAttribute("codice_voce") || "").trim();
+            if (!codice) continue;
+            const declaratoria = testoPrimoTag(el, "declaratoria_voce");
+            const livelli = [];
+            for (let n = 1; n <= 8; n++) {
+              const nomeLivello = testoPrimoTag(el, "descr_liv_" + n);
+              if (nomeLivello) livelli.push(nomeLivello);
+            }
+            const tipologia = String(el.getAttribute("tipologia_risorsa") || "").trim();
+            const um = String(el.getAttribute("unita_misura_voce") || "").trim();
+            const prezzo = String(el.getAttribute("prezzo_voce") || "").trim();
+            const gia = usati.get(codice) || 0;
+            const prdId = gia > 0 ? codice + " [" + (gia + 1) + "]" : codice;
+            usati.set(codice, gia + 1);
+            if (um) unitaMap.set(um, um);
+            const breve = declaratoria || livelli.join(" · ") || "(senza descrizione)";
+            const extra = [livelli.join(" · "), tipologia].filter(Boolean).join(" · ");
+            const estesa = extra && extra !== breve ? breve + "\n" + extra : breve;
+            list.push({
+              prdId,
+              voce: true,
+              senzaSottovoci: true,
+              breve,
+              estesa,
+              unitaDiMisuraId: um || null,
+              prezzo,
+              searchBlob: [prdId, breve, estesa, um].join(" ").toLowerCase(),
+            });
+            mains.add(prdId);
+          }
+          return { list, mains, unitaMap };
+        }
+
         function loadProdotti(doc) {
           const list = [];
           const nodes = doc.getElementsByTagName("prodotto");
@@ -569,6 +620,7 @@
 
         function getDirectSubVoci(mainId) {
           const mainRow = byPrdId.get(mainId);
+          if (mainRow && mainRow.senzaSottovoci) return [];
           const baseMain = String(mainId || "").trim().toUpperCase();
           const mainGroupKey = String(getGroupKeyFromRow(mainRow || mainId) || "").toUpperCase();
           const re = new RegExp("^" + escapeRegExp(baseMain) + "\\.[^.]+$");
@@ -980,21 +1032,27 @@
         }
 
         async function applyXmlText(text, sourceLabel, isUploadedFile, sourcePath) {
+          setStatus("Analisi del file XML…", false);
+          await new Promise((resolve) => setTimeout(resolve, 0));
           const doc = parseXml(text);
-          const { list, mains } = loadProdotti(doc);
+          const lombardia = loadVociRegioneLombardia(doc);
+          const usareLombardia = lombardia.list.length > 0;
+          const parsed = usareLombardia ? lombardia : loadProdotti(doc);
           const dataset = {
-            unitaMap: loadUnita(doc),
-            prodotti: list,
-            voceMainIds: mains,
+            unitaMap: usareLombardia ? lombardia.unitaMap : loadUnita(doc),
+            prodotti: parsed.list,
+            voceMainIds: parsed.mains,
             sourcePath: isUploadedFile ? normalizeUploadedPath(sourcePath, sourceLabel || "file XML") : "",
           };
           if (isUploadedFile) {
             uploadedDataset = dataset;
             upsertUploadedOption(sourceLabel);
           }
+          const tipoFile = usareLombardia ? "Regione Lombardia" : "prezziario";
+          const cosa = usareLombardia ? " voci." : " righe prodotto.";
           applyDatasetToState(
             dataset,
-            "Caricato: " + (sourceLabel || "prezziario") + " — " + dataset.prodotti.length + " righe prodotto.",
+            "Caricato (" + tipoFile + "): " + (sourceLabel || "file") + " — " + dataset.prodotti.length + cosa,
           );
         }
 
@@ -1057,6 +1115,7 @@
           if (!f) return;
           const nome = (f.name || "").toLowerCase();
           const sourcePath = normalizeUploadedPath(fileEl.value, f.name);
+          setStatus("Lettura del file…", false);
           try {
             if (nome.endsWith(".xlsx") || nome.endsWith(".xls")) {
               if (typeof XLSX === "undefined") {
@@ -1196,7 +1255,8 @@
             .sort(function (a, b) {
               return a.prdId.localeCompare(b.prdId, "it");
             });
-          const subsFinal = subs.length ? subs : extractSubVociFromMainText(main);
+          const subsFinal =
+            main.senzaSottovoci ? [] : subs.length ? subs : extractSubVociFromMainText(main);
           subsList.innerHTML = "";
           if (subsFinal.length) {
             subsBlock.hidden = false;
