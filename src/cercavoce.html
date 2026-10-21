@@ -547,6 +547,45 @@
           return { list, mains, unitaMap };
         }
 
+        /**
+         * Elenco prezzi esportato da Access (struttura precedente):
+         * ogni riga ha Codice, Declaratoria e, se è una voce, U_M e Prezzo.
+         */
+        function loadVociElencoPrezziAccess(doc) {
+          const nodiCodice = doc.getElementsByTagName("Codice");
+          const list = [];
+          const mains = new Set();
+          const unitaMap = new Map();
+          const usati = new Map();
+          for (let i = 0; i < nodiCodice.length; i++) {
+            const nodo = nodiCodice[i];
+            const riga = nodo.parentElement;
+            if (!riga) continue;
+            const codice = String(nodo.textContent || "").replace(/\s+/g, " ").trim();
+            if (!codice) continue;
+            const declaratoria = testoPrimoTag(riga, "Declaratoria");
+            const um = testoPrimoTag(riga, "U_M");
+            const prezzo = testoPrimoTag(riga, "Prezzo");
+            const gia = usati.get(codice) || 0;
+            const prdId = gia > 0 ? codice + " [" + (gia + 1) + "]" : codice;
+            usati.set(codice, gia + 1);
+            if (um) unitaMap.set(um, um);
+            const breve = declaratoria || "(senza descrizione)";
+            list.push({
+              prdId,
+              voce: true,
+              senzaSottovoci: true,
+              breve,
+              estesa: breve,
+              unitaDiMisuraId: um || null,
+              prezzo,
+              searchBlob: [prdId, breve, um].join(" ").toLowerCase(),
+            });
+            mains.add(prdId);
+          }
+          return { list, mains, unitaMap };
+        }
+
         function loadProdotti(doc) {
           const list = [];
           const nodes = doc.getElementsByTagName("prodotto");
@@ -1036,10 +1075,12 @@
           await new Promise((resolve) => setTimeout(resolve, 0));
           const doc = parseXml(text);
           const lombardia = loadVociRegioneLombardia(doc);
+          const elenco = lombardia.list.length > 0 ? null : loadVociElencoPrezziAccess(doc);
           const usareLombardia = lombardia.list.length > 0;
-          const parsed = usareLombardia ? lombardia : loadProdotti(doc);
+          const usareElenco = !!(elenco && elenco.list.length > 0);
+          const parsed = usareLombardia ? lombardia : usareElenco ? elenco : loadProdotti(doc);
           const dataset = {
-            unitaMap: usareLombardia ? lombardia.unitaMap : loadUnita(doc),
+            unitaMap: usareLombardia || usareElenco ? parsed.unitaMap : loadUnita(doc),
             prodotti: parsed.list,
             voceMainIds: parsed.mains,
             sourcePath: isUploadedFile ? normalizeUploadedPath(sourcePath, sourceLabel || "file XML") : "",
@@ -1048,8 +1089,12 @@
             uploadedDataset = dataset;
             upsertUploadedOption(sourceLabel);
           }
-          const tipoFile = usareLombardia ? "Regione Lombardia" : "prezziario";
-          const cosa = usareLombardia ? " voci." : " righe prodotto.";
+          const tipoFile = usareLombardia
+            ? "Regione Lombardia"
+            : usareElenco
+              ? "elenco prezzi"
+              : "prezziario";
+          const cosa = usareLombardia || usareElenco ? " voci." : " righe prodotto.";
           applyDatasetToState(
             dataset,
             "Caricato (" + tipoFile + "): " + (sourceLabel || "file") + " — " + dataset.prodotti.length + cosa,
