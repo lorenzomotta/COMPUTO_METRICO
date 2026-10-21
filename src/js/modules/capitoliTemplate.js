@@ -3,10 +3,16 @@
  * File: AppData/.../templates/capitoli/*.json
  */
 
-import { createCapitoloId, normalizzaCapitolo, sortCapitoli } from "./archivioCapitoli.js";
+import {
+  createCapitoloId,
+  normalizzaCapitolo,
+  padreIdCapitolo,
+  sanitizzaCapitoli,
+  sortCapitoli,
+} from "./archivioCapitoli.js";
 
 const TEMPLATE_TIPO = "capitoli-template";
-const TEMPLATE_VERSION = 1;
+const TEMPLATE_VERSION = 2;
 
 function getInvoke() {
   return window.__TAURI__?.core?.invoke;
@@ -25,17 +31,28 @@ export function buildCapitoliTemplatePayload(capitoli, nomeTemplate) {
           id: typeof c?.id === "string" && c.id.trim() ? c.id : createCapitoloId(),
           sequenza: c?.sequenza,
           nome: c?.nome,
+          padreId: c?.padreId,
         }),
       )
       .filter(Boolean),
-  ).map((c) => ({ sequenza: c.sequenza, nome: c.nome }));
+  );
+  const indicePerId = new Map(list.map((c, index) => [c.id, index]));
+  const salvati = list.map((c) => {
+    const padre = padreIdCapitolo(c);
+    const indicePadre = indicePerId.has(padre) ? indicePerId.get(padre) : null;
+    return {
+      sequenza: c.sequenza,
+      nome: c.nome,
+      padre: indicePadre == null ? null : indicePadre,
+    };
+  });
 
   return {
     tipo: TEMPLATE_TIPO,
     version: TEMPLATE_VERSION,
     nome,
     savedAt: new Date().toISOString(),
-    capitoli: list,
+    capitoli: salvati,
   };
 }
 
@@ -60,21 +77,34 @@ export function parseCapitoliTemplatePayload(raw) {
       ? data.nome.trim()
       : "Template capitoli";
   const src = Array.isArray(data.capitoli) ? data.capitoli : [];
-  const capitoli = [];
-  const seenSeq = new Set();
-  for (const item of src) {
+  /** @type {(object | null)[]} */
+  const perIndice = [];
+  for (let i = 0; i < src.length; i += 1) {
+    const item = src[i];
     const seq = Math.floor(Number(item?.sequenza));
     const n = typeof item?.nome === "string" ? item.nome.trim() : "";
-    if (!Number.isFinite(seq) || seq < 1 || !n) continue;
-    if (seenSeq.has(seq)) continue;
-    seenSeq.add(seq);
-    capitoli.push({
+    if (!Number.isFinite(seq) || seq < 1 || !n) {
+      perIndice[i] = null;
+      continue;
+    }
+    perIndice[i] = {
       id: createCapitoloId(),
       sequenza: seq,
       nome: n,
-    });
+      padreId: "",
+    };
   }
-  return { nome, capitoli: sortCapitoli(capitoli) };
+  for (let i = 0; i < src.length; i += 1) {
+    const cap = perIndice[i];
+    if (!cap) continue;
+    const padreGrezzo = Number(src[i]?.padre);
+    if (!Number.isInteger(padreGrezzo)) continue;
+    const padre = perIndice[padreGrezzo];
+    if (!padre || padre === cap) continue;
+    cap.padreId = padre.id;
+  }
+  const capitoli = perIndice.filter(Boolean);
+  return { nome, capitoli: sortCapitoli(sanitizzaCapitoli(capitoli)) };
 }
 
 export async function listCapitoliTemplates() {

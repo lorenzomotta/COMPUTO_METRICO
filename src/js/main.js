@@ -42,10 +42,18 @@ import {
   CAPITOLO_SENZA_KEY,
   applicaSequenzaConScambio,
   buildVociGroupsByCapitolo,
+  catenaPadri,
   createCapitoloId,
+  filtraGruppiConContenuto,
   formatVoceNumeroCapitolo,
   getCapitoloById,
+  idCapitoloEDiscendenti,
   loadCapitoli,
+  normalizzaCapitolo,
+  numeroPercorsoCapitolo,
+  padreIdCapitolo,
+  profonditaCapitolo,
+  puoMettereSotto,
   saveCapitoli,
   sortCapitoli,
 } from "./modules/archivioCapitoli.js";
@@ -465,7 +473,14 @@ window.addEventListener("DOMContentLoaded", () => {
   let archivioPianiMisura = [];
   /** @type {{ id: string, sequenza: number, nome: string }[]} */
   let archivioCapitoli = [];
+  /** Riga dell’elenco di cui si sta cambiando il nome. */
   let editingCapitoloId = null;
+  /** Capitoli di cui l’elenco archivio mostra i livelli sotto. */
+  const capitoliLivelliAperti = new Set();
+  /** Padre della riga nuova, ancora senza nome, nell’elenco archivio. */
+  let bozzaLivelloPadreId = "";
+  /** Pulsante dell’archivio premuto mentre si sta scrivendo un nome. */
+  let bottoneArchivioPremuto = null;
 
   let pianoIdCounter = 1;
   let stratoMurIdCounter = 1;
@@ -1564,7 +1579,8 @@ window.addEventListener("DOMContentLoaded", () => {
     for (const c of sortCapitoli(archivioCapitoli)) {
       const opt = document.createElement("option");
       opt.value = c.id;
-      opt.textContent = `${c.sequenza} · ${c.nome}`;
+      const spazi = "\u00A0\u00A0".repeat(profonditaCapitolo(archivioCapitoli, c.id));
+      opt.textContent = `${spazi}${numeroPercorsoCapitolo(archivioCapitoli, c.id)} · ${c.nome}`;
       voceCapitoloEl.appendChild(opt);
     }
     voceCapitoloEl.value = current && getCapitoloById(archivioCapitoli, current) ? current : "";
@@ -1576,46 +1592,113 @@ window.addEventListener("DOMContentLoaded", () => {
     return voci.filter((v) => String(v?.capitoloId ?? "").trim() === sid).length;
   }
 
+  /** Voci di questo capitolo o livello, più quelle dei livelli sotto. */
+  function countVociNelRamoCapitolo(capitoloId) {
+    const ids = new Set(idCapitoloEDiscendenti(archivioCapitoli, capitoloId));
+    if (!ids.size) return 0;
+    return voci.filter((v) => ids.has(String(v?.capitoloId ?? "").trim())).length;
+  }
+
   /** @type {"load" | "delete" | null} */
   let capitoliTemplatePickerMode = null;
 
   function openArchivioCapitoliDialog() {
     capitoliTemplatePickerMode = null;
-    const rows =
-      archivioCapitoli.length === 0
-        ? `<tr><td colspan="4" class="empty-cell">Nessun capitolo. Aggiungine uno con sequenza e nome.</td></tr>`
-        : sortCapitoli(archivioCapitoli)
-            .map((c) => {
-              const uses = countVociPerCapitolo(c.id);
-              return `<tr>
-              <td>${c.sequenza}</td>
-              <td>${escapeHtml(c.nome)}</td>
+    if (archivioCapitoli.length === 0) {
+      archivioCapitoli = [
+        { id: createCapitoloId(), sequenza: 1, nome: "NUOVO", padreId: "" },
+      ];
+      bozzaLivelloPadreId = "";
+      editingCapitoloId = null;
+      saveArchivioCapitoliToStorage();
+      popolaSelectCapitoliVoce(voceCapitoloEl?.value || "");
+      renderVoci();
+    }
+    const ordinati = sortCapitoli(archivioCapitoli);
+    if (bozzaLivelloPadreId && !getCapitoloById(ordinati, bozzaLivelloPadreId)) {
+      bozzaLivelloPadreId = "";
+    }
+    if (bozzaLivelloPadreId) {
+      capitoliLivelliAperti.add(bozzaLivelloPadreId);
+      for (const id of catenaPadri(ordinati, bozzaLivelloPadreId)) capitoliLivelliAperti.add(id);
+    }
+    const visibili = ordinati.filter((c) =>
+      catenaPadri(ordinati, c.id).every((id) => capitoliLivelliAperti.has(id)),
+    );
+    const htmlRighe = visibili.map((c) => {
+      const uses = countVociNelRamoCapitolo(c.id);
+      const prof = profonditaCapitolo(ordinati, c.id);
+      const numero = numeroPercorsoCapitolo(ordinati, c.id);
+      const puoLivello = prof < 2;
+      const aperto = capitoliLivelliAperti.has(c.id);
+      const haFigli = ordinati.some((altro) => padreIdCapitolo(altro) === c.id);
+      const toggle = puoLivello
+        ? `<button type="button" class="btn-action btn-secondary capitoli-apri-livelli" data-action="toggle-livelli-capitolo" data-id="${escapeHtml(c.id)}" title="${haFigli ? "Apri o chiudi i livelli sotto" : "I livelli sotto si vedono qui, quando li crei"}">${aperto && haFigli ? "▼" : "▶"}</button>`
+        : `<span class="capitoli-apri-livelli-vuoto"></span>`;
+      const nomeHtml =
+        c.id === editingCapitoloId
+          ? `<input class="capitoli-nome-inline" data-id="${escapeHtml(c.id)}" type="text" value="${escapeHtml(c.nome)}" aria-label="Nome" />`
+          : `<span class="capitoli-nome-testo">${escapeHtml(c.nome)}</span>`;
+      const titoloPiu = prof === 0 ? "Aggiungi il 1° livello sotto" : "Aggiungi il 2° livello sotto";
+      return `<tr class="capitoli-archivio-riga livello-${prof}">
+              <td><input class="capitoli-seq-inline" data-id="${escapeHtml(c.id)}" type="number" min="1" step="1" value="${c.sequenza}" aria-label="Sequenza di ${escapeHtml(c.nome)}" /></td>
+              <td class="capitoli-nome-cella">
+                ${toggle}
+                <span class="capitoli-numero">${escapeHtml(numero)}</span>
+                ${nomeHtml}
+              </td>
               <td>${uses}</td>
               <td class="actions-cell">
-                <button type="button" class="btn-action btn-edit" data-action="edit-capitolo" data-id="${escapeHtml(c.id)}" title="Modifica">✎</button>
+                ${
+                  puoLivello
+                    ? `<button type="button" class="btn-action btn-secondary" data-action="add-livello-capitolo" data-id="${escapeHtml(c.id)}" title="${titoloPiu}">+</button>`
+                    : ""
+                }
+                <button type="button" class="btn-action btn-edit" data-action="edit-capitolo" data-id="${escapeHtml(c.id)}" title="Modifica il nome" aria-label="Modifica il nome di ${escapeHtml(c.nome)}">✎</button>
                 <button type="button" class="btn-action btn-delete" data-action="delete-capitolo" data-id="${escapeHtml(c.id)}" title="${uses > 0 ? "In uso: le voci passeranno a Senza capitolo" : "Elimina"}">🗑</button>
               </td>
             </tr>`;
-            })
-            .join("");
-    const editing = editingCapitoloId ? getCapitoloById(archivioCapitoli, editingCapitoloId) : null;
-    const nextSeq =
-      archivioCapitoli.reduce((max, c) => Math.max(max, Number(c.sequenza) || 0), 0) + 1;
+    });
+    if (bozzaLivelloPadreId) {
+      const at = visibili.findIndex((c) => c.id === bozzaLivelloPadreId);
+      if (at >= 0) {
+        let insertAt = at + 1;
+        while (
+          insertAt < visibili.length &&
+          catenaPadri(ordinati, visibili[insertAt].id).includes(bozzaLivelloPadreId)
+        ) {
+          insertAt += 1;
+        }
+        const padre = visibili[at];
+        const prof = profonditaCapitolo(ordinati, padre.id) + 1;
+        const seq =
+          ordinati
+            .filter((c) => padreIdCapitolo(c) === padre.id)
+            .reduce((max, c) => Math.max(max, Number(c.sequenza) || 0), 0) + 1;
+        const numero = `${numeroPercorsoCapitolo(ordinati, padre.id)}.${seq}`;
+        htmlRighe.splice(
+          insertAt,
+          0,
+          `<tr class="capitoli-archivio-riga livello-${prof} capitoli-riga-bozza">
+              <td>${seq}</td>
+              <td class="capitoli-nome-cella">
+                <span class="capitoli-apri-livelli-vuoto"></span>
+                <span class="capitoli-numero">${escapeHtml(numero)}</span>
+                <input id="capitolo-bozza-nome" class="capitoli-nome-inline" type="text" value="" placeholder="Scrivi il nome" aria-label="Nome del livello" />
+              </td>
+              <td>0</td>
+              <td class="actions-cell"></td>
+            </tr>`,
+        );
+      }
+    }
+    const rows =
+      htmlRighe.length > 0
+        ? htmlRighe.join("")
+        : `<tr><td colspan="4" class="empty-cell">Nessun capitolo.</td></tr>`;
     capitoliArchivioDialogEl.innerHTML = `
       <div class="ifc-riepilogo-dialog-header"><h3>Archivio CAPITOLI</h3></div>
-      <p class="bim-riepilogo-note">La <strong>sequenza</strong> ordina i capitoli in elenco e in stampa (voci 1.1, 1.2, 2.1…). Se in modifica assegni un numero già usato, i due capitoli si scambiano (es. 2→1 e l’ex 1 diventa 2). Le voci senza capitolo restano in fondo.</p>
-      <div class="capitoli-form-row">
-        <div class="field capitoli-field-seq">
-          <label for="archivio-capitolo-seq">Sequenza</label>
-          <input id="archivio-capitolo-seq" type="number" min="1" step="1" value="${editing ? editing.sequenza : nextSeq}" />
-        </div>
-        <div class="field capitoli-field-nome">
-          <label for="archivio-capitolo-nome">Nome capitolo</label>
-          <input id="archivio-capitolo-nome" type="text" placeholder="Es: SCAVI E MOVIMENTI TERRA" value="${editing ? escapeHtml(editing.nome) : ""}" autocomplete="off" />
-        </div>
-        <button type="button" class="btn-action btn-secondary" data-action="save-capitolo">${editing ? "Salva modifica" : "Aggiungi"}</button>
-        ${editing ? `<button type="button" class="btn-action btn-delete" data-action="cancel-edit-capitolo">Annulla</button>` : ""}
-      </div>
+      <p class="bim-riepilogo-note">Il <strong>+</strong> accanto a un capitolo aggiunge il 1° livello sotto, e ti fa scrivere il nome. Il <strong>+</strong> sul 1° livello aggiunge il 2°. La matita <strong>✎</strong> serve per cambiare un nome già scritto. Se l’elenco è vuoto, parte un capitolo chiamato <strong>NUOVO</strong>.</p>
       <div class="capitoli-template-bar">
         <button type="button" class="btn-action btn-secondary" data-action="salva-template-capitoli" title="Salva solo i capitoli (non il computo) come template su PC">Salva come template</button>
         <button type="button" class="btn-action btn-secondary" data-action="carica-template-capitoli" title="Carica un template di capitoli salvato">Carica da template</button>
@@ -1641,8 +1724,91 @@ window.addEventListener("DOMContentLoaded", () => {
       </div>
     `;
     capitoliArchivioDialogEl.showModal();
+    capitoliArchivioDialogEl.querySelectorAll(".capitoli-nome-inline").forEach((input) => {
+      if (!(input instanceof HTMLInputElement)) return;
+      const fine = (riapri) => {
+        const annulla = input.dataset.annulla === "1";
+        if (input.id === "capitolo-bozza-nome") {
+          const nome = annulla ? "" : input.value.trim();
+          const padre = bozzaLivelloPadreId;
+          bozzaLivelloPadreId = "";
+          if (nome && padre && puoMettereSotto(archivioCapitoli, "", padre)) {
+            const sequenza =
+              archivioCapitoli
+                .filter((c) => padreIdCapitolo(c) === padre)
+                .reduce((max, c) => Math.max(max, Number(c.sequenza) || 0), 0) + 1;
+            archivioCapitoli.push({
+              id: createCapitoloId(),
+              sequenza,
+              nome,
+              padreId: padre,
+            });
+            capitoliLivelliAperti.add(padre);
+            saveArchivioCapitoliToStorage();
+            popolaSelectCapitoliVoce(voceCapitoloEl?.value || "");
+            renderVoci();
+          }
+        } else {
+          const id = String(input.dataset.id || "");
+          const attuale = getCapitoloById(archivioCapitoli, id);
+          if (editingCapitoloId === id) editingCapitoloId = null;
+          const nome = annulla ? "" : input.value.trim();
+          if (attuale && nome && nome !== attuale.nome) {
+            archivioCapitoli = archivioCapitoli.map((c) => (c.id === id ? { ...c, nome } : c));
+            saveArchivioCapitoliToStorage();
+            popolaSelectCapitoliVoce(voceCapitoloEl?.value || "");
+            renderVoci();
+          }
+        }
+        if (riapri) openArchivioCapitoliDialog();
+      };
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          input.blur();
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          input.dataset.annulla = "1";
+          input.blur();
+        }
+      });
+      input.addEventListener("blur", () => {
+        const premuto = bottoneArchivioPremuto;
+        bottoneArchivioPremuto = null;
+        fine(!premuto);
+      });
+    });
+    capitoliArchivioDialogEl.querySelectorAll(".capitoli-seq-inline").forEach((input) => {
+      if (!(input instanceof HTMLInputElement)) return;
+      input.addEventListener("change", () => {
+        const id = String(input.dataset.id || "");
+        const sequenza = Number.parseInt(input.value, 10);
+        const attuale = getCapitoloById(archivioCapitoli, id);
+        if (!attuale || !Number.isInteger(sequenza) || sequenza < 1 || sequenza === attuale.sequenza) {
+          if (attuale) input.value = String(attuale.sequenza);
+          return;
+        }
+        archivioCapitoli = applicaSequenzaConScambio(archivioCapitoli, id, sequenza);
+        saveArchivioCapitoliToStorage();
+        popolaSelectCapitoliVoce(voceCapitoloEl?.value || "");
+        renderVoci();
+        openArchivioCapitoliDialog();
+      });
+    });
     window.requestAnimationFrame(() => {
-      capitoliArchivioDialogEl.querySelector("#archivio-capitolo-nome")?.focus();
+      const acceso =
+        capitoliArchivioDialogEl.querySelector("#capitolo-bozza-nome") ||
+        (editingCapitoloId
+          ? capitoliArchivioDialogEl.querySelector(
+              `.capitoli-nome-inline[data-id="${CSS.escape(editingCapitoloId)}"]`,
+            )
+          : null);
+      if (acceso instanceof HTMLInputElement) {
+        acceso.focus();
+        if (editingCapitoloId) acceso.select();
+      }
     });
   }
 
@@ -5984,8 +6150,13 @@ window.addEventListener("DOMContentLoaded", () => {
     setVoceDialogModalitaSoloUnitaMisura(false);
   }
 
-  function nextCapitoloSequenzaDisponibile() {
-    return archivioCapitoli.reduce((max, c) => Math.max(max, Number(c.sequenza) || 0), 0) + 1;
+  function nextCapitoloSequenzaDisponibile(padreId = "") {
+    const pid = String(padreId || "").trim();
+    return (
+      archivioCapitoli
+        .filter((c) => padreIdCapitolo(c) === pid)
+        .reduce((max, c) => Math.max(max, Number(c.sequenza) || 0), 0) + 1
+    );
   }
 
   function openVoceCapitoloNuovoDialog() {
@@ -6044,7 +6215,9 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       return true;
     }
-    const seqOccupata = archivioCapitoli.some((c) => c.sequenza === sequenza);
+    const seqOccupata = archivioCapitoli.some(
+      (c) => padreIdCapitolo(c) === "" && c.sequenza === sequenza,
+    );
     if (seqOccupata) {
       window.alert(
         `La sequenza ${sequenza} è già usata. Scegli un altro numero (suggerito: ${nextCapitoloSequenzaDisponibile()}).`,
@@ -6057,6 +6230,7 @@ window.addEventListener("DOMContentLoaded", () => {
       id: nuovoId,
       sequenza,
       nome,
+      padreId: "",
     });
     saveArchivioCapitoliToStorage();
     popolaSelectCapitoliVoce(nuovoId);
@@ -6213,12 +6387,14 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const groupsRender = buildVociGroupsByCapitolo(vociDaRenderizzare, archivioCapitoli).filter(
-      (g) => g.voci.length > 0,
+    const groupsRender = filtraGruppiConContenuto(
+      buildVociGroupsByCapitolo(vociDaRenderizzare, archivioCapitoli),
     );
     /** @type {{ kind: string, group: any, item?: any, indexInGroup?: number, collapsed?: boolean }[]} */
     const flatRender = [];
     for (const g of groupsRender) {
+      const nascostoDaPadre = (g.antenati || []).some((id) => capitoliCollapsed.has(id));
+      if (nascostoDaPadre) continue;
       const collapsed = capitoliCollapsed.has(g.key);
       flatRender.push({ kind: "cap", group: g, collapsed });
       if (!collapsed) {
@@ -6231,21 +6407,37 @@ window.addEventListener("DOMContentLoaded", () => {
     flatRender.forEach((entry) => {
       if (entry.kind === "cap") {
         const g = entry.group;
-        const importoCap = g.voci.reduce((acc, v) => acc + calcolaImportoVoceEuro(v), 0);
         const trCap = document.createElement("tr");
-        trCap.className = "voci-row-capitolo";
+        trCap.className = `voci-row-capitolo voci-row-capitolo-livello-${Number(g.profondita) || 0}`;
         trCap.dataset.action = "toggle-capitolo";
         trCap.dataset.capitoloKey = g.key;
         const tdCap = document.createElement("td");
         tdCap.colSpan = 9;
         const toggle = entry.collapsed ? "▶" : "▼";
-        const titolo =
-          g.capitolo != null
-            ? `${g.capitolo.sequenza} · ${g.capitolo.nome}`
-            : "Senza capitolo";
-        tdCap.innerHTML = `<span class="voci-capitolo-toggle">${toggle}</span>${escapeHtml(titolo)}<span class="voci-capitolo-totale">${formatEuro2(importoCap)}</span>`;
+        const titoloTesto =
+          g.capitolo != null ? `${g.sequenzaLabel} · ${g.capitolo.nome}` : "Senza capitolo";
+        const importoCap = groupsRender
+          .filter((altro) => altro.key === g.key || (altro.antenati || []).includes(g.key))
+          .reduce(
+            (acc, altro) => acc + altro.voci.reduce((sum, v) => sum + calcolaImportoVoceEuro(v), 0),
+            0,
+          );
+        const bar = document.createElement("div");
+        bar.className = "voci-capitolo-bar";
+        const toggleEl = document.createElement("span");
+        toggleEl.className = "voci-capitolo-toggle";
+        toggleEl.textContent = toggle;
+        const nomeEl = document.createElement("span");
+        nomeEl.className = "voci-capitolo-nome";
+        nomeEl.textContent = titoloTesto;
+        bar.append(toggleEl, nomeEl);
+        const totaleEl = document.createElement("span");
+        totaleEl.className = "voci-capitolo-totale";
+        totaleEl.textContent = formatEuro2(importoCap);
+        bar.appendChild(totaleEl);
+        tdCap.appendChild(bar);
         trCap.appendChild(tdCap);
-        trCap.title = entry.collapsed ? "Clic per aprire le voci" : "Clic per chiudere le voci";
+        trCap.title = entry.collapsed ? "Clic per aprire" : "Clic per chiudere";
         vociBodyEl.appendChild(trCap);
         return;
       }
@@ -6256,7 +6448,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const daApertureAccessori = voceDerivataDaApertureAccessori(item);
       const bloccataInVoci = voceBloccataInVoci(item);
       const row = document.createElement("tr");
-      row.className = "voci-row-principale";
+      row.className = `voci-row-principale voci-row-sotto-livello-${Number(entry.group?.profondita) || 0}`;
       row.dataset.idVoce = String(item.idVoce);
       row.title = "Doppio clic per aprire in fullscreen";
       row.appendChild(createCell(String(item.idVoce)));
@@ -7608,6 +7800,23 @@ window.addEventListener("DOMContentLoaded", () => {
       doc.setFontSize(size);
       doc.text(normalizePdfText(text), x, yTop);
     };
+    /** Codice voce in prima colonna: più basso e stretto, così non entra nella descrizione. */
+    const codiceVoceFontSize = 7;
+    const codiceVoceScala = 0.75;
+    const codiceVoceMaxW = Math.max(4, leftTextX - marginLeft - 0.7);
+    const drawCodiceVoce = (x, yTop, text) => {
+      const clean = normalizePdfText(text);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(codiceVoceFontSize);
+      const naturale = doc.getTextWidth(clean);
+      let scala = codiceVoceScala;
+      if (naturale > 0 && naturale * scala > codiceVoceMaxW) {
+        scala = codiceVoceMaxW / naturale;
+      }
+      doc.saveGraphicsState();
+      doc.text(clean, x, yTop, { horizontalScale: scala });
+      doc.restoreGraphicsState();
+    };
     const drawTextRight = (x, yTop, text, bold = false, size = detailFontSize) => {
       doc.setFont("helvetica", bold ? "bold" : "normal");
       doc.setFontSize(size);
@@ -7775,8 +7984,8 @@ window.addEventListener("DOMContentLoaded", () => {
       return `${line};`;
     };
 
-    const voicesGroups = buildVociGroupsByCapitolo(voci, archivioCapitoli).filter(
-      (g) => g.voci.length > 0,
+    const voicesGroups = filtraGruppiConContenuto(
+      buildVociGroupsByCapitolo(voci, archivioCapitoli),
     );
     let totaleComplessivoComputo = 0;
     drawPageHeader();
@@ -7786,10 +7995,11 @@ window.addEventListener("DOMContentLoaded", () => {
       voicesGroups.forEach((group) => {
         const capTitle =
           group.capitolo != null
-            ? `${group.capitolo.sequenza}  ${group.capitolo.nome}`
+            ? `${group.sequenzaLabel}  ${group.capitolo.nome}`
             : "Senza capitolo";
+        const xCap = marginLeft + (Number(group.profondita) || 0) * 8;
         ensureSpace(voceLineH + 2);
-        drawText(marginLeft, y + 4, capTitle, true, voceFontSize + 0.5);
+        drawText(xCap, y + 4, capTitle, true, voceFontSize + 0.5);
         y += voceLineH + 1;
 
         let totaleCapitolo = 0;
@@ -7810,12 +8020,10 @@ window.addEventListener("DOMContentLoaded", () => {
         });
 
         ensureSpace(voceLineH);
-        drawText(
+        drawCodiceVoce(
           marginLeft,
           y + 4,
           `${formatVoceNumeroCapitolo(group, indexInGroup)})`,
-          false,
-          voceFontSize,
         );
         drawJustifiedParagraph(item.voce || "-", leftTextX, y + 4, voceColW, voceFontSize, voceLineH);
         y += gapAfterVoce;
@@ -8074,11 +8282,11 @@ window.addEventListener("DOMContentLoaded", () => {
         y += detailLineH + 4.5;
         });
 
-        if (showPrices) {
+        if (showPrices && group.voci.length > 0) {
           ensureSpace(detailLineH + 5);
           const labelCap =
             group.capitolo != null
-              ? `TOTALE CAPITOLO ${group.capitolo.sequenza}`
+              ? `TOTALE ${group.sequenzaLabel}`
               : "TOTALE SENZA CAPITOLO";
           drawText(leftTextX, y + 4.2, labelCap, true, totalFontSize);
           drawTextRight(
@@ -10021,22 +10229,17 @@ window.addEventListener("DOMContentLoaded", () => {
       const seen = new Set();
       archivioCapitoli = [];
       for (const item of payload.archivioCapitoli) {
-        const n =
-          item && typeof item === "object"
-            ? {
-                id: typeof item.id === "string" ? item.id.trim() : createCapitoloId(),
-                sequenza: Number(item.sequenza),
-                nome: typeof item.nome === "string" ? item.nome.trim() : "",
-              }
-            : null;
-        if (!n || !n.id || !n.nome || !Number.isFinite(n.sequenza) || n.sequenza < 1) continue;
+        if (!item || typeof item !== "object") continue;
+        const n = normalizzaCapitolo({
+          id: typeof item.id === "string" ? item.id.trim() : createCapitoloId(),
+          sequenza: Number(item.sequenza),
+          nome: typeof item.nome === "string" ? item.nome.trim() : "",
+          padreId: typeof item.padreId === "string" ? item.padreId : "",
+        });
+        if (!n) continue;
         if (seen.has(n.id)) continue;
         seen.add(n.id);
-        archivioCapitoli.push({
-          id: n.id,
-          sequenza: Math.floor(n.sequenza),
-          nome: n.nome,
-        });
+        archivioCapitoli.push(n);
       }
       archivioCapitoli = sortCapitoli(archivioCapitoli);
     } else {
@@ -11665,7 +11868,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   vociBodyEl.addEventListener("click", (event) => {
     const capitoloRow = event.target.closest("tr.voci-row-capitolo[data-capitolo-key]");
-    if (capitoloRow && !event.target.closest("button")) {
+    if (capitoloRow && !event.target.closest("button, input")) {
       const key = String(capitoloRow.dataset.capitoloKey || "");
       if (!key) return;
       if (capitoliCollapsed.has(key)) capitoliCollapsed.delete(key);
@@ -11984,7 +12187,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   btnChiudiCapitoliVociEl?.addEventListener("click", () => {
     for (const g of buildVociGroupsByCapitolo(voci, archivioCapitoli)) {
-      if (g.voci.length > 0) capitoliCollapsed.add(g.key);
+      if (g.key !== CAPITOLO_SENZA_KEY) capitoliCollapsed.add(g.key);
     }
     renderVoci();
   });
@@ -12770,12 +12973,19 @@ window.addEventListener("DOMContentLoaded", () => {
 
   capitoliArchivioDialogEl.id = "capitoli-archivio-dialog";
   capitoliArchivioDialogEl.className = "ifc-riepilogo-dialog";
+  capitoliArchivioDialogEl.addEventListener("mousedown", (event) => {
+    const target = event.target;
+    bottoneArchivioPremuto =
+      target instanceof Element ? target.closest("button[data-action]") : null;
+  });
   capitoliArchivioDialogEl.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
+    bottoneArchivioPremuto = null;
     if (!button) return;
     const action = button.dataset.action;
     if (action === "close-archivio-capitoli") {
       editingCapitoloId = null;
+      bozzaLivelloPadreId = "";
       capitoliArchivioDialogEl.close();
       return;
     }
@@ -12784,68 +12994,61 @@ window.addEventListener("DOMContentLoaded", () => {
       openArchivioCapitoliDialog();
       return;
     }
-    if (action === "edit-capitolo") {
-      editingCapitoloId = String(button.dataset.id || "");
+    if (action === "toggle-livelli-capitolo") {
+      const id = String(button.dataset.id || "");
+      if (!id) return;
+      if (capitoliLivelliAperti.has(id)) capitoliLivelliAperti.delete(id);
+      else capitoliLivelliAperti.add(id);
       openArchivioCapitoliDialog();
       return;
     }
-    if (action === "save-capitolo") {
-      const seqEl = capitoliArchivioDialogEl.querySelector("#archivio-capitolo-seq");
-      const nomeEl = capitoliArchivioDialogEl.querySelector("#archivio-capitolo-nome");
-      const sequenza = Number.parseInt(seqEl instanceof HTMLInputElement ? seqEl.value : "", 10);
-      const nome = nomeEl instanceof HTMLInputElement ? nomeEl.value.trim() : "";
-      if (!Number.isInteger(sequenza) || sequenza < 1) {
-        window.alert("Inserisci una sequenza valida (numero intero ≥ 1).");
+    if (action === "add-livello-capitolo") {
+      const id = String(button.dataset.id || "");
+      if (!puoMettereSotto(archivioCapitoli, "", id)) {
+        window.alert("Sotto un capitolo ci sono al massimo due livelli.");
         return;
       }
-      if (!nome) {
-        window.alert("Inserisci il nome del capitolo.");
-        return;
-      }
-      if (editingCapitoloId) {
-        archivioCapitoli = applicaSequenzaConScambio(
-          archivioCapitoli,
-          editingCapitoloId,
-          sequenza,
-        ).map((c) => (c.id === editingCapitoloId ? { ...c, nome } : c));
-        editingCapitoloId = null;
-      } else {
-        const seqOccupata = archivioCapitoli.some((c) => c.sequenza === sequenza);
-        if (seqOccupata) {
-          window.alert(
-            `La sequenza ${sequenza} è già usata. Scegli un altro numero, oppure modifica quel capitolo e cambia tu la sequenza (così i due si scambiano).`,
-          );
-          return;
-        }
-        archivioCapitoli.push({
-          id: createCapitoloId(),
-          sequenza,
-          nome,
-        });
-      }
-      saveArchivioCapitoliToStorage();
-      popolaSelectCapitoliVoce(voceCapitoloEl?.value || "");
+      editingCapitoloId = null;
+      bozzaLivelloPadreId = id;
+      capitoliLivelliAperti.add(id);
       openArchivioCapitoliDialog();
-      renderVoci();
+      return;
+    }
+    if (action === "edit-capitolo") {
+      editingCapitoloId = String(button.dataset.id || "");
+      bozzaLivelloPadreId = "";
+      openArchivioCapitoliDialog();
       return;
     }
     if (action === "delete-capitolo") {
       const id = String(button.dataset.id || "");
       if (!id) return;
-      const uses = countVociPerCapitolo(id);
-      if (uses > 0) {
+      const daTogliere = idCapitoloEDiscendenti(archivioCapitoli, id);
+      const haLivelli = daTogliere.length > 1;
+      const uses = voci.filter((v) => daTogliere.includes(String(v?.capitoloId || "").trim())).length;
+      if (uses > 0 || haLivelli) {
         const ok = window.confirm(
-          `Il capitolo è usato da ${uses} voc${uses === 1 ? "e" : "i"}. Eliminandolo, quelle voci passeranno a «Senza capitolo». Continuare?`,
+          haLivelli
+            ? "Questo capitolo ha dei livelli sotto. Se lo elimini, elimino anche i livelli. Le voci collegate passano a «Senza capitolo». Continuare?"
+            : `Il capitolo è usato da ${uses} voc${uses === 1 ? "e" : "i"}. Eliminandolo, quelle voci passeranno a «Senza capitolo». Continuare?`,
         );
         if (!ok) return;
-        voci = voci.map((v) =>
-          String(v.capitoloId || "").trim() === id ? { ...v, capitoloId: "" } : v,
-        );
-        saveVoci();
+        if (uses > 0) {
+          const ids = new Set(daTogliere);
+          voci = voci.map((v) =>
+            ids.has(String(v.capitoloId || "").trim()) ? { ...v, capitoloId: "" } : v,
+          );
+          saveVoci();
+        }
       }
-      archivioCapitoli = archivioCapitoli.filter((c) => c.id !== id);
-      if (editingCapitoloId === id) editingCapitoloId = null;
-      capitoliCollapsed.delete(id);
+      const idsTolti = new Set(daTogliere);
+      archivioCapitoli = archivioCapitoli.filter((c) => !idsTolti.has(c.id));
+      if (idsTolti.has(editingCapitoloId)) editingCapitoloId = null;
+      if (idsTolti.has(bozzaLivelloPadreId)) bozzaLivelloPadreId = "";
+      for (const cid of daTogliere) {
+        capitoliCollapsed.delete(cid);
+        capitoliLivelliAperti.delete(cid);
+      }
       saveArchivioCapitoliToStorage();
       popolaSelectCapitoliVoce("");
       openArchivioCapitoliDialog();
