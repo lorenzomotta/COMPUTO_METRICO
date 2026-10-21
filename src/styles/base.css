@@ -317,8 +317,33 @@ body {
 }
 
 .voce-form-riga-meta .voce-field-um {
-  flex: 0.8 1 7.2rem;
-  max-width: 11rem;
+  flex: 0.9 1 9rem;
+  max-width: 13rem;
+}
+
+.voce-unita-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.voce-unita-row #voce-unita-misura {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  min-height: 30px;
+  padding: 5px 8px;
+  font-size: 0.84rem;
+}
+
+.voce-unita-row #voce-unita-add {
+  flex: 0 0 auto;
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .voce-form-riga-meta .voce-field-rif {
@@ -326,7 +351,6 @@ body {
 }
 
 .voce-form-riga-meta #voce-abbreviata,
-.voce-form-riga-meta #voce-unita-misura,
 .voce-form-riga-meta #voce-riferimento {
   width: 100%;
   min-height: 30px;

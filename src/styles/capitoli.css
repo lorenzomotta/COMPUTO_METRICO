@@ -3,6 +3,19 @@
 #capitoli-archivio-dialog {
   max-width: min(720px, 96vw);
   width: 100%;
+  max-height: min(58vh, 500px);
+  overflow: hidden;
+}
+
+#capitoli-archivio-dialog .ifc-riepilogo-table-host {
+  max-height: 168px;
+  overflow: auto;
+}
+
+#capitoli-archivio-dialog .capitoli-archivio-table thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
 }
 
 #capitoli-archivio-dialog .capitoli-form-row {

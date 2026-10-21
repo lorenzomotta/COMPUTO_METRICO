@@ -253,6 +253,15 @@
   background: rgba(124, 206, 138, 0.38);
 }
 
+.table-voci td.voci-cell-from-strade {
+  background: rgba(186, 132, 74, 0.34);
+  font-weight: 600;
+}
+
+.table-voci tbody tr:hover td.voci-cell-from-strade {
+  background: rgba(186, 132, 74, 0.48);
+}
+
 .table-voci .actions-cell .btn-action {
   width: 25px;
   height: 23px;

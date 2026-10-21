@@ -7,6 +7,7 @@
  * - sede stradale: aree automatiche Ingombro − (Marciapiedi + Aiuole + Parcheggi + Manufatti)
  *   per stesso riferimento (niente sottrazioni per-strato; Cordoli esclusi);
  * - reinterro: aree automatiche Ingombro − Volume occupato, per stesso riferimento;
+ *   la voce riceve anche Strada/Tratto, come le altre sezioni;
  * - manufatti: una voce per tipo; quantità = N° pezzi (la formula toglie mq dalla Sede);
  * - fogna, allacci fogna, luci, gas, acqua, telefonica, cordoli e segnaletica:
  *   spunta USA accesa → in VOCI entra la Quantità; spenta → entra formula × Quantità;
@@ -147,9 +148,8 @@ function trovaVocePerStratoStrada(voci, labelKey, schedaId, stradaTratto) {
 
   return (
     stesse.find((item) => {
-      const sid = String(item.stradeSchedaId || "").trim();
       const st = String(item.stradaTratto || "").trim();
-      if (sid || st) return false;
+      if (st) return false;
       return !schedaDiversaNellaVoce(item, schedaId);
     }) || null
   );
@@ -960,6 +960,7 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
         "STRADA_GAS",
         "STRADA_ACQUA",
         "STRADA_TELEFONICA",
+        "STRADA_REINTERRO_CALCOLO",
       ]);
       if (!tipiDaRiscrivere.has(tipoOg)) return true;
       if (!schedaId) return true;
@@ -996,7 +997,7 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
       nextPos += 1;
       changed = true;
     } else {
-      if (String(item.stradaTratto || "") !== stradaTratto) {
+      if (stradaTratto && String(item.stradaTratto || "") !== stradaTratto) {
         item.stradaTratto = stradaTratto;
         changed = true;
       }

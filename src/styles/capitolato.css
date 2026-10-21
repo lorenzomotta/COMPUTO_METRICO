@@ -83,7 +83,7 @@
 }
 
 .capitolato-col-unita {
-  width: 6.4rem;
+  width: 8.8rem;
 }
 
 .capitolato-col-prezzo {
@@ -131,6 +131,57 @@
   box-sizing: border-box;
   padding-left: 4px;
   padding-right: 2px;
+}
+
+.capitolato-unita-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.capitolato-unita-wrap .capitolato-unita {
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.capitolato-unita-add {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.capitolato-unita-dialog {
+  width: min(420px, 94vw);
+}
+
+.capitolato-unita-note {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #334e68;
+}
+
+.capitolato-unita-dialog .field {
+  margin-bottom: 14px;
+}
+
+.capitolato-unita-dialog .field label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: #1a3558;
+  font-size: 0.85rem;
+}
+
+.capitolato-unita-dialog .field input {
+  width: 100%;
+  min-height: 34px;
+  box-sizing: border-box;
+  padding: 7px 10px;
 }
 
 .capitolato-azioni {

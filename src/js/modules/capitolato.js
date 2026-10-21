@@ -79,10 +79,18 @@ export function elencoCapitolato(voci) {
  *   onSalva: (righe: { chiaveOriginale: string, voce: string, unitaMisura: string, prezzo: number }[], nuove: { voce: string, unitaMisura: string, prezzo: number }[]) => void,
  *   onEliminaSenzaBreve?: (chiave: string) => void,
  *   onModificaVoce?: (idVoce: number) => void,
+ *   onAggiungiUnita?: (nome: string) => string,
  * }} opts
  * @returns {{ aggiornaSeAperto: () => void, apriDaSessioneCerca: () => void }}
  */
-export function initCapitolato({ getVoci, getUnitaOptions, onSalva, onEliminaSenzaBreve, onModificaVoce }) {
+export function initCapitolato({
+  getVoci,
+  getUnitaOptions,
+  onSalva,
+  onEliminaSenzaBreve,
+  onModificaVoce,
+  onAggiungiUnita,
+}) {
   const openBtn = document.querySelector("#btn-capitolato");
   const dialogEl = document.querySelector("#capitolato-dialog");
   const formEl = document.querySelector("#capitolato-form");
@@ -99,6 +107,12 @@ export function initCapitolato({ getVoci, getUnitaOptions, onSalva, onEliminaSen
   const breviBodyEl = document.querySelector("#capitolato-brevi-body");
   const breviVuotoEl = document.querySelector("#capitolato-brevi-vuoto");
   const breviChiudiEl = document.querySelector("#capitolato-brevi-chiudi");
+  const unitaDialogEl = document.querySelector("#capitolato-unita-dialog");
+  const unitaFormEl = document.querySelector("#capitolato-unita-form");
+  const unitaNomeEl = document.querySelector("#capitolato-unita-nome");
+  const unitaAnnullaEl = document.querySelector("#capitolato-unita-annulla");
+  /** @type {HTMLSelectElement | null} */
+  let selectUnitaInAttesa = null;
   if (!openBtn || !dialogEl || !formEl || !bodyEl) return;
 
   function mostraMsg(testo) {
@@ -141,6 +155,44 @@ export function initCapitolato({ getVoci, getUnitaOptions, onSalva, onEliminaSen
     return { perChiave, nuove };
   }
 
+  function riempiSelectUnita(sel, valore) {
+    const scelto = String(valore ?? "").trim();
+    sel.replaceChildren();
+    for (const nome of opzioniUnita(scelto)) {
+      const opt = document.createElement("option");
+      opt.value = nome;
+      opt.textContent = nome;
+      sel.appendChild(opt);
+    }
+    if (scelto) sel.value = scelto;
+  }
+
+  function apriNuovaUnita(sel) {
+    selectUnitaInAttesa = sel;
+    if (unitaNomeEl instanceof HTMLInputElement) unitaNomeEl.value = "";
+    if (unitaDialogEl instanceof HTMLDialogElement && !unitaDialogEl.open) {
+      unitaDialogEl.showModal();
+    }
+    setTimeout(() => unitaNomeEl?.focus(), 0);
+  }
+
+  function confermaNuovaUnita(event) {
+    event.preventDefault();
+    const scritta = unitaNomeEl instanceof HTMLInputElement ? unitaNomeEl.value.trim() : "";
+    if (!scritta) {
+      unitaNomeEl?.focus();
+      return;
+    }
+    const canonica = String(onAggiungiUnita?.(scritta) || scritta).trim() || scritta;
+    const target = selectUnitaInAttesa;
+    for (const sel of bodyEl.querySelectorAll(".capitolato-unita")) {
+      if (!(sel instanceof HTMLSelectElement)) continue;
+      riempiSelectUnita(sel, sel === target ? canonica : sel.value);
+    }
+    selectUnitaInAttesa = null;
+    if (unitaDialogEl instanceof HTMLDialogElement && unitaDialogEl.open) unitaDialogEl.close();
+  }
+
   function creaRiga({ chiave, voce, unita, prezzo, nBrevi, nuova }) {
     const tr = document.createElement("tr");
     if (nuova) tr.dataset.nuova = "1";
@@ -155,17 +207,21 @@ export function initCapitolato({ getVoci, getUnitaOptions, onSalva, onEliminaSen
     tdVoce.appendChild(area);
 
     const tdUnita = document.createElement("td");
+    const wrapUnita = document.createElement("div");
+    wrapUnita.className = "capitolato-unita-wrap";
     const sel = document.createElement("select");
     sel.className = "capitolato-unita";
     sel.setAttribute("aria-label", "Unità di misura");
-    for (const nome of opzioniUnita(unita)) {
-      const opt = document.createElement("option");
-      opt.value = nome;
-      opt.textContent = nome;
-      sel.appendChild(opt);
-    }
-    if (unita) sel.value = unita;
-    tdUnita.appendChild(sel);
+    riempiSelectUnita(sel, unita);
+    const btnUnita = document.createElement("button");
+    btnUnita.type = "button";
+    btnUnita.className = "btn-action btn-secondary capitolato-unita-add";
+    btnUnita.textContent = "+";
+    btnUnita.title = "Aggiungi una nuova unità di misura";
+    btnUnita.setAttribute("aria-label", "Aggiungi una nuova unità di misura");
+    btnUnita.addEventListener("click", () => apriNuovaUnita(sel));
+    wrapUnita.append(sel, btnUnita);
+    tdUnita.appendChild(wrapUnita);
 
     const tdPrezzo = document.createElement("td");
     const prezzoEl = document.createElement("input");
@@ -488,7 +544,13 @@ export function initCapitolato({ getVoci, getUnitaOptions, onSalva, onEliminaSen
   dialogEl.addEventListener("close", () => {
     nascondiAiuto();
     if (breviDialogEl?.open) breviDialogEl.close();
+    if (unitaDialogEl instanceof HTMLDialogElement && unitaDialogEl.open) unitaDialogEl.close();
   });
+  unitaAnnullaEl?.addEventListener("click", () => {
+    selectUnitaInAttesa = null;
+    if (unitaDialogEl instanceof HTMLDialogElement && unitaDialogEl.open) unitaDialogEl.close();
+  });
+  unitaFormEl?.addEventListener("submit", confermaNuovaUnita);
   filtroEl?.addEventListener("input", () => applicaFiltro());
 
   formEl.addEventListener("submit", (event) => {

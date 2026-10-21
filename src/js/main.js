@@ -2569,10 +2569,15 @@ window.addEventListener("DOMContentLoaded", () => {
         typeof m?.solaiInterniSchedaId === "string" && m.solaiInterniSchedaId.trim() !== "";
       const daSolaiIncl =
         typeof m?.solaiInclinatiSchedaId === "string" && m.solaiInclinatiSchedaId.trim() !== "";
-      const daStrade = typeof m?.stradeSchedaId === "string" && m.stradeSchedaId.trim() !== "";
       const daEsterni = typeof m?.esterniKey === "string" && m.esterniKey.trim() !== "";
-      return daVani || daCamm || daPerim || daElev || daSolai || daSolaiIncl || daStrade || daEsterni;
+      return daVani || daCamm || daPerim || daElev || daSolai || daSolaiIncl || daEsterni;
     });
+  }
+
+  function voceDerivataDaStrade(item) {
+    if (String(item?.stradeSchedaId || "").trim() !== "") return true;
+    const mm = normalizzaMisurazioniManualiVoce(item?.misurazioniManuali, item?.unitaMisura);
+    return mm.some((m) => typeof m?.stradeSchedaId === "string" && m.stradeSchedaId.trim() !== "");
   }
 
   /** Voci auto da aperture (tipologia, scuro, inferiata, zanzariera, controdavanzale, cassonetto). */
@@ -2584,6 +2589,7 @@ window.addEventListener("DOMContentLoaded", () => {
   function voceBloccataInVoci(item) {
     return (
       voceDerivataDaVani(item) ||
+      voceDerivataDaStrade(item) ||
       isVoceSpecialeNoTotaleRiferimento(item) ||
       voceDerivataDaApertureAccessori(item)
     );
@@ -6246,6 +6252,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const item = entry.item;
       const index = entry.indexInGroup;
       const derivataDaVani = voceDerivataDaVani(item);
+      const derivataDaStrade = voceDerivataDaStrade(item);
       const daApertureAccessori = voceDerivataDaApertureAccessori(item);
       const bloccataInVoci = voceBloccataInVoci(item);
       const row = document.createElement("tr");
@@ -6257,7 +6264,9 @@ window.addEventListener("DOMContentLoaded", () => {
       const cellVoceAbbrev = createCell(item.voceAbbreviata || "-");
       cellVoceAbbrev.title = item.voce;
       cellVoceAbbrev.classList.add("voci-cell-open-focus");
-      if (derivataDaVani || daApertureAccessori) {
+      if (derivataDaStrade) {
+        cellVoceAbbrev.classList.add("voci-cell-from-strade");
+      } else if (derivataDaVani || daApertureAccessori) {
         cellVoceAbbrev.classList.add("voci-cell-from-vani");
       }
       if (isVoceSpecialeNoTotaleRiferimento(item)) {
@@ -11487,6 +11496,19 @@ window.addEventListener("DOMContentLoaded", () => {
     onSalva: applicaModificheCapitolato,
     onEliminaSenzaBreve: eliminaCapitolatoLibera,
     onModificaVoce: (idVoce) => apriModificaVoce(idVoce),
+    onAggiungiUnita: (nome) => {
+      const nuova = String(nome ?? "").trim();
+      if (!nuova) return "";
+      const gia = vociUnitaMisuraOptions.find(
+        (item) => item.toLowerCase() === nuova.toLowerCase(),
+      );
+      if (gia) return gia;
+      vociUnitaMisuraOptions.push(nuova);
+      saveVociUnitaOptions();
+      const corrente = voceUnitaMisuraEl instanceof HTMLSelectElement ? voceUnitaMisuraEl.value : "";
+      renderVociUnitaOptions(corrente);
+      return nuova;
+    },
   });
 
   voceDialogCancelEl.addEventListener("click", () => {
@@ -11496,6 +11518,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   voceDialogEl?.addEventListener("close", () => {
     if (editingVoceSoloUnitaMisura) setVoceDialogModalitaSoloUnitaMisura(false);
+    closeVoceUnitaNuovoDialog();
     capitolatoUi?.aggiornaSeAperto?.();
   });
 
