@@ -6409,6 +6409,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const g = entry.group;
         const trCap = document.createElement("tr");
         trCap.className = `voci-row-capitolo voci-row-capitolo-livello-${Number(g.profondita) || 0}`;
+        if (g.capitolo == null) trCap.classList.add("voci-row-capitolo-senza");
         trCap.dataset.action = "toggle-capitolo";
         trCap.dataset.capitoloKey = g.key;
         const tdCap = document.createElement("td");

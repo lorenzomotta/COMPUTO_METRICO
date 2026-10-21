@@ -188,24 +188,44 @@
 }
 
 .voci-row-capitolo {
-  background: rgba(16, 35, 63, 0.08);
+  background: #d4eefc;
   cursor: pointer;
 }
 
-.voci-row-capitolo-livello-1 {
-  background: rgba(16, 35, 63, 0.05);
+.table-voci tbody tr.voci-row-capitolo-livello-0 td,
+.table-voci tbody tr.voci-row-capitolo-livello-0:hover td {
+  background: #d4eefc;
 }
 
-.voci-row-capitolo-livello-1 td {
+.voci-row-capitolo-livello-1 {
+  background: #fff3c4;
+}
+
+.voci-row-capitolo-livello-1 td,
+.table-voci tbody tr.voci-row-capitolo-livello-1 td,
+.table-voci tbody tr.voci-row-capitolo-livello-1:hover td {
+  background: #fff3c4;
   padding-left: 22px;
 }
 
 .voci-row-capitolo-livello-2 {
-  background: rgba(16, 35, 63, 0.03);
+  background: #e4e4e4;
 }
 
-.voci-row-capitolo-livello-2 td {
+.voci-row-capitolo-livello-2 td,
+.table-voci tbody tr.voci-row-capitolo-livello-2 td,
+.table-voci tbody tr.voci-row-capitolo-livello-2:hover td {
+  background: #e4e4e4;
   padding-left: 40px;
+}
+
+.voci-row-capitolo-senza {
+  background: #f6b4b4;
+}
+
+.table-voci tbody tr.voci-row-capitolo-senza td,
+.table-voci tbody tr.voci-row-capitolo-senza:hover td {
+  background: #f6b4b4;
 }
 
 .voci-row-capitolo td {
