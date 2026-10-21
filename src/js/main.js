@@ -96,7 +96,7 @@ import {
   openVistaStrade,
   wireStradeUi,
 } from "./strade-misurazione.js";
-import { applicaStradeDaImport, datiStradePerExport } from "./strade.js";
+import { allineaStratiDopoSpostamentoVoce, applicaStradeDaImport, datiStradePerExport } from "./strade.js";
 import { applicaSchedeModuliDaImport, leggiSchedeModuliPerExport } from "./modules/computoPacchettoSchede.js";
 import { openVistaMisureVarie, wireMisureVarieUi } from "./misure-varie.js";
 import { openVistaScavo, wireScavoUi, dismissScavoIfOpen } from "./scavo.js";
@@ -6304,6 +6304,7 @@ window.addEventListener("DOMContentLoaded", () => {
       item.posizione = index + 1;
     });
     normalizzaPosizioniVoci();
+    allineaStratiDopoSpostamentoVoce(voci, idVoce);
   }
 
   function exitVoceFocusMode() {

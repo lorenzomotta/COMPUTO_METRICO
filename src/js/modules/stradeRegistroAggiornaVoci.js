@@ -12,6 +12,7 @@
  * - fogna, allacci fogna, luci, gas, acqua, telefonica, cordoli e segnaletica:
  *   spunta USA accesa → in VOCI entra la Quantità; spenta → entra formula × Quantità;
  * - varie: una voce per tipo; quantità = formula × pezzi; l’unità si sceglie in VOCI;
+ * - l’ordine degli strati, dentro ogni capitolo, diventa l’ordine di quelle voci in VOCI.
  */
 
 import { STORAGE_VOCI_ARCHIVIO_KEY } from "./archivioVociVocibrevi.js";
@@ -64,6 +65,81 @@ function abbrevKey(s) {
   return String(s ?? "")
     .trim()
     .toLocaleLowerCase("it-IT");
+}
+
+/** Sezioni in cui lo strato ha la casella Pos. e diventa una voce. */
+function sezioneConStratiInVoci(tipo) {
+  if (isZonaReinterro(tipo)) return false;
+  if (isZonaManufatti(tipo) || isZonaComeManufatti(tipo)) return false;
+  if (isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return false;
+  return true;
+}
+
+/** Nomi voce, nell’ordine delle sezioni e poi degli strati. */
+function ordineVociDagliStrati(snapshot) {
+  const keys = [];
+  const visti = new Set();
+  for (const tipo of TIPI_ZONA_STRADA) {
+    if (!sezioneConStratiInVoci(tipo)) continue;
+    for (const st of snapshot?.[tipo]?.strati || []) {
+      const nome = typeof st?.vocibreve === "string" ? st.vocibreve.trim() : "";
+      if (!nome) continue;
+      const key = abbrevKey(nome);
+      if (visti.has(key)) continue;
+      visti.add(key);
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+
+/**
+ * Dentro ogni capitolo, le voci di questa strada prendono l’ordine degli strati.
+ * Restano nei posti che avevano già: le altre voci non si spostano.
+ */
+function applicaOrdineStratiAlleVoci(voci, ordine, schedaId) {
+  if (!schedaId || ordine.length < 2) return false;
+  const posto = new Map();
+  ordine.forEach((key, i) => {
+    if (!posto.has(key)) posto.set(key, i);
+  });
+  const perCapitolo = new Map();
+  for (const item of voci) {
+    if (!item || typeof item !== "object") continue;
+    const cap = typeof item.capitoloId === "string" ? item.capitoloId.trim() : "";
+    if (!perCapitolo.has(cap)) perCapitolo.set(cap, []);
+    perCapitolo.get(cap).push(item);
+  }
+  let changed = false;
+  for (const gruppo of perCapitolo.values()) {
+    gruppo.sort((a, b) => {
+      const pa = Number(a.posizione) || 0;
+      const pb = Number(b.posizione) || 0;
+      if (pa !== pb) return pa - pb;
+      return (Number(a.idVoce) || 0) - (Number(b.idVoce) || 0);
+    });
+    const indici = [];
+    for (let i = 0; i < gruppo.length; i += 1) {
+      const item = gruppo[i];
+      if (String(item.stradeSchedaId || "").trim() !== schedaId) continue;
+      if (!posto.has(abbrevKey(item.voceAbbreviata))) continue;
+      indici.push(i);
+    }
+    if (indici.length < 2) continue;
+    const ordinati = indici
+      .map((i) => gruppo[i])
+      .sort((a, b) => posto.get(abbrevKey(a.voceAbbreviata)) - posto.get(abbrevKey(b.voceAbbreviata)));
+    const diverso = indici.some((idx, j) => gruppo[idx] !== ordinati[j]);
+    if (!diverso) continue;
+    indici.forEach((idx, j) => {
+      gruppo[idx] = ordinati[j];
+    });
+    gruppo.forEach((item, i) => {
+      if (item.posizione !== i + 1) item.posizione = i + 1;
+    });
+    changed = true;
+  }
+  return changed;
 }
 
 function parseNonNegativeDecimal3OrNull(raw) {
@@ -1076,6 +1152,10 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
 
   for (const item of voci) {
     if (etichettaStradaSeUnaScheda(item)) changed = true;
+  }
+
+  if (applicaOrdineStratiAlleVoci(voci, ordineVociDagliStrati(snapshot), schedaId)) {
+    changed = true;
   }
 
   if (!changed) return { righe: righeScritte, vociAggiornate: abbrevs.size };

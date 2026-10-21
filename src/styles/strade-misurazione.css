@@ -92,11 +92,17 @@
   gap: 8px;
 }
 
-.strade-strato-num {
-  font-weight: 700;
-  min-width: 1.4rem;
-  color: #1a3358;
-  padding-bottom: 4px;
+.strade-strato-field--pos {
+  width: 3.2rem;
+  min-width: 3.2rem;
+  flex: 0 0 auto;
+}
+
+.strade-strato-field--pos input {
+  width: 100%;
+  text-align: center;
+  padding-left: 2px;
+  padding-right: 2px;
 }
 
 .strade-strato-field {

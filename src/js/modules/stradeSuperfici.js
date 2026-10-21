@@ -3088,10 +3088,31 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
     const row = document.createElement("div");
     row.className = "strade-strato-head";
 
-    const num = document.createElement("span");
-    num.className = "strade-strato-num";
-    num.textContent = String(st.n ?? "");
-    row.appendChild(num);
+    const totStrati = (zona.strati || []).length;
+    const posWrap = document.createElement("label");
+    posWrap.className = "strade-strato-field strade-strato-field--pos";
+    posWrap.innerHTML = `<span>Pos.</span>`;
+    const inpPos = document.createElement("input");
+    inpPos.type = "number";
+    inpPos.min = "1";
+    inpPos.max = String(totStrati);
+    inpPos.step = "1";
+    inpPos.className = "strade-strato-pos vani-in-num";
+    inpPos.value = String(st.n ?? "");
+    inpPos.disabled = totStrati <= 1;
+    inpPos.title =
+      totStrati <= 1
+        ? "Con un solo strato non c’è un altro posto"
+        : "Scrivi il numero e premi Invio: lo strato si sposta in questa sezione";
+    inpPos.setAttribute("aria-label", `Posizione dello strato ${st.n ?? ""}`);
+    inpPos.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        inpPos.blur();
+      }
+    });
+    posWrap.appendChild(inpPos);
+    row.appendChild(posWrap);
 
     const voceWrap = document.createElement("label");
     voceWrap.className = "strade-strato-field strade-strato-field--voce";

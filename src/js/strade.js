@@ -187,6 +187,123 @@ function sostituisciVociStorage(mappa, accetta) {
   }
 }
 
+function chiaveNomeStrato(s) {
+  return String(s ?? "")
+    .trim()
+    .toLocaleLowerCase("it-IT");
+}
+
+/** Sezioni in cui lo strato ha la casella Pos. e diventa una voce. */
+function sezioneConStratiInVoci(tipo) {
+  if (isZonaReinterro(tipo)) return false;
+  if (isZonaManufatti(tipo) || isZonaComeManufatti(tipo)) return false;
+  if (isZonaCordoli(tipo) || isZonaSegnaletica(tipo) || isZonaVarie(tipo)) return false;
+  return true;
+}
+
+function sezioniConNomeStrato(snapshot, nomeKey) {
+  const out = [];
+  if (!snapshot || !nomeKey) return out;
+  for (const tipo of TIPI_ZONA_STRADA) {
+    if (!sezioneConStratiInVoci(tipo)) continue;
+    const trovato = (snapshot[tipo]?.strati || []).some(
+      (st) => chiaveNomeStrato(st?.vocibreve) === nomeKey,
+    );
+    if (trovato) out.push(tipo);
+  }
+  return out;
+}
+
+/**
+ * Mette gli strati collegati alle voci nell’ordine delle voci.
+ * Se un nome è doppio, non sposta nulla.
+ */
+function riordinaStratiComeVoci(zona, ordineNomi) {
+  if (!zona || !Array.isArray(zona.strati) || ordineNomi.length < 2) return false;
+  const strati = zona.strati;
+  const voluti = new Set(ordineNomi);
+  const perNome = new Map();
+  for (const st of strati) {
+    const key = chiaveNomeStrato(st?.vocibreve);
+    if (!voluti.has(key)) continue;
+    if (perNome.has(key)) return false;
+    perNome.set(key, st);
+  }
+  const ordinati = [];
+  for (const key of ordineNomi) {
+    const st = perNome.get(key);
+    if (st) ordinati.push(st);
+  }
+  if (ordinati.length < 2) return false;
+  const indici = [];
+  for (let i = 0; i < strati.length; i += 1) {
+    if (perNome.get(chiaveNomeStrato(strati[i]?.vocibreve)) === strati[i]) indici.push(i);
+  }
+  if (indici.length !== ordinati.length) return false;
+  if (indici.every((idx, j) => strati[idx] === ordinati[j])) return false;
+  indici.forEach((idx, j) => {
+    strati[idx] = ordinati[j];
+  });
+  rinumeraStratiZona(zona);
+  return true;
+}
+
+/**
+ * Dopo uno spostamento in Voci, aggiorna la Pos. degli strati di quella sezione.
+ * Se il nome è in più sezioni, o non si capisce quale strato è, non fa nulla e non segnala errore.
+ */
+export function allineaStratiDopoSpostamentoVoce(voci, idVoce) {
+  try {
+    const lista = Array.isArray(voci) ? voci : [];
+    const voce = lista.find((item) => item && item.idVoce === idVoce);
+    if (!voce) return;
+    const schedaId = String(voce.stradeSchedaId || "").trim();
+    const nomeKey = chiaveNomeStrato(voce.voceAbbreviata);
+    if (!schedaId || !nomeKey) return;
+    const rec = registrati.find((item) => String(item?.id || "") === schedaId) || null;
+    const bozzaStessa = schedaBozzaCollegataId === schedaId;
+    const fonte = rec || (bozzaStessa ? scheda : null);
+    if (!fonte) return;
+    const sezioni = sezioniConNomeStrato(fonte, nomeKey);
+    if (sezioni.length !== 1) return;
+    const tipo = sezioni[0];
+    const cap = String(voce.capitoloId || "").trim();
+    const fratelli = lista.filter((item) => {
+      if (!item) return false;
+      if (String(item.capitoloId || "").trim() !== cap) return false;
+      if (String(item.stradeSchedaId || "").trim() !== schedaId) return false;
+      const key = chiaveNomeStrato(item.voceAbbreviata);
+      if (!key) return false;
+      const sue = sezioniConNomeStrato(fonte, key);
+      return sue.length === 1 && sue[0] === tipo;
+    });
+    fratelli.sort((a, b) => {
+      const pa = Number(a.posizione) || 0;
+      const pb = Number(b.posizione) || 0;
+      if (pa !== pb) return pa - pb;
+      return (Number(a.idVoce) || 0) - (Number(b.idVoce) || 0);
+    });
+    const ordineNomi = [];
+    const visti = new Set();
+    for (const item of fratelli) {
+      const key = chiaveNomeStrato(item.voceAbbreviata);
+      if (visti.has(key)) continue;
+      visti.add(key);
+      ordineNomi.push(key);
+    }
+    if (ordineNomi.length < 2) return;
+    if (bozzaStessa) syncBozzaDaDom();
+    let changed = false;
+    if (rec && riordinaStratiComeVoci(rec[tipo], ordineNomi)) changed = true;
+    if (bozzaStessa && scheda && riordinaStratiComeVoci(scheda[tipo], ordineNomi)) changed = true;
+    if (!changed) return;
+    if (rec) saveRegistrati();
+    if (bozzaStessa) renderForm();
+  } catch {
+    /* la voce in Voci è già spostata; gli strati restano dove sono */
+  }
+}
+
 /** Schede STRADE, tipi di questo computo e libreria tipi, da mettere nel file esportato. */
 export function datiStradePerExport() {
   let registrati = null;
@@ -638,6 +755,31 @@ function onHostInput(e) {
   aggiornaCalcoliZonaBlock(block, scheda[tipo], mqOverride);
 }
 
+function spostaStratoAllaPosizione(input, block, tipo) {
+  if (!scheda[tipo]) return;
+  syncZonaDaBlock(block, scheda[tipo]);
+  const zona = scheda[tipo];
+  const strati = Array.isArray(zona.strati) ? zona.strati : [];
+  const card = input.closest(".strade-strato-card");
+  const sid = Number(card?.dataset.stratoId);
+  const attuale = strati.findIndex((st) => st.id === sid);
+  const nuova = Number.parseInt(input.value, 10);
+  const tot = strati.length;
+  if (attuale < 0 || !Number.isInteger(nuova) || tot <= 1) {
+    input.value = attuale >= 0 ? String(attuale + 1) : input.value;
+    return;
+  }
+  const dest = Math.min(tot, Math.max(1, nuova));
+  if (dest === attuale + 1) {
+    input.value = String(dest);
+    return;
+  }
+  const [item] = strati.splice(attuale, 1);
+  strati.splice(dest - 1, 0, item);
+  rinumeraStratiZona(zona);
+  renderForm();
+}
+
 function onHostChange(e) {
   const t = e.target;
   if (!(t instanceof HTMLElement)) return;
@@ -645,6 +787,10 @@ function onHostChange(e) {
   if (!block) return;
   const tipo = String(block.dataset.tipoZona || "");
   if (!TIPI_ZONA_STRADA.includes(/** @type {typeof TIPI_ZONA_STRADA[number]} */ (tipo))) return;
+  if (t instanceof HTMLInputElement && t.classList.contains("strade-strato-pos")) {
+    spostaStratoAllaPosizione(t, block, tipo);
+    return;
+  }
   if (
     t instanceof HTMLSelectElement &&
     t.matches(
