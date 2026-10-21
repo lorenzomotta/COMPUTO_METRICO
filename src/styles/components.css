@@ -186,12 +186,30 @@
 
 .table-voci th:nth-child(2),
 .table-voci td:nth-child(2) {
-  width: 6%;
+  width: 10%;
+}
+
+.table-voci td.voci-cell-posizione {
+  white-space: nowrap;
+}
+
+.voci-pos-prefisso {
+  font-weight: 700;
+  margin-right: 2px;
+}
+
+.voci-pos-inline {
+  width: 2.8rem;
+  min-height: 26px;
+  padding: 1px 4px;
+  text-align: center;
+  font: inherit;
+  box-sizing: border-box;
 }
 
 .table-voci th:nth-child(3),
 .table-voci td:nth-child(3) {
-  width: 16%;
+  width: 17%;
 }
 
 .table-voci th:nth-child(4),
@@ -221,7 +239,7 @@
 
 .table-voci th:nth-child(9),
 .table-voci td:nth-child(9) {
-  width: 18%;
+  width: 13%;
 }
 
 .table-voci .actions-cell {
@@ -277,6 +295,16 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
+}
+
+.table-voci .actions-cell .voci-nota-strato {
+  background: #b7bcc6;
+  color: #3a4250;
+}
+
+.table-voci .actions-cell .voci-nota-strato.is-piena {
+  background: #1f8d63;
+  color: #fff;
 }
 
 .table-voci .actions-cell .btn-voce-mm-add {

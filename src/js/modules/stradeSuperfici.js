@@ -1516,6 +1516,7 @@ export function emptyStratoStrada(nextId, n = 1) {
     n: Number.isFinite(n) ? n : 1,
     vocibreve: "",
     spessore: "",
+    note: "",
     sottrazioni: [],
   };
 }
@@ -1648,6 +1649,7 @@ function sanificaStrato(row, nextId, n) {
     n,
     vocibreve: typeof src.vocibreve === "string" ? src.vocibreve : "",
     spessore: src.spessore != null && src.spessore !== "" ? String(src.spessore) : "",
+    note: typeof src.note === "string" ? src.note : "",
     sottrazioni: sottSrc.map((s, i) => sanificaSottrazione(s, nextId, i + 1)),
   };
 }
@@ -1751,6 +1753,7 @@ export function cloneZonaPerSnapshot(zona, tipoZona) {
       id: typeof st?.id === "number" ? st.id : 0,
       n: typeof st?.n === "number" && Number.isFinite(st.n) ? st.n : i + 1,
       vocibreve: typeof st?.vocibreve === "string" ? st.vocibreve : "",
+      note: typeof st?.note === "string" ? st.note : "",
       spessore:
         isZonaReinterroCalcolo(tipoZona)
           ? ""
@@ -3174,6 +3177,19 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
 
     const azioni = document.createElement("div");
     azioni.className = "strade-strato-azioni";
+    const notaTesto = typeof st.note === "string" ? st.note.trim() : "";
+    const btnNota = document.createElement("button");
+    btnNota.type = "button";
+    btnNota.className = `btn-action vani-btn-micro strade-strato-nota${notaTesto ? " is-piena" : ""}`;
+    btnNota.dataset.action = "nota-strato-strada";
+    btnNota.dataset.tipoZona = tipo;
+    btnNota.dataset.stratoId = String(st.id);
+    btnNota.textContent = "!";
+    btnNota.title = notaTesto ? "Apri la nota" : "Scrivi una nota";
+    btnNota.setAttribute("aria-label", notaTesto ? "Apri la nota dello strato" : "Scrivi una nota dello strato");
+    azioni.appendChild(btnNota);
+    const azioniRiga = document.createElement("div");
+    azioniRiga.className = "strade-strato-azioni-riga";
     if (!nascondiSottrazioni) {
       const btnAddSott = document.createElement("button");
       btnAddSott.type = "button";
@@ -3184,7 +3200,7 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
       btnAddSott.textContent = "−";
       btnAddSott.title = "Aggiungi sottrazione a questo strato";
       btnAddSott.setAttribute("aria-label", "Aggiungi sottrazione");
-      azioni.appendChild(btnAddSott);
+      azioniRiga.appendChild(btnAddSott);
     }
     const btnRm = document.createElement("button");
     btnRm.type = "button";
@@ -3196,7 +3212,8 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
     btnRm.title = "Rimuovi strato";
     btnRm.setAttribute("aria-label", "Rimuovi strato");
     btnRm.disabled = (zona.strati || []).length <= 1;
-    azioni.appendChild(btnRm);
+    azioniRiga.appendChild(btnRm);
+    azioni.appendChild(azioniRiga);
     row.appendChild(azioni);
 
     card.appendChild(row);

@@ -2663,6 +2663,21 @@
                 </div>
               </dialog>
 
+              <dialog id="strade-conferma-strato-dialog" class="formula-dialog vani-conferma-elimina-dialog" aria-modal="true">
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3>CONFERMA ELIMINAZIONE</h3>
+                  <p id="strade-conferma-strato-msg" class="vani-conferma-elimina-msg"></p>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="strade-conferma-strato-annulla" class="btn-action btn-secondary">
+                      Annulla
+                    </button>
+                    <button type="button" id="strade-conferma-strato-conferma" class="btn-action btn-delete">
+                      Elimina
+                    </button>
+                  </div>
+                </div>
+              </dialog>
+
               <dialog
                 id="strade-tipologie-dialog"
                 class="formula-dialog vani-conferma-elimina-dialog strade-tipologie-dialog"
@@ -2690,6 +2705,23 @@
                   <div class="formula-dialog-actions">
                     <button type="button" id="strade-libreria-no" class="btn-action btn-secondary">No</button>
                     <button type="button" id="strade-libreria-si" class="btn-action btn-secondary">Sì</button>
+                  </div>
+                </div>
+              </dialog>
+
+              <dialog
+                id="strade-strato-nota-dialog"
+                class="formula-dialog vani-conferma-elimina-dialog strade-strato-nota-dialog"
+                aria-modal="true"
+                aria-labelledby="strade-strato-nota-title"
+              >
+                <div class="vani-conferma-elimina-dialog-inner">
+                  <h3 id="strade-strato-nota-title">Nota dello strato</h3>
+                  <p class="vani-conferma-elimina-msg">La nota resta nascosta. In Voci la leggi passando il mouse sul pulsante !.</p>
+                  <textarea id="strade-strato-nota-testo" rows="6" placeholder="Scrivi la nota" aria-label="Nota dello strato"></textarea>
+                  <div class="formula-dialog-actions">
+                    <button type="button" id="strade-strato-nota-annulla" class="btn-action btn-secondary">Annulla</button>
+                    <button type="button" id="strade-strato-nota-salva" class="btn-action btn-secondary">Salva</button>
                   </div>
                 </div>
               </dialog>

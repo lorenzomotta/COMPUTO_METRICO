@@ -2746,6 +2746,19 @@ window.addEventListener("DOMContentLoaded", () => {
     return mm.some((m) => typeof m?.stradeSchedaId === "string" && m.stradeSchedaId.trim() !== "");
   }
 
+  function noteStradeDellaVoce(item) {
+    const mm = normalizzaMisurazioniManualiVoce(item?.misurazioniManuali, item?.unitaMisura);
+    const viste = new Set();
+    const testi = [];
+    for (const m of mm) {
+      const t = String(m?.stradeNota ?? "").trim();
+      if (!t || viste.has(t)) continue;
+      viste.add(t);
+      testi.push(t);
+    }
+    return testi.join("\n\n");
+  }
+
   /** Voci auto da aperture (tipologia, scuro, inferiata, zanzariera, controdavanzale, cassonetto). */
   function voceDerivataDaApertureAccessori(item) {
     const mm = normalizzaMisurazioniManualiVoce(item?.misurazioniManuali, item?.unitaMisura);
@@ -2903,6 +2916,7 @@ window.addEventListener("DOMContentLoaded", () => {
         solaiInterniSchedaId,
         solaiInclinatiSchedaId,
         stradeSchedaId,
+        stradeNota: typeof m?.stradeNota === "string" ? m.stradeNota : "",
         esterniKey,
         stratoAltezza,
         stratoElevazione:
@@ -5914,6 +5928,7 @@ window.addEventListener("DOMContentLoaded", () => {
       solaiInterniSchedaId: row.solaiInterniSchedaId || "",
       solaiInclinatiSchedaId: row.solaiInclinatiSchedaId || "",
       stradeSchedaId: row.stradeSchedaId || "",
+      stradeNota: typeof row.stradeNota === "string" ? row.stradeNota : "",
       stratoAltezza: row.stratoAltezza ?? null,
       stratoElevazione: row.stratoElevazione ?? null,
       divisore:
@@ -6393,9 +6408,11 @@ window.addEventListener("DOMContentLoaded", () => {
     /** @type {{ kind: string, group: any, item?: any, indexInGroup?: number, collapsed?: boolean }[]} */
     const flatRender = [];
     for (const g of groupsRender) {
-      const nascostoDaPadre = (g.antenati || []).some((id) => capitoliCollapsed.has(id));
+      const apriPerRicerca = ricercaAttiva;
+      const nascostoDaPadre =
+        !apriPerRicerca && (g.antenati || []).some((id) => capitoliCollapsed.has(id));
       if (nascostoDaPadre) continue;
-      const collapsed = capitoliCollapsed.has(g.key);
+      const collapsed = !apriPerRicerca && capitoliCollapsed.has(g.key);
       flatRender.push({ kind: "cap", group: g, collapsed });
       if (!collapsed) {
         g.voci.forEach((voceItem, indexInGroup) => {
@@ -6453,7 +6470,48 @@ window.addEventListener("DOMContentLoaded", () => {
       row.dataset.idVoce = String(item.idVoce);
       row.title = "Doppio clic per aprire in fullscreen";
       row.appendChild(createCell(String(item.idVoce)));
-      row.appendChild(createCell(formatVoceNumeroCapitolo(entry.group, entry.indexInGroup)));
+      const cellPos = document.createElement("td");
+      cellPos.className = "voci-cell-posizione";
+      const posizioneVoce = index + 1;
+      const prefissoCapitolo = String(entry.group?.sequenzaLabel ?? "").trim();
+      if (prefissoCapitolo) {
+        const prefissoEl = document.createElement("span");
+        prefissoEl.className = "voci-pos-prefisso";
+        prefissoEl.textContent = `${prefissoCapitolo}.`;
+        cellPos.appendChild(prefissoEl);
+      }
+      const inputPos = document.createElement("input");
+      inputPos.type = "number";
+      inputPos.min = "1";
+      inputPos.step = "1";
+      inputPos.className = "voci-pos-inline";
+      inputPos.value = String(posizioneVoce);
+      inputPos.disabled = ricercaAttiva;
+      inputPos.title = ricercaAttiva
+        ? "Svuota il campo Cerca per cambiare la posizione"
+        : "Scrivi il numero e premi Invio: la voce si sposta tra quelle di questo capitolo";
+      inputPos.setAttribute(
+        "aria-label",
+        `Posizione della voce ${item.voceAbbreviata || item.idVoce}`,
+      );
+      inputPos.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          inputPos.blur();
+        }
+      });
+      inputPos.addEventListener("change", () => {
+        const nuova = Number.parseInt(inputPos.value, 10);
+        if (!Number.isInteger(nuova) || nuova < 1 || nuova === posizioneVoce) {
+          inputPos.value = String(posizioneVoce);
+          return;
+        }
+        spostaVoceAPosizione(item.idVoce, nuova);
+        saveVoci();
+        renderVoci();
+      });
+      cellPos.appendChild(inputPos);
+      row.appendChild(cellPos);
       const cellVoceAbbrev = createCell(item.voceAbbreviata || "-");
       cellVoceAbbrev.title = item.voce;
       cellVoceAbbrev.classList.add("voci-cell-open-focus");
@@ -6509,30 +6567,6 @@ window.addEventListener("DOMContentLoaded", () => {
       editButton.title = "Modifica";
       editButton.setAttribute("aria-label", "Modifica");
 
-      const upButton = document.createElement("button");
-      upButton.type = "button";
-      upButton.className = "btn-action btn-secondary";
-      upButton.dataset.action = "move-voce-up";
-      upButton.dataset.id = String(item.idVoce);
-      upButton.textContent = "↑";
-      upButton.title = ricercaAttiva
-        ? "Svuota il campo Cerca per usare Sposta sopra"
-        : "Sposta sopra";
-      upButton.setAttribute("aria-label", "Sposta sopra");
-      upButton.disabled = ricercaAttiva || index === 0;
-
-      const downButton = document.createElement("button");
-      downButton.type = "button";
-      downButton.className = "btn-action btn-secondary";
-      downButton.dataset.action = "move-voce-down";
-      downButton.dataset.id = String(item.idVoce);
-      downButton.textContent = "↓";
-      downButton.title = ricercaAttiva
-        ? "Svuota il campo Cerca per usare Sposta sotto"
-        : "Sposta sotto";
-      downButton.setAttribute("aria-label", "Sposta sotto");
-      downButton.disabled = ricercaAttiva || index === entry.group.voci.length - 1;
-
       const deleteButton = document.createElement("button");
       deleteButton.type = "button";
       deleteButton.className = "btn-action btn-delete";
@@ -6561,16 +6595,25 @@ window.addEventListener("DOMContentLoaded", () => {
           : daApertureAccessori
             ? "Voce automatica da aperture: copia non disponibile"
             : "Voce da VANI/CAMMINAMENTI: copia non disponibile";
-        upButton.disabled = ricercaAttiva || index === 0;
-        downButton.disabled = ricercaAttiva || index === entry.group.voci.length - 1;
         deleteButton.disabled = false;
         deleteButton.title = "Elimina voce";
+      }
+
+      if (derivataDaStrade) {
+        const notaVoce = noteStradeDellaVoce(item);
+        const notaBtn = document.createElement("button");
+        notaBtn.type = "button";
+        notaBtn.className = `btn-action voci-nota-strato${notaVoce ? " is-piena" : ""}`;
+        notaBtn.textContent = "!";
+        notaBtn.title = notaVoce || "Nessuna nota";
+        notaBtn.setAttribute("aria-label", notaVoce ? "Nota dello strato" : "Nessuna nota");
+        actionsCell.appendChild(notaBtn);
       }
 
       const isVoceManuale =
         normalizzaTipoMisuraVoce(item.tipoMisura) === TIPOMISURA_VOCE_MANUALE;
 
-      actionsCell.append(upButton, downButton, copyButton, editButton);
+      actionsCell.append(copyButton, editButton);
       actionsCell.appendChild(deleteButton);
       if (isVoceManuale) {
         const collapseMmButton = document.createElement("button");
@@ -11502,7 +11545,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   vociBodyEl.addEventListener("dblclick", (event) => {
-    if (event.target.closest("button")) return;
+    if (event.target.closest("button, input, select, textarea")) return;
     const trVoce = event.target.closest("tr.voci-row-principale");
     if (trVoce) {
       const idVoce = Number(trVoce.dataset.idVoce);
@@ -12144,26 +12187,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (button.dataset.action === "copy-voce") {
       duplicaVoceCompleta(id);
-      return;
-    }
-
-    if (button.dataset.action === "move-voce-up") {
-      normalizzaPosizioniVoci();
-      const row = voci.find((item) => item.idVoce === id);
-      if (!row) return;
-      spostaVoceAPosizione(id, row.posizione - 1);
-      saveVoci();
-      renderVoci();
-      return;
-    }
-
-    if (button.dataset.action === "move-voce-down") {
-      normalizzaPosizioniVoci();
-      const row = voci.find((item) => item.idVoce === id);
-      if (!row) return;
-      spostaVoceAPosizione(id, row.posizione + 1);
-      saveVoci();
-      renderVoci();
     }
   });
 

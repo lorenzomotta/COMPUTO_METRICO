@@ -98,6 +98,10 @@ let registrati = [];
 let schedaBozzaCollegataId = null;
 let feedbackTimer = 0;
 let eliminaPending = null;
+/** Strato in attesa di conferma prima di toglierlo. */
+let stratoDaEliminare = null;
+/** Strato di cui è aperto il riquadro della nota. */
+let notaStratoCtx = null;
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -558,6 +562,37 @@ function onRegistra() {
     console.error("[STRADE] REGISTRA fallita", err);
     mostraFeedback("Errore in registrazione. Riapri STRADE e riprova.", true);
   }
+}
+
+function chiediEliminaStrato(tipo, stratoId) {
+  const zona = scheda[tipo];
+  const st = (zona?.strati || []).find((x) => x.id === stratoId);
+  if (!st || (zona.strati || []).length <= 1) return;
+  stratoDaEliminare = { tipo, stratoId };
+  const nome = String(st.vocibreve || "").trim() || `strato ${st.n ?? ""}`;
+  const dlg = document.getElementById("strade-conferma-strato-dialog");
+  const msg = document.getElementById("strade-conferma-strato-msg");
+  if (msg) {
+    msg.textContent = `Eliminare lo strato «${nome}»? Quando registri la strada, la voce collegata sparisce anche da Voci.`;
+  }
+  if (dlg && typeof dlg.showModal === "function" && !dlg.open) dlg.showModal();
+}
+
+function chiudiConfermaStrato() {
+  stratoDaEliminare = null;
+  const dlg = document.getElementById("strade-conferma-strato-dialog");
+  if (dlg && typeof dlg.close === "function" && dlg.open) dlg.close();
+}
+
+function confermaEliminaStrato() {
+  const pending = stratoDaEliminare;
+  chiudiConfermaStrato();
+  if (!pending) return;
+  const zona = scheda[pending.tipo];
+  if (!zona || (zona.strati || []).length <= 1) return;
+  zona.strati = zona.strati.filter((st) => st.id !== pending.stratoId);
+  rinumeraStratiZona(zona);
+  renderForm();
 }
 
 function chiediElimina(id) {
@@ -1044,12 +1079,23 @@ async function onHostClick(e) {
     });
     return;
   }
+  if (action === "nota-strato-strada") {
+    const sid = Number(btn.getAttribute("data-strato-id"));
+    const st = (zona.strati || []).find((x) => x.id === sid);
+    if (!st) return;
+    notaStratoCtx = { tipo, stratoId: sid };
+    const dlg = document.getElementById("strade-strato-nota-dialog");
+    const ta = document.getElementById("strade-strato-nota-testo");
+    if (!(dlg instanceof HTMLDialogElement) || !(ta instanceof HTMLTextAreaElement)) return;
+    ta.value = typeof st.note === "string" ? st.note : "";
+    if (!dlg.open) dlg.showModal();
+    ta.focus();
+    return;
+  }
   if (action === "rimuovi-strato-strada") {
     const sid = Number(btn.getAttribute("data-strato-id"));
     if ((zona.strati || []).length <= 1) return;
-    zona.strati = zona.strati.filter((st) => st.id !== sid);
-    rinumeraStratiZona(zona);
-    renderForm();
+    chiediEliminaStrato(tipo, sid);
     return;
   }
   if (action === "aggiungi-sottrazione-strato") {
@@ -1128,6 +1174,19 @@ function onSidebarListClick(e) {
   }
 }
 
+function chiudiNotaStrato(salva) {
+  const dlg = document.getElementById("strade-strato-nota-dialog");
+  const ta = document.getElementById("strade-strato-nota-testo");
+  if (salva && notaStratoCtx && ta instanceof HTMLTextAreaElement) {
+    const zona = scheda[notaStratoCtx.tipo];
+    const st = (zona?.strati || []).find((x) => x.id === notaStratoCtx.stratoId);
+    if (st) st.note = ta.value.trim();
+    renderForm();
+  }
+  notaStratoCtx = null;
+  if (dlg instanceof HTMLDialogElement && dlg.open) dlg.close();
+}
+
 export function prepareVistaStrade() {
   loadRegistrati();
   popolaDatalistArchivioPianiMisura(ARCHIVIO_PIANI_MISURA_STORAGE_KEY, "datalist-piani-misura-archivio");
@@ -1176,6 +1235,16 @@ export function initStradeUi() {
   document.getElementById("strade-tipologie-chiudi")?.addEventListener("click", () => {
     if (dlgTipologie instanceof HTMLDialogElement && dlgTipologie.open) dlgTipologie.close();
   });
+  document.getElementById("strade-strato-nota-salva")?.addEventListener("click", () => {
+    chiudiNotaStrato(true);
+  });
+  document.getElementById("strade-strato-nota-annulla")?.addEventListener("click", () => {
+    chiudiNotaStrato(false);
+  });
+  document.getElementById("strade-strato-nota-dialog")?.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    chiudiNotaStrato(false);
+  });
   host?.addEventListener(
     "blur",
     (e) => {
@@ -1194,6 +1263,16 @@ export function initStradeUi() {
   });
   document.getElementById("strade-conferma-elimina-conferma")?.addEventListener("click", () => {
     confermaElimina();
+  });
+  document.getElementById("strade-conferma-strato-annulla")?.addEventListener("click", () => {
+    chiudiConfermaStrato();
+  });
+  document.getElementById("strade-conferma-strato-conferma")?.addEventListener("click", () => {
+    confermaEliminaStrato();
+  });
+  document.getElementById("strade-conferma-strato-dialog")?.addEventListener("cancel", (e) => {
+    e.preventDefault();
+    chiudiConfermaStrato();
   });
 
   document.getElementById("strade-avviso-ok")?.addEventListener("click", () => {

@@ -293,9 +293,9 @@ function sistemaNomiStratoCambiati(voci, snapshot, schedaId, abbrevs) {
     const voce = voci[i];
     if (!voce || giaRinominate.has(voce) || !voceSoloDiQuestaScheda(voce, schedaId)) continue;
     if (abbrevs.has(abbrevKey(voce.voceAbbreviata))) continue;
-    togliRigheDiScheda(voce, schedaId);
+    if (togliRigheDiScheda(voce, schedaId)) changed = true;
     const mm = Array.isArray(voce.misurazioniManuali) ? voce.misurazioniManuali : [];
-    if (mm.length === 0 && !voceHaDatiUtente(voce)) {
+    if (mm.length === 0) {
       voci.splice(i, 1);
       changed = true;
     }
@@ -491,6 +491,7 @@ function creaRigaArea({
     risultato,
     apertureCollegate: [],
     stradeSchedaId: sid,
+    stradeNota: typeof strato?.note === "string" ? strato.note.trim() : "",
     stratoNumero: typeof strato?.n === "number" ? strato.n : null,
     areaNumero: typeof area?.n === "number" ? area.n : null,
   };
@@ -906,7 +907,6 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
   const schedaId =
     snapshot.id != null && String(snapshot.id).trim() !== "" ? String(snapshot.id).trim() : "";
   const abbrevs = raccogliAbbrevDaScheda(snapshot);
-  if (abbrevs.size === 0) return { righe: 0, vociAggiornate: 0 };
 
   let raw;
   try {
@@ -977,6 +977,18 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
     typeof snapshot.descrizione === "string" ? snapshot.descrizione.trim() : "";
 
   if (sistemaNomiStratoCambiati(voci, snapshot, schedaId, abbrevs)) changed = true;
+
+  if (abbrevs.size === 0) {
+    if (changed) {
+      try {
+        localStorage.setItem(STORAGE_VOCI_ARCHIVIO_KEY, JSON.stringify(voci));
+        document.dispatchEvent(new CustomEvent("computo-voci-storage-externally-updated"));
+      } catch {
+        return { righe: 0, vociAggiornate: 0 };
+      }
+    }
+    return { righe: 0, vociAggiornate: 0 };
+  }
 
   for (const [key, meta] of abbrevs) {
     let item = trovaVocePerStratoStrada(voci, key, schedaId, stradaTratto);
