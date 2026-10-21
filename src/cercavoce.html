@@ -126,6 +126,7 @@
         color: var(--muted);
         min-height: 1.4em;
         margin: 0.25rem 0 0.75rem;
+        white-space: pre-line;
       }
       #status.err {
         color: #b91c1c;
@@ -290,10 +291,14 @@
           <select id="prezziario-select" disabled></select>
         </div>
         <div class="field-file-xml">
-          <label for="file-fallback">Oppure carica file (.xml, .xlsx o .html)</label>
+          <label for="btn-collega-prezziario">File sul computer</label>
+          <button type="button" class="btn btn-primary" id="btn-collega-prezziario">
+            Carica e collega al computo
+          </button>
           <input
             id="file-fallback"
             type="file"
+            hidden
             accept=".xml,application/xml,text/xml,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.html,text/html"
           />
         </div>
@@ -372,6 +377,7 @@
         const statusEl = document.getElementById("status");
         const selectEl = document.getElementById("prezziario-select");
         const fileEl = document.getElementById("file-fallback");
+        const btnCollegaPrezziario = document.getElementById("btn-collega-prezziario");
         const searchEl = document.getElementById("search-input");
         const btnClearSearch = document.getElementById("btn-clear-search");
         const resultsEl = document.getElementById("results");
@@ -401,7 +407,42 @@
         let activeHitPrdId = null;
         const MAX_RESULTS = 250;
         const CUSTOM_FILE_OPTION_VALUE = "__uploaded_file__";
+        const STORAGE_PREZZIARIO_COLLEGATO = "computo_metrico_prezziario_collegato";
         let uploadedDataset = null;
+
+        function nomeFileDaPercorso(path) {
+          const parti = String(path || "").split(/[\\/]/);
+          return parti[parti.length - 1] || String(path || "");
+        }
+
+        function leggiPrezziarioCollegato() {
+          try {
+            const raw = localStorage.getItem(STORAGE_PREZZIARIO_COLLEGATO);
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            const path = typeof data?.path === "string" ? data.path.trim() : "";
+            if (!path) return null;
+            const fileName =
+              typeof data?.fileName === "string" && data.fileName.trim()
+                ? data.fileName.trim()
+                : nomeFileDaPercorso(path);
+            return { path, fileName };
+          } catch {
+            return null;
+          }
+        }
+
+        function salvaPrezziarioCollegato(path, fileName) {
+          const pulito = String(path || "").trim();
+          if (!pulito) return;
+          localStorage.setItem(
+            STORAGE_PREZZIARIO_COLLEGATO,
+            JSON.stringify({
+              path: pulito,
+              fileName: String(fileName || nomeFileDaPercorso(pulito)),
+            }),
+          );
+        }
 
         function setStatus(msg, isErr) {
           statusEl.textContent = msg || "";
@@ -721,6 +762,9 @@
             const e = (p.estesa || "").trim().toLowerCase();
             return b.startsWith(qn) || e.startsWith(qn);
           }
+          if (!p.searchBlob) {
+            p.searchBlob = [p.prdId, p.breve, p.estesa, p.unitaDiMisuraId || ""].join(" ").toLowerCase();
+          }
           return p.searchBlob.includes(qn);
         }
 
@@ -1036,6 +1080,8 @@
             prodotti: parsed.list,
             voceMainIds: parsed.mains,
             sourcePath: normalizeUploadedPath(sourcePath, sourceLabel || "file Excel"),
+            tipoFile: "Excel",
+            cosa: " righe.",
           };
           uploadedDataset = dataset;
           upsertUploadedOption(sourceLabel || "file Excel");
@@ -1053,6 +1099,8 @@
             prodotti: parsed.list,
             voceMainIds: parsed.mains,
             sourcePath: normalizeUploadedPath(sourcePath, sourceLabel || "file HTML"),
+            tipoFile: "HTML",
+            cosa: " righe.",
           };
           uploadedDataset = dataset;
           upsertUploadedOption(sourceLabel || "file HTML");
@@ -1079,22 +1127,24 @@
           const usareLombardia = lombardia.list.length > 0;
           const usareElenco = !!(elenco && elenco.list.length > 0);
           const parsed = usareLombardia ? lombardia : usareElenco ? elenco : loadProdotti(doc);
-          const dataset = {
-            unitaMap: usareLombardia || usareElenco ? parsed.unitaMap : loadUnita(doc),
-            prodotti: parsed.list,
-            voceMainIds: parsed.mains,
-            sourcePath: isUploadedFile ? normalizeUploadedPath(sourcePath, sourceLabel || "file XML") : "",
-          };
-          if (isUploadedFile) {
-            uploadedDataset = dataset;
-            upsertUploadedOption(sourceLabel);
-          }
           const tipoFile = usareLombardia
             ? "Regione Lombardia"
             : usareElenco
               ? "elenco prezzi"
               : "prezziario";
           const cosa = usareLombardia || usareElenco ? " voci." : " righe prodotto.";
+          const dataset = {
+            unitaMap: usareLombardia || usareElenco ? parsed.unitaMap : loadUnita(doc),
+            prodotti: parsed.list,
+            voceMainIds: parsed.mains,
+            sourcePath: isUploadedFile ? normalizeUploadedPath(sourcePath, sourceLabel || "file XML") : "",
+            tipoFile,
+            cosa,
+          };
+          if (isUploadedFile) {
+            uploadedDataset = dataset;
+            upsertUploadedOption(sourceLabel);
+          }
           applyDatasetToState(
             dataset,
             "Caricato (" + tipoFile + "): " + (sourceLabel || "file") + " — " + dataset.prodotti.length + cosa,
@@ -1122,7 +1172,25 @@
             }
             selectEl.disabled = items.length === 0;
             selectEl.addEventListener("change", onSelectChange);
-            if (items.length > 0) {
+            const collegato = leggiPrezziarioCollegato();
+            if (collegato) {
+              try {
+                await caricaPrezziarioDaPercorso(collegato.path);
+              } catch (err) {
+                const msg = err && err.message ? String(err.message) : String(err);
+                const fileMancante = /Errore lettura file|os error 2|non riesce a trovare|cannot find|not found/i.test(msg);
+                if (fileMancante) {
+                  setStatus(
+                    "Non trovo il prezzario collegato al computo.\n" +
+                      collegato.path +
+                      "\nSe lo hai spostato, ricaricalo con «Carica e collega al computo».",
+                    true,
+                  );
+                } else {
+                  setStatus(msg, true);
+                }
+              }
+            } else if (items.length > 0) {
               await loadPrezziarioFromUrl("./prezziari/" + selectEl.value, selectEl.options[selectEl.selectedIndex].text);
             }
           } catch (e) {
@@ -1155,6 +1223,278 @@
           }
         }
 
+        function testoSenzaBom(text) {
+          const s = String(text || "");
+          return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
+        }
+
+        const CACHE_PREZZIARIO_DB = "computo_metrico_prezziario_cache";
+        const CACHE_PREZZIARIO_STORE = "file";
+        const CACHE_PREZZIARIO_KEY = "ultimo";
+        const CACHE_PREZZIARIO_VERSIONE = 1;
+
+        function apriCachePrezziario() {
+          return new Promise((resolve, reject) => {
+            const req = indexedDB.open(CACHE_PREZZIARIO_DB, 1);
+            req.onupgradeneeded = function () {
+              const db = req.result;
+              if (!db.objectStoreNames.contains(CACHE_PREZZIARIO_STORE)) {
+                db.createObjectStore(CACHE_PREZZIARIO_STORE);
+              }
+            };
+            req.onsuccess = function () {
+              resolve(req.result);
+            };
+            req.onerror = function () {
+              reject(req.error);
+            };
+          });
+        }
+
+        async function leggiStatFile(path) {
+          const tauriInvoke = window.__TAURI__?.core?.invoke;
+          if (typeof tauriInvoke !== "function") return null;
+          try {
+            return await tauriInvoke("file_stat", { path });
+          } catch (err) {
+            const msg = err && err.message ? String(err.message) : String(err);
+            if (/command|not registered|unknown/i.test(msg)) return null;
+            throw err;
+          }
+        }
+
+        function compattaRigaPrezziario(p) {
+          const breve = p.breve || "";
+          const estesa = p.estesa && p.estesa !== breve ? p.estesa : "";
+          return [
+            p.prdId || "",
+            p.rawPrdId || "",
+            p.groupKey || "",
+            p.voce ? 1 : 0,
+            p.senzaSottovoci ? 1 : 0,
+            breve,
+            estesa,
+            p.unitaDiMisuraId || "",
+            p.prezzo || "",
+          ];
+        }
+
+        function espandiRigaPrezziario(t) {
+          const prdId = t[0] || "";
+          const breve = t[5] || "";
+          const estesa = t[6] || breve;
+          const um = t[7] || "";
+          const row = {
+            prdId,
+            voce: t[3] === 1,
+            breve,
+            estesa,
+            unitaDiMisuraId: um || null,
+            prezzo: t[8] || "",
+          };
+          if (t[1]) row.rawPrdId = t[1];
+          if (t[2]) row.groupKey = t[2];
+          if (t[4] === 1) row.senzaSottovoci = true;
+          return row;
+        }
+
+        async function leggiCachePrezziario(path, stat) {
+          if (!stat || !window.indexedDB) return null;
+          const db = await apriCachePrezziario();
+          const record = await new Promise((resolve, reject) => {
+            const tx = db.transaction(CACHE_PREZZIARIO_STORE, "readonly");
+            const req = tx.objectStore(CACHE_PREZZIARIO_STORE).get(CACHE_PREZZIARIO_KEY);
+            req.onsuccess = function () {
+              resolve(req.result || null);
+            };
+            req.onerror = function () {
+              reject(req.error);
+            };
+          });
+          db.close();
+          if (!record || record.v !== CACHE_PREZZIARIO_VERSIONE) return null;
+          if (record.path !== path) return null;
+          if (Number(record.size) !== Number(stat.size)) return null;
+          if (Number(record.modifiedMs) !== Number(stat.modifiedMs)) return null;
+          if (!Array.isArray(record.rows) || record.rows.length === 0) return null;
+          return record;
+        }
+
+        async function salvaCachePrezziario(path, stat, dataset) {
+          if (!stat || !dataset || !Array.isArray(dataset.prodotti) || dataset.prodotti.length === 0) return;
+          if (!window.indexedDB) return;
+          const rows = dataset.prodotti.map(compattaRigaPrezziario);
+          const unita = [];
+          if (dataset.unitaMap && typeof dataset.unitaMap.forEach === "function") {
+            dataset.unitaMap.forEach((label, id) => {
+              unita.push([id, label]);
+            });
+          }
+          const record = {
+            v: CACHE_PREZZIARIO_VERSIONE,
+            path,
+            size: Number(stat.size),
+            modifiedMs: Number(stat.modifiedMs),
+            tipoFile: dataset.tipoFile || "prezziario",
+            cosa: dataset.cosa || " righe.",
+            unita,
+            rows,
+          };
+          const db = await apriCachePrezziario();
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction(CACHE_PREZZIARIO_STORE, "readwrite");
+            tx.oncomplete = function () {
+              resolve();
+            };
+            tx.onerror = function () {
+              reject(tx.error);
+            };
+            tx.objectStore(CACHE_PREZZIARIO_STORE).put(record, CACHE_PREZZIARIO_KEY);
+          });
+          db.close();
+        }
+
+        async function applicaCachePrezziario(cache, path, nome) {
+          setStatus("Riapro il prezzario già letto…", false);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          const prodotti = [];
+          const voceMainIds = new Set();
+          const rows = cache.rows;
+          for (let i = 0; i < rows.length; i += 1) {
+            const p = espandiRigaPrezziario(rows[i]);
+            prodotti.push(p);
+            if (p.voce) voceMainIds.add(p.prdId);
+            if (i > 0 && i % 8000 === 0) {
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
+          }
+          const dataset = {
+            unitaMap: new Map(Array.isArray(cache.unita) ? cache.unita : []),
+            prodotti,
+            voceMainIds,
+            sourcePath: path,
+            tipoFile: cache.tipoFile,
+            cosa: cache.cosa,
+          };
+          uploadedDataset = dataset;
+          upsertUploadedOption(nome);
+          applyDatasetToState(
+            dataset,
+            "Caricato (" +
+              (cache.tipoFile || "prezziario") +
+              "): " +
+              nome +
+              " — " +
+              prodotti.length +
+              (cache.cosa || " righe.") +
+              " Aperto dalla memoria, senza rileggere il file.",
+          );
+          preparaRicercaInSfondo();
+        }
+
+        function preparaRicercaInSfondo() {
+          const lista = prodotti;
+          let i = 0;
+          function passo() {
+            const fine = Math.min(lista.length, i + 2500);
+            for (; i < fine; i += 1) {
+              const p = lista[i];
+              if (!p || p.searchBlob) continue;
+              p.searchBlob = [p.prdId, p.breve, p.estesa, p.unitaDiMisuraId || ""].join(" ").toLowerCase();
+            }
+            if (i < lista.length) setTimeout(passo, 0);
+          }
+          setTimeout(passo, 40);
+        }
+
+        async function leggiTestoDaPercorso(path) {
+          const tauriInvoke = window.__TAURI__?.core?.invoke;
+          if (typeof tauriInvoke !== "function") {
+            throw new Error("Apertura file dal percorso non disponibile.");
+          }
+          const text = await tauriInvoke("read_file_text", { path });
+          return testoSenzaBom(text);
+        }
+
+        async function caricaPrezziarioDaPercorso(path) {
+          const nome = nomeFileDaPercorso(path);
+          const lower = nome.toLowerCase();
+          const stat = await leggiStatFile(path);
+          if (stat) {
+            try {
+              const cache = await leggiCachePrezziario(path, stat);
+              if (cache) {
+                await applicaCachePrezziario(cache, path, nome);
+                salvaPrezziarioCollegato(path, nome);
+                return;
+              }
+            } catch (_) {
+              /* se la memoria non si legge, si ricarica il file */
+            }
+          }
+          setStatus("Lettura del file…", false);
+          if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
+            const tauriInvoke = window.__TAURI__?.core?.invoke;
+            if (typeof tauriInvoke !== "function") {
+              throw new Error("Apertura file dal percorso non disponibile.");
+            }
+            if (typeof XLSX === "undefined") {
+              throw new Error("Libreria Excel non disponibile. Verifica che esista src/vendor/xlsx.full.min.js");
+            }
+            const bytes = await tauriInvoke("read_file_bytes", { path });
+            const uint8 = new Uint8Array(Array.isArray(bytes) ? bytes : []);
+            await applyXlsxArrayBuffer(uint8.buffer, nome, path);
+          } else if (lower.endsWith(".html") || lower.endsWith(".htm")) {
+            await applyHtmlText(await leggiTestoDaPercorso(path), nome, path);
+          } else {
+            await applyXmlText(await leggiTestoDaPercorso(path), nome, true, path);
+          }
+          salvaPrezziarioCollegato(path, nome);
+          if (stat && uploadedDataset && statusEl && !statusEl.classList.contains("err")) {
+            const msg = statusEl.textContent;
+            setStatus(msg + " Memorizzo le voci per la prossima apertura…", false);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            try {
+              await salvaCachePrezziario(path, stat, uploadedDataset);
+            } catch (_) {
+              /* se non entra in memoria, la prossima volta si rilegge il file */
+            }
+            if (statusEl && !statusEl.classList.contains("err")) {
+              statusEl.textContent =
+                msg + " Collegato al computo: la prossima volta si riapre più in fretta.";
+            }
+          } else if (statusEl && !statusEl.classList.contains("err")) {
+            statusEl.textContent =
+              statusEl.textContent +
+              " Collegato al computo: la prossima volta che apri Cerca voce si ricarica da solo.";
+          }
+        }
+
+        async function scegliPrezziarioDaCollegare() {
+          const tauriDialogOpen = window.__TAURI__?.dialog?.open;
+          if (typeof tauriDialogOpen !== "function") {
+            fileEl.click();
+            return;
+          }
+          const selected = await tauriDialogOpen({
+            multiple: false,
+            title: "Scegli il prezzario da collegare al computo",
+            filters: [{ name: "Prezzario", extensions: ["xml", "xlsx", "xls", "html", "htm"] }],
+          });
+          if (selected == null) return;
+          const path = Array.isArray(selected) ? selected[0] : selected;
+          if (typeof path !== "string" || !path.trim()) return;
+          await caricaPrezziarioDaPercorso(path.trim());
+        }
+
+        btnCollegaPrezziario?.addEventListener("click", async function () {
+          try {
+            await scegliPrezziarioDaCollegare();
+          } catch (e) {
+            setStatus(e && e.message ? e.message : String(e), true);
+          }
+        });
+
         fileEl.addEventListener("change", async function () {
           const f = fileEl.files && fileEl.files[0];
           if (!f) return;
@@ -1178,7 +1518,11 @@
               return;
             }
             const text = await f.text();
-            await applyXmlText(text, f.name, true, sourcePath);
+            await applyXmlText(testoSenzaBom(text), f.name, true, sourcePath);
+            setStatus(
+              "File letto solo per questa volta. Per ritrovarlo in Cerca voce usa «Carica e collega al computo».",
+              true,
+            );
           } catch (e) {
             setStatus(e && e.message ? e.message : String(e), true);
           }
@@ -1293,7 +1637,7 @@
               ? " · U.M. " + unitaMap.get(main.unitaDiMisuraId)
               : "";
           detailCode.textContent = main.prdId + um + (main.prezzo ? " · € " + main.prezzo : "");
-          detailMain.textContent = (main.estesa || main.breve).trim();
+          detailMain.textContent = testoConCodiceVoce((main.estesa || main.breve).trim(), main);
 
           const subs = getDirectSubVoci(mainId)
             .filter((s) => s.prdId !== mainId)
@@ -1352,14 +1696,22 @@
           return Math.abs(n) > 1e-9;
         }
 
-        /** Riga testuale con prezzo unitario e U.M. dal prezziario (XML o Excel). */
-        function rigaPrezzoUnitarioRiepilogo(p) {
-          if (!p || !prezzoListinoSignificativo(p.prezzo)) return "";
-          const um =
-            p.unitaDiMisuraId && unitaMap.get(p.unitaDiMisuraId)
-              ? " / " + unitaMap.get(p.unitaDiMisuraId)
-              : "";
-          return "Prezzo unitario (prezziario): " + String(p.prezzo).trim() + " €" + um;
+        /** Codice del listino, senza il suffisso interno usato solo se il codice è doppio. */
+        function codiceVocePulito(row) {
+          if (!row) return "";
+          const raw = stripGeneratedDuplicateSuffix(row.rawPrdId || row.prdId || "");
+          if (!raw || /^HTML-\d+$/i.test(raw)) return "";
+          return raw;
+        }
+
+        /** Mette il codice in fondo al testo della voce. */
+        function testoConCodiceVoce(testo, row) {
+          const base = String(testo || "").trim();
+          const codice = codiceVocePulito(row);
+          if (!codice) return base;
+          const coda = "Codice voce: " + codice;
+          if (base.endsWith(coda)) return base;
+          return base ? base + "\n" + coda : coda;
         }
 
         function buildRiepilogoFromDetail() {
@@ -1369,41 +1721,44 @@
           if (!main) return;
           const lines = [];
           const mainText = (main.estesa || main.breve).trim();
-          lines.push(mainText);
-          const mainPrezzo = rigaPrezzoUnitarioRiepilogo(main);
-          if (mainPrezzo) lines.push(mainPrezzo);
+          lines.push(testoConCodiceVoce(mainText, main));
 
           subsList.querySelectorAll("input[type=checkbox]").forEach((cb) => {
             if (!cb.checked) return;
             const p = byPrdId.get(cb.dataset.prdId);
             if (!p && !cb.dataset.text) return;
             const riga = p ? (p.breve || p.estesa).trim() : cb.dataset.text;
-            lines.push("- " + riga);
-            if (!p) return;
-            const subPrezzo = rigaPrezzoUnitarioRiepilogo(p);
-            if (subPrezzo) lines.push("  " + subPrezzo);
+            lines.push("- " + (p ? testoConCodiceVoce(riga, p) : riga));
           });
 
           riepilogoEl.value = lines.join("\n\n");
         }
 
-        /** Ultimo prezzo in euro presente nel testo riepilogo (preferisce le righe «Prezzo unitario»). */
-        function estraiUltimoPrezzoDaRiepilogo(text) {
-          const lines = String(text || "").split(/\r?\n/);
-          let last = null;
-          for (const line of lines) {
-            const mPreferito = line.match(
-              /Prezzo unitario\s*\(prezziario\)\s*:\s*([0-9][0-9.,]*)\s*€/i,
-            );
-            const mGenerico = !mPreferito
-              ? line.match(/([0-9][0-9.,]*)\s*€/)
-              : null;
-            const raw = mPreferito ? mPreferito[1] : mGenerico ? mGenerico[1] : null;
-            if (!raw) continue;
-            const n = parsePrezzoListino(raw);
-            if (!Number.isNaN(n) && n >= 0) last = n;
+        /** Prezzo e unità letti dalla voce scelta, senza scriverli nel testo. */
+        function prezzoEUnitaDallaSelezione() {
+          const righe = [];
+          if (activeHitPrdId) {
+            const main = byPrdId.get(findMainPrdId(activeHitPrdId));
+            if (main) righe.push(main);
           }
-          return last;
+          subsList.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+            if (!cb.checked) return;
+            const p = byPrdId.get(cb.dataset.prdId);
+            if (p) righe.push(p);
+          });
+          let prezzo = null;
+          let unita = "";
+          righe.forEach((p) => {
+            if (!prezzoListinoSignificativo(p.prezzo)) return;
+            const n = parsePrezzoListino(p.prezzo);
+            if (Number.isNaN(n) || n < 0) return;
+            prezzo = n;
+            unita =
+              p.unitaDiMisuraId && unitaMap.get(p.unitaDiMisuraId)
+                ? String(unitaMap.get(p.unitaDiMisuraId)).trim()
+                : "";
+          });
+          return { prezzo, unita };
         }
 
         btnApply.addEventListener("click", function () {
@@ -1426,18 +1781,6 @@
           }
         });
 
-        function estraiUnitaDaRiepilogo(text) {
-          const lines = String(text || "").split(/\r?\n/);
-          let last = "";
-          for (const line of lines) {
-            const m = line.match(
-              /Prezzo unitario\s*\(prezziario\)\s*:\s*[0-9][0-9.,]*\s*€\s*\/\s*(.+)\s*$/i,
-            );
-            if (m) last = m[1].trim();
-          }
-          return last;
-        }
-
         btnAggiungiComputo?.addEventListener("click", function () {
           const testo = riepilogoEl.value.trim();
           if (!testo) {
@@ -1445,7 +1788,8 @@
             return;
           }
           const fromCapitolato = new URLSearchParams(window.location.search).get("from") === "capitolato";
-          const prezzoNum = estraiUltimoPrezzoDaRiepilogo(riepilogoEl.value);
+          const scelto = prezzoEUnitaDallaSelezione();
+          const prezzoNum = scelto.prezzo;
           if (fromCapitolato) {
             let payload = { perChiave: [], nuove: [] };
             try {
@@ -1458,7 +1802,7 @@
             if (!Array.isArray(payload.nuove)) payload.nuove = [];
             payload.nuove.unshift({
               voce: riepilogoEl.value,
-              unita: estraiUnitaDaRiepilogo(riepilogoEl.value),
+              unita: scelto.unita,
               prezzo: prezzoNum != null ? Number(prezzoNum).toFixed(2) : "0",
             });
             try {
@@ -1470,7 +1814,7 @@
             const msgPrezzoCap =
               prezzoNum != null
                 ? ` Prezzo ${Number(prezzoNum).toFixed(2)} € inviato al capitolato.`
-                : " (nessun prezzo trovato nel riepilogo).";
+                : " (nessun prezzo nel listino).";
             setStatus("Apertura capitolato…" + msgPrezzoCap, false);
             window.location.href = "index.html?openCapitolato=1";
             return;
@@ -1499,7 +1843,7 @@
           const msgPrezzo =
             prezzoNum != null
               ? ` Prezzo ${Number(prezzoNum).toFixed(2)} € inviato a Nuova voce.`
-              : " (nessun prezzo trovato nel riepilogo).";
+              : " (nessun prezzo nel listino).";
           setStatus("Apertura Nuova voce…" + msgPrezzo, false);
           window.location.href = "index.html?openVoceDialog=1";
         });

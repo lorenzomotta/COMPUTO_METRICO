@@ -87,6 +87,33 @@ fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
+fn read_file_text(path: String) -> Result<String, String> {
+    fs::read_to_string(&path).map_err(|e| format!("Errore lettura file: {}", e))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FileStatPayload {
+    size: u64,
+    modified_ms: u64,
+}
+
+#[tauri::command]
+fn file_stat(path: String) -> Result<FileStatPayload, String> {
+    let meta = fs::metadata(&path).map_err(|e| format!("Errore lettura file: {}", e))?;
+    let modified_ms = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    Ok(FileStatPayload {
+        size: meta.len(),
+        modified_ms,
+    })
+}
+
+#[tauri::command]
 fn exit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
@@ -330,6 +357,8 @@ pub fn run() {
             write_temp_export_file_bytes,
             open_file_with_system,
             read_file_bytes,
+            read_file_text,
+            file_stat,
             exit_app,
             get_app_version,
             check_app_update,

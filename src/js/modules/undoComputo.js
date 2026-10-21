@@ -5,7 +5,10 @@
  */
 
 const PREFIX = "computo_metrico_";
-const SKIP_KEYS = new Set(["computo_metrico_ifc_data"]);
+const SKIP_KEYS = new Set([
+  "computo_metrico_ifc_data",
+  "computo_metrico_prezziario_collegato",
+]);
 const COALESCE_MS = 450;
 
 /** @type {Record<string, string>|null} */

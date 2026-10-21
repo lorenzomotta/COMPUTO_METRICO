@@ -403,6 +403,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const STORAGE_VOCI_UNITA_OPTIONS = "computo_metrico_voci_unita_options";
   const STORAGE_ARCHIVIO_CAPITOLI = ARCHIVIO_CAPITOLI_STORAGE_KEY;
   const STORAGE_IFC_DATA = "computo_metrico_ifc_data";
+  const STORAGE_PREZZIARIO_COLLEGATO = "computo_metrico_prezziario_collegato";
   const STORAGE_APERTURE_MASTER = "computo_metrico_aperture_master";
   const STORAGE_ARCHIVIO_PIANI_MISURA = ARCHIVIO_PIANI_MISURA_STORAGE_KEY;
   const STORAGE_DAVANZALI_SBORDI = "computo_metrico_davanzali_sbordi";
@@ -8726,6 +8727,42 @@ window.addEventListener("DOMContentLoaded", () => {
     return loadIfcWithViewerFile(file, ifcPath);
   }
 
+  function leggiPrezziarioCollegatoPerExport() {
+    try {
+      const raw = localStorage.getItem(STORAGE_PREZZIARIO_COLLEGATO);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      const path = typeof data?.path === "string" ? data.path.trim() : "";
+      if (!path) return null;
+      return {
+        path,
+        fileName: typeof data?.fileName === "string" ? data.fileName.trim() : "",
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function applicaPrezziarioLinkDaImport(payload) {
+    const link = payload?.prezziarioLink;
+    const path = link && typeof link.path === "string" ? link.path.trim() : "";
+    try {
+      if (!path) {
+        localStorage.removeItem(STORAGE_PREZZIARIO_COLLEGATO);
+        return;
+      }
+      localStorage.setItem(
+        STORAGE_PREZZIARIO_COLLEGATO,
+        JSON.stringify({
+          path,
+          fileName: typeof link.fileName === "string" ? link.fileName.trim() : "",
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
   function buildComputoDataPayload() {
     const ifcLink =
       ifcDataCache?.source?.linkedPath && typeof ifcDataCache.source.linkedPath === "string"
@@ -8754,6 +8791,7 @@ window.addEventListener("DOMContentLoaded", () => {
       archivioCapitoli: [...archivioCapitoli],
       vociUnitaMisuraOptions,
       ifcLink,
+      prezziarioLink: leggiPrezziarioCollegatoPerExport(),
       strade: datiStradePerExport(),
       schedeModuli: leggiSchedeModuliPerExport(),
       davanzaliSbordi: { ...davanzaliSbordiByKey },
@@ -10374,6 +10412,7 @@ window.addEventListener("DOMContentLoaded", () => {
       ifcDataCache = payload.ifcData && typeof payload.ifcData === "object" ? payload.ifcData : null;
       saveIfcData();
     }
+    applicaPrezziarioLinkDaImport(payload);
 
     setPianoFormMode();
     setStratiFormMode();
