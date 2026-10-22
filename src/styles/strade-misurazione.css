@@ -121,11 +121,18 @@
 }
 
 .strade-strato-field--voce {
-  flex: 1 1 180px;
-  min-width: 140px;
+  flex: 1 1 110px;
+  min-width: 88px;
+}
+
+.strade-strato-field--um {
+  width: 5.5rem;
+  min-width: 5.5rem;
+  flex: 0 0 auto;
 }
 
 .strade-strato-field input,
+.strade-strato-field select,
 .strade-strato-voce {
   width: 100%;
 }
@@ -535,12 +542,22 @@
 .strade-sott-rif,
 .strade-strato-voce {
   width: 100%;
-  min-width: 100px;
+  min-width: 72px;
   padding: 3px 6px;
   border: 1px solid rgba(16, 35, 63, 0.18);
   border-radius: 5px;
   font-size: 0.82rem;
   color: #10233f;
+}
+
+.strade-strato-unita {
+  width: 100%;
+  padding: 3px 2px;
+  border: 1px solid rgba(16, 35, 63, 0.18);
+  border-radius: 5px;
+  font-size: 0.78rem;
+  color: #10233f;
+  background: #fff;
 }
 
 .strade-strato-spessore {

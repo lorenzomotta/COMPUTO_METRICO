@@ -1510,12 +1510,19 @@ export function duplicaAreaStrada(area, nextId, n) {
   };
 }
 
+const UNITA_STRATO_OPZIONI = ["ml.", "mq.", "mc", "n.", "Kg.", "a corpo", "percentuale"];
+
+function unitaStratoPulita(raw) {
+  return String(raw ?? "").trim();
+}
+
 export function emptyStratoStrada(nextId, n = 1) {
   return {
     id: typeof nextId === "function" ? nextId() : Number(nextId) || 0,
     n: Number.isFinite(n) ? n : 1,
     vocibreve: "",
     spessore: "",
+    unitaMisura: "",
     note: "",
     sottrazioni: [],
   };
@@ -1649,6 +1656,7 @@ function sanificaStrato(row, nextId, n) {
     n,
     vocibreve: typeof src.vocibreve === "string" ? src.vocibreve : "",
     spessore: src.spessore != null && src.spessore !== "" ? String(src.spessore) : "",
+    unitaMisura: unitaStratoPulita(src.unitaMisura),
     note: typeof src.note === "string" ? src.note : "",
     sottrazioni: sottSrc.map((s, i) => sanificaSottrazione(s, nextId, i + 1)),
   };
@@ -1754,6 +1762,7 @@ export function cloneZonaPerSnapshot(zona, tipoZona) {
       n: typeof st?.n === "number" && Number.isFinite(st.n) ? st.n : i + 1,
       vocibreve: typeof st?.vocibreve === "string" ? st.vocibreve : "",
       note: typeof st?.note === "string" ? st.note : "",
+      unitaMisura: unitaStratoPulita(st?.unitaMisura),
       spessore:
         isZonaReinterroCalcolo(tipoZona)
           ? ""
@@ -3124,9 +3133,7 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
     inpVoce.placeholder = "Voce breve";
     inpVoce.autocomplete = "off";
     inpVoce.setAttribute("aria-label", "Voce breve strato");
-    inpVoce.title = isFormulaUnitaVoce
-      ? "Scegli la voce: l’unità di misura (n., ml., mq.…) viene da quella voce"
-      : "Voce breve dello strato";
+    inpVoce.title = "Voce breve dello strato";
     inpVoce.value = typeof st.vocibreve === "string" ? st.vocibreve : "";
     voceWrap.appendChild(inpVoce);
     row.appendChild(voceWrap);
@@ -3148,6 +3155,33 @@ function renderStratiCards(tipo, zona, datalistId, opts = {}) {
       spWrap.appendChild(inpSp);
       row.appendChild(spWrap);
     }
+
+    const umWrap = document.createElement("label");
+    umWrap.className = "strade-strato-field strade-strato-field--um";
+    umWrap.innerHTML = `<span>U.M.</span>`;
+    const selUm = document.createElement("select");
+    selUm.className = "strade-strato-unita";
+    selUm.title = "Unità di misura di questo strato. La ritrovi in Voci quando registri la strada.";
+    selUm.setAttribute("aria-label", "Unità di misura dello strato");
+    const optVuota = document.createElement("option");
+    optVuota.value = "";
+    optVuota.textContent = "—";
+    selUm.appendChild(optVuota);
+    const unitaAttuale = unitaStratoPulita(st.unitaMisura);
+    const opzioniUm = [...UNITA_STRATO_OPZIONI];
+    if (unitaAttuale && !opzioniUm.some((u) => u.toLowerCase() === unitaAttuale.toLowerCase())) {
+      opzioniUm.push(unitaAttuale);
+    }
+    opzioniUm.forEach((u) => {
+      const opt = document.createElement("option");
+      opt.value = u;
+      opt.textContent = u;
+      selUm.appendChild(opt);
+    });
+    const sceltaUm = opzioniUm.find((u) => u.toLowerCase() === unitaAttuale.toLowerCase()) || "";
+    selUm.value = sceltaUm;
+    umWrap.appendChild(selUm);
+    row.appendChild(umWrap);
 
     const labelBase = nascondiSottrazioni
       ? isZonaReinterroCalcolo(tipo)
@@ -3524,8 +3558,10 @@ export function syncZonaDaBlock(block, zona) {
     if (!st) return;
     const voce = card.querySelector(".strade-strato-voce");
     const sp = card.querySelector(".strade-strato-spessore");
+    const um = card.querySelector(".strade-strato-unita");
     if (voce instanceof HTMLInputElement) st.vocibreve = voce.value;
     if (sp instanceof HTMLInputElement) st.spessore = sp.value;
+    if (um instanceof HTMLSelectElement) st.unitaMisura = um.value.trim();
     if (!Array.isArray(st.sottrazioni)) st.sottrazioni = [];
     card.querySelectorAll(".strade-sott-row").forEach((row) => {
       const sottId = Number(row.dataset.sottId);

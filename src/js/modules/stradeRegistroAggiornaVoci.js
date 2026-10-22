@@ -644,6 +644,14 @@ function raccogliAbbrevDaScheda(snapshot) {
       const vb = typeof st?.vocibreve === "string" ? st.vocibreve.trim() : "";
       if (!vb) continue;
       const key = abbrevKey(vb);
+      const unitaScelta = typeof st?.unitaMisura === "string" ? st.unitaMisura.trim() : "";
+      if (unitaScelta) {
+        const attuale = abbrevs.get(key);
+        if (!attuale || attuale.unitaEsplicita !== true) {
+          abbrevs.set(key, { label: vb, unita: unitaScelta, unitaEsplicita: true });
+        }
+        continue;
+      }
       if (!abbrevs.has(key)) {
         if (isZonaManufatti(tipo)) {
           abbrevs.set(key, { label: vb, unita: UNITA_N });
@@ -1095,8 +1103,14 @@ export function aggiornaVociDaSnapshotStrade(snapshot) {
       }
     }
 
-    // Spunta USA: l’unità diventa n. Anche se in VOCI era già mq., ml. o mc.
-    if (meta?.forzaUnita === true && meta.unita === UNITA_N) {
+    // Unità scelta sullo strato: vale quella, anche se la voce ne aveva già un’altra.
+    if (meta?.unitaEsplicita === true && typeof meta.unita === "string" && meta.unita.trim()) {
+      const scelta = meta.unita.trim();
+      if (String(item.unitaMisura || "").trim() !== scelta) {
+        item.unitaMisura = scelta;
+        changed = true;
+      }
+    } else if (meta?.forzaUnita === true && meta.unita === UNITA_N) {
       if (String(item.unitaMisura || "").trim() !== UNITA_N) {
         item.unitaMisura = UNITA_N;
         changed = true;

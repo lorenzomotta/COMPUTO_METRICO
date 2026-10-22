@@ -98,6 +98,19 @@
       .btn:hover {
         background: #eef1f6;
       }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .prezziario-scelta {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .prezziario-scelta select {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
       .btn-primary {
         background: var(--accent);
         color: #fff;
@@ -288,7 +301,12 @@
       <div class="row row-prezziari">
         <div class="field-prezziario">
           <label for="prezziario-select">Prezziario</label>
-          <select id="prezziario-select" disabled></select>
+          <div class="prezziario-scelta">
+            <select id="prezziario-select" disabled></select>
+            <button type="button" class="btn" id="btn-elimina-prezziario" disabled>
+              Togli dalla lista
+            </button>
+          </div>
         </div>
         <div class="field-file-xml">
           <label for="btn-collega-prezziario">File sul computer</label>
@@ -376,6 +394,7 @@
         const INDEX_URL = "./prezziari/prezziari-index.json";
         const statusEl = document.getElementById("status");
         const selectEl = document.getElementById("prezziario-select");
+        const btnEliminaPrezziario = document.getElementById("btn-elimina-prezziario");
         const fileEl = document.getElementById("file-fallback");
         const btnCollegaPrezziario = document.getElementById("btn-collega-prezziario");
         const searchEl = document.getElementById("search-input");
@@ -442,6 +461,90 @@
               fileName: String(fileName || nomeFileDaPercorso(pulito)),
             }),
           );
+        }
+
+        function tauriInvoke() {
+          const inv = window.__TAURI__?.core?.invoke;
+          return typeof inv === "function" ? inv : null;
+        }
+
+        function aggiornaPulsanteEliminaPrezziario() {
+          const opt = selectEl.options[selectEl.selectedIndex];
+          if (btnEliminaPrezziario) {
+            btnEliminaPrezziario.disabled = !(opt && opt.dataset.source === "libreria");
+          }
+        }
+
+        function aggiungiOpzioneLibreria(info) {
+          const fileName = String(info?.fileName || "").trim();
+          const path = String(info?.path || "").trim();
+          if (!fileName || !path) return null;
+          const value = "libreria:" + fileName;
+          let opt = [...selectEl.options].find((o) => o.value === value) || null;
+          if (!opt) {
+            opt = document.createElement("option");
+            opt.value = value;
+            selectEl.appendChild(opt);
+          }
+          opt.textContent = fileName;
+          opt.dataset.source = "libreria";
+          opt.dataset.path = path;
+          opt.dataset.fileName = fileName;
+          selectEl.disabled = false;
+          return opt;
+        }
+
+        function riempiSelectPrezziari(items, libreria) {
+          selectEl.innerHTML = "";
+          (items || []).forEach((item) => {
+            const opt = document.createElement("option");
+            opt.value = item.file;
+            opt.textContent = item.label || item.file;
+            opt.dataset.id = item.id || item.file;
+            opt.dataset.source = "builtin";
+            selectEl.appendChild(opt);
+          });
+          (libreria || []).forEach((item) => aggiungiOpzioneLibreria(item));
+          selectEl.disabled = selectEl.options.length === 0;
+          aggiornaPulsanteEliminaPrezziario();
+        }
+
+        async function elencoPrezziariLibreria() {
+          const inv = tauriInvoke();
+          if (!inv) return [];
+          try {
+            const lista = await inv("list_prezziari_libreria");
+            return Array.isArray(lista) ? lista : [];
+          } catch (_) {
+            return [];
+          }
+        }
+
+        async function memorizzaInLibreria(pathOrigine) {
+          const inv = tauriInvoke();
+          if (!inv) return null;
+          const giaInElenco = [...selectEl.options].some(
+            (opt) => opt.dataset.source === "libreria" && opt.dataset.path === pathOrigine,
+          );
+          if (!giaInElenco && statusEl && !statusEl.classList.contains("err")) {
+            statusEl.textContent = statusEl.textContent + " Copio il file nell'elenco Prezziario…";
+          }
+          const info = await inv("salva_prezziario_in_libreria", { sourcePath: pathOrigine });
+          if (!info || !info.path) return null;
+          aggiungiOpzioneLibreria(info);
+          const opt = [...selectEl.options].find((o) => o.value === "libreria:" + info.fileName);
+          if (opt) selectEl.value = opt.value;
+          salvaPrezziarioCollegato(info.path, info.fileName);
+          aggiornaPulsanteEliminaPrezziario();
+          if (info.copied && info.path !== pathOrigine && uploadedDataset) {
+            try {
+              const statNuovo = await leggiStatFile(info.path);
+              if (statNuovo) await salvaCachePrezziario(info.path, statNuovo, uploadedDataset);
+            } catch (_) {
+              /* la prossima apertura rilegge il file copiato */
+            }
+          }
+          return info;
         }
 
         function setStatus(msg, isErr) {
@@ -1152,61 +1255,76 @@
         }
 
         async function initIndex() {
+          let items = [];
+          let indiceOk = false;
           try {
             const res = await fetch(INDEX_URL);
             if (!res.ok) throw new Error("Indice non trovato.");
             const data = await res.json();
-            const items = data.prezziari || [];
-            selectEl.innerHTML = "";
-            items.forEach((item) => {
-              const opt = document.createElement("option");
-              opt.value = item.file;
-              opt.textContent = item.label || item.file;
-              opt.dataset.id = item.id || item.file;
-              selectEl.appendChild(opt);
-            });
-            if (items.length === 0) {
-              setStatus('Nessun prezziario in prezziari-index.json. Usa "Carica file" (.xml, .xlsx o .html).', true);
-            } else {
-              setStatus("Seleziona un prezziario o carica un file XML / Excel / HTML.", false);
-            }
-            selectEl.disabled = items.length === 0;
-            selectEl.addEventListener("change", onSelectChange);
-            const collegato = leggiPrezziarioCollegato();
-            if (collegato) {
-              try {
-                await caricaPrezziarioDaPercorso(collegato.path);
-              } catch (err) {
-                const msg = err && err.message ? String(err.message) : String(err);
-                const fileMancante = /Errore lettura file|os error 2|non riesce a trovare|cannot find|not found/i.test(msg);
-                if (fileMancante) {
-                  setStatus(
-                    "Non trovo il prezzario collegato al computo.\n" +
-                      collegato.path +
-                      "\nSe lo hai spostato, ricaricalo con «Carica e collega al computo».",
-                    true,
-                  );
-                } else {
-                  setStatus(msg, true);
-                }
-              }
-            } else if (items.length > 0) {
-              await loadPrezziarioFromUrl("./prezziari/" + selectEl.value, selectEl.options[selectEl.selectedIndex].text);
-            }
+            items = data.prezziari || [];
+            indiceOk = true;
           } catch (e) {
-            setStatus(
-              "Indice non caricato: apri la pagina tramite app Tauri o server locale, oppure usa «Carica file» (.xml / .xlsx / .html). (" +
-                (e && e.message ? e.message : e) +
-                ")",
-              true,
-            );
-            selectEl.disabled = true;
+            if (!tauriInvoke()) {
+              setStatus(
+                "Indice non caricato: apri la pagina tramite app Tauri o server locale, oppure usa «Carica file» (.xml / .xlsx / .html). (" +
+                  (e && e.message ? e.message : e) +
+                  ")",
+                true,
+              );
+              selectEl.disabled = true;
+              return;
+            }
+          }
+          const libreria = await elencoPrezziariLibreria();
+          riempiSelectPrezziari(items, libreria);
+          if (!selectEl.dataset.bound) {
+            selectEl.addEventListener("change", onSelectChange);
+            selectEl.dataset.bound = "1";
+          }
+          if (items.length === 0 && libreria.length === 0) {
+            setStatus('Nessun prezziario in elenco. Usa «Carica e collega al computo».', true);
+          } else if (indiceOk) {
+            setStatus("Scegli un prezzario dall'elenco, oppure carica un file dal computer.", false);
+          }
+          const collegato = leggiPrezziarioCollegato();
+          if (collegato) {
+            const giaInElenco = [...selectEl.options].find((opt) => opt.dataset.path === collegato.path);
+            if (giaInElenco) selectEl.value = giaInElenco.value;
+            try {
+              await caricaPrezziarioDaPercorso(collegato.path);
+            } catch (err) {
+              const msg = err && err.message ? String(err.message) : String(err);
+              const fileMancante = /Errore lettura file|os error 2|non riesce a trovare|cannot find|not found/i.test(msg);
+              if (fileMancante) {
+                setStatus(
+                  "Non trovo il prezzario collegato al computo.\n" +
+                    collegato.path +
+                    "\nSe lo hai spostato, ricaricalo con «Carica e collega al computo».",
+                  true,
+                );
+              } else {
+                setStatus(msg, true);
+              }
+            }
+            return;
+          }
+          if (items.length > 0) {
+            await loadPrezziarioFromUrl("./prezziari/" + selectEl.value, selectEl.options[selectEl.selectedIndex].text);
           }
         }
 
         async function onSelectChange() {
           const opt = selectEl.options[selectEl.selectedIndex];
+          aggiornaPulsanteEliminaPrezziario();
           if (!opt) return;
+          if (opt.dataset.source === "libreria" && opt.dataset.path) {
+            try {
+              await caricaPrezziarioDaPercorso(opt.dataset.path);
+            } catch (e) {
+              setStatus(e && e.message ? e.message : String(e), true);
+            }
+            return;
+          }
           if (opt.value === CUSTOM_FILE_OPTION_VALUE) {
             if (!uploadedDataset) {
               setStatus("Nessun file caricato disponibile.", true);
@@ -1426,6 +1544,19 @@
               if (cache) {
                 await applicaCachePrezziario(cache, path, nome);
                 salvaPrezziarioCollegato(path, nome);
+                try {
+                  const info = await memorizzaInLibreria(path);
+                  if (info?.copied && statusEl && !statusEl.classList.contains("err")) {
+                    statusEl.textContent = statusEl.textContent + " Copiato nell'elenco Prezziario.";
+                  }
+                } catch (errCopia) {
+                  if (statusEl && !statusEl.classList.contains("err")) {
+                    statusEl.textContent =
+                      statusEl.textContent +
+                      " Non sono riuscito a copiarlo nell'elenco: " +
+                      (errCopia && errCopia.message ? errCopia.message : String(errCopia));
+                  }
+                }
                 return;
               }
             } catch (_) {
@@ -1450,6 +1581,17 @@
             await applyXmlText(await leggiTestoDaPercorso(path), nome, true, path);
           }
           salvaPrezziarioCollegato(path, nome);
+          let infoLibreria = null;
+          try {
+            infoLibreria = await memorizzaInLibreria(path);
+          } catch (errCopia) {
+            if (statusEl && !statusEl.classList.contains("err")) {
+              statusEl.textContent =
+                statusEl.textContent +
+                " Non sono riuscito a copiarlo nell'elenco: " +
+                (errCopia && errCopia.message ? errCopia.message : String(errCopia));
+            }
+          }
           if (stat && uploadedDataset && statusEl && !statusEl.classList.contains("err")) {
             const msg = statusEl.textContent;
             setStatus(msg + " Memorizzo le voci per la prossima apertura…", false);
@@ -1461,12 +1603,15 @@
             }
             if (statusEl && !statusEl.classList.contains("err")) {
               statusEl.textContent =
-                msg + " Collegato al computo: la prossima volta si riapre più in fretta.";
+                msg +
+                " Collegato al computo: la prossima volta si riapre più in fretta." +
+                (infoLibreria?.copied ? " Copiato nell'elenco Prezziario." : "");
             }
           } else if (statusEl && !statusEl.classList.contains("err")) {
             statusEl.textContent =
               statusEl.textContent +
-              " Collegato al computo: la prossima volta che apri Cerca voce si ricarica da solo.";
+              " Collegato al computo: la prossima volta che apri Cerca voce si ricarica da solo." +
+              (infoLibreria?.copied ? " Copiato nell'elenco Prezziario." : "");
           }
         }
 
@@ -1493,6 +1638,43 @@
           } catch (e) {
             setStatus(e && e.message ? e.message : String(e), true);
           }
+        });
+
+        btnEliminaPrezziario?.addEventListener("click", async function () {
+          const opt = selectEl.options[selectEl.selectedIndex];
+          if (!opt || opt.dataset.source !== "libreria") return;
+          const nome = opt.dataset.fileName || opt.textContent;
+          const conferma = window.confirm(
+            "Togliere «" +
+              nome +
+              "» dall'elenco del programma?\nIl file originale sul computer resta al suo posto.",
+          );
+          if (!conferma) return;
+          const inv = tauriInvoke();
+          if (!inv) {
+            setStatus("Per togliere un prezzario apri il programma.", true);
+            return;
+          }
+          try {
+            await inv("elimina_prezziario_libreria", { fileName: nome });
+          } catch (e) {
+            setStatus(e && e.message ? e.message : String(e), true);
+            return;
+          }
+          const collegato = leggiPrezziarioCollegato();
+          if (collegato && (collegato.path === opt.dataset.path || collegato.fileName === nome)) {
+            localStorage.removeItem(STORAGE_PREZZIARIO_COLLEGATO);
+          }
+          opt.remove();
+          aggiornaPulsanteEliminaPrezziario();
+          if (selectEl.options.length === 0) {
+            selectEl.disabled = true;
+            setStatus("Nessun prezzario in elenco. Usa «Carica e collega al computo».", false);
+            return;
+          }
+          selectEl.selectedIndex = 0;
+          aggiornaPulsanteEliminaPrezziario();
+          await onSelectChange();
         });
 
         fileEl.addEventListener("change", async function () {

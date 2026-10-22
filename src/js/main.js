@@ -6106,7 +6106,6 @@ window.addEventListener("DOMContentLoaded", () => {
     vocePosizioneEl,
     voceAbbreviataEl,
     voceTipoMisuraEl,
-    voceNoteEl,
   ];
 
   function setVoceDialogModalitaSoloUnitaMisura(attiva) {
@@ -6126,6 +6125,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (vocePrezzoEl) vocePrezzoEl.disabled = false;
     if (voceRiferimentoEl) voceRiferimentoEl.disabled = false;
     if (voceTestoEl) voceTestoEl.disabled = false;
+    if (voceNoteEl) voceNoteEl.disabled = false;
     if (voceBtnCercaEl) voceBtnCercaEl.disabled = false;
     if (voceUnitaMisuraEl) voceUnitaMisuraEl.disabled = false;
   }
@@ -6355,7 +6355,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (voci.length === 0) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 9;
+      cell.colSpan = 10;
       cell.className = "empty-cell";
       cell.textContent = "Nessuna voce inserita.";
       row.appendChild(cell);
@@ -6396,7 +6396,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (filtratePerAbbrev.length === 0) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 9;
+      cell.colSpan = 10;
       cell.className = "empty-cell";
       cell.textContent = "Nessuna voce corrisponde alla ricerca (voce abbreviata).";
       row.appendChild(cell);
@@ -6432,7 +6432,7 @@ window.addEventListener("DOMContentLoaded", () => {
         trCap.dataset.action = "toggle-capitolo";
         trCap.dataset.capitoloKey = g.key;
         const tdCap = document.createElement("td");
-        tdCap.colSpan = 9;
+        tdCap.colSpan = 10;
         const toggle = entry.collapsed ? "▶" : "▼";
         const titoloTesto =
           g.capitolo != null ? `${g.sequenzaLabel} · ${g.capitolo.nome}` : "Senza capitolo";
@@ -6529,14 +6529,15 @@ window.addEventListener("DOMContentLoaded", () => {
       cellVoceAbbrev.dataset.idVoce = String(item.idVoce);
       row.appendChild(cellVoceAbbrev);
       row.appendChild(createCell(item.unitaMisura || "-"));
+      let quantitaNettaVoce = 0;
       {
         const mm = normalizzaMisurazioniManualiVoce(item.misurazioniManuali, item.unitaMisura);
         const totaleQuantitaVoce = mm.reduce((sum, m) => sum + Number(m.risultato || 0), 0);
         const detrazioneAperture = calcolaDetrazioneApertureVoce(item, mm);
-        const totaleQuantitaVoceNetto = totaleQuantitaVoce - detrazioneAperture;
-        const cellQta = createCell(formatTotaleMisurazioniManualiIt(totaleQuantitaVoceNetto));
+        quantitaNettaVoce = totaleQuantitaVoce - detrazioneAperture;
+        const cellQta = createCell(formatTotaleMisurazioniManualiIt(quantitaNettaVoce));
         cellQta.classList.add("voci-cell-qta-netta");
-        if (!Number.isFinite(totaleQuantitaVoceNetto) || totaleQuantitaVoceNetto === 0) {
+        if (!Number.isFinite(quantitaNettaVoce) || quantitaNettaVoce === 0) {
           cellQta.classList.add("voci-cell-zero");
         }
         cellQta.title = "Quantità totale netta (misurazioni − aperture)";
@@ -6548,7 +6549,28 @@ window.addEventListener("DOMContentLoaded", () => {
         cellPrezzo.classList.add("voci-cell-zero");
       }
       row.appendChild(cellPrezzo);
-      row.appendChild(createCell(item.note || "-"));
+      const prezzoPerParziale = parseNonNegativeDecimal2(item.prezzo) ?? 0;
+      const parziale = quantitaNettaVoce * prezzoPerParziale;
+      const cellParziale = createCell(formatEuro2(parziale));
+      cellParziale.classList.add("voci-cell-parziale");
+      cellParziale.title = "Quantità netta × prezzo";
+      if (!Number.isFinite(parziale) || parziale === 0) {
+        cellParziale.classList.add("voci-cell-zero");
+      }
+      row.appendChild(cellParziale);
+      const cellNote = document.createElement("td");
+      cellNote.className = "voci-cell-note";
+      const notaVoceTesto = String(item.note || "").trim();
+      if (!notaVoceTesto) {
+        cellNote.textContent = "-";
+      } else {
+        const testoNota = document.createElement("span");
+        testoNota.className = "voci-note-testo";
+        testoNota.textContent = notaVoceTesto;
+        cellNote.appendChild(testoNota);
+        cellNote.dataset.note = notaVoceTesto;
+      }
+      row.appendChild(cellNote);
       const cellStrada = createCell(String(item.stradaTratto || "").trim() || "-");
       cellStrada.classList.add("voci-cell-strada");
       const nomeStrada = String(item.stradaTratto || "").trim();
@@ -6607,7 +6629,7 @@ window.addEventListener("DOMContentLoaded", () => {
         notaBtn.type = "button";
         notaBtn.className = `btn-action voci-nota-strato${notaVoce ? " is-piena" : ""}`;
         notaBtn.textContent = "!";
-        notaBtn.title = notaVoce || "Nessuna nota";
+        if (notaVoce) notaBtn.dataset.note = notaVoce;
         notaBtn.setAttribute("aria-label", notaVoce ? "Nota dello strato" : "Nessuna nota");
         actionsCell.appendChild(notaBtn);
       }
@@ -6665,7 +6687,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const subTr = document.createElement("tr");
         subTr.className = "voci-row-mm-nested";
         const subTd = document.createElement("td");
-        subTd.colSpan = 9;
+        subTd.colSpan = 10;
 
         const wrap = document.createElement("div");
         wrap.className = "voci-mm-nested-wrap";
@@ -11584,6 +11606,57 @@ window.addEventListener("DOMContentLoaded", () => {
     voceMmTemplateFaldaMeta = { canale: false, gronda: null };
   });
 
+  const vociNoteTooltipEl = document.createElement("div");
+  vociNoteTooltipEl.className = "voci-note-tooltip";
+  vociNoteTooltipEl.hidden = true;
+  document.body.appendChild(vociNoteTooltipEl);
+
+  function posizionaTooltipNotaVoce(cell) {
+    const testo = String(cell?.dataset?.note || "").trim();
+    if (!testo) {
+      vociNoteTooltipEl.hidden = true;
+      return;
+    }
+    vociNoteTooltipEl.textContent = testo;
+    vociNoteTooltipEl.classList.toggle("voci-note-tooltip--strato", cell.classList.contains("voci-nota-strato"));
+    vociNoteTooltipEl.hidden = false;
+    const riquadro = cell.getBoundingClientRect();
+    const larghezza = cell.classList.contains("voci-nota-strato")
+      ? Math.min(480, window.innerWidth * 0.76)
+      : Math.min(420, window.innerWidth * 0.7);
+    const sinistra = Math.max(8, Math.min(riquadro.left, window.innerWidth - larghezza - 8));
+    vociNoteTooltipEl.style.left = `${sinistra}px`;
+    const sotto = riquadro.bottom + 6;
+    const altezza = vociNoteTooltipEl.offsetHeight;
+    const sopra = riquadro.top - altezza - 6;
+    vociNoteTooltipEl.style.top = `${sotto + altezza > window.innerHeight - 8 && sopra > 8 ? sopra : sotto}px`;
+  }
+
+  function cellaNotaSottoMouse(event) {
+    const strato = event.target.closest(".voci-nota-strato");
+    if (strato && vociBodyEl.contains(strato) && String(strato.dataset.note || "").trim()) return strato;
+    const cell = event.target.closest(".voci-cell-note");
+    if (cell && vociBodyEl.contains(cell) && String(cell.dataset.note || "").trim()) return cell;
+    return null;
+  }
+
+  vociBodyEl.addEventListener("mouseover", (event) => {
+    const cell = cellaNotaSottoMouse(event);
+    if (!cell) {
+      vociNoteTooltipEl.hidden = true;
+      return;
+    }
+    posizionaTooltipNotaVoce(cell);
+  });
+
+  vociBodyEl.addEventListener("mouseout", (event) => {
+    const cell = event.target.closest(".voci-cell-note, .voci-nota-strato");
+    if (!cell) return;
+    const verso = event.relatedTarget;
+    if (verso instanceof Node && cell.contains(verso)) return;
+    vociNoteTooltipEl.hidden = true;
+  });
+
   vociBodyEl.addEventListener("dblclick", (event) => {
     if (event.target.closest("button, input, select, textarea")) return;
     const trVoce = event.target.closest("tr.voci-row-principale");
@@ -11861,6 +11934,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const prezzo = parseNonNegativeDecimal2(vocePrezzoEl?.value ?? "");
       const riferimento = voceRiferimentoEl ? voceRiferimentoEl.value.trim() : "";
       const voce = voceTestoEl.value.trim();
+      const note = voceNoteEl ? voceNoteEl.value.trim() : "";
       if (!unitaMisura || !voce || prezzo === null) return;
       if (
         unitaMisura &&
@@ -11878,6 +11952,7 @@ window.addEventListener("DOMContentLoaded", () => {
               prezzo,
               riferimento,
               voce,
+              note,
               capitoloId: normalizeCapitoloIdOnVoce(voceCapitoloEl?.value),
               misurazioniManuali: normalizzaMisurazioniManualiVoce(
                 item.misurazioniManuali,

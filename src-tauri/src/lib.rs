@@ -329,6 +329,137 @@ fn open_capitoli_templates_dir(app: tauri::AppHandle) -> Result<(), String> {
     open_file_with_system(dir.to_string_lossy().to_string())
 }
 
+fn prezziari_libreria_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let mut dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Cartella dati app non disponibile: {}", e))?;
+    dir.push("prezziari");
+    fs::create_dir_all(&dir).map_err(|e| format!("Errore creazione cartella prezzari: {}", e))?;
+    Ok(dir)
+}
+
+fn estensione_prezziario_ok(path: &std::path::Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase()
+            .as_str(),
+        "xml" | "xlsx" | "xls" | "html" | "htm"
+    )
+}
+
+fn nome_file_prezziario(file_name: &str) -> Result<String, String> {
+    let nome = file_name.trim();
+    if nome.is_empty()
+        || nome.contains("..")
+        || nome.contains('/')
+        || nome.contains('\\')
+        || nome.contains(':')
+    {
+        return Err("Nome prezzario non valido.".into());
+    }
+    if !estensione_prezziario_ok(std::path::Path::new(nome)) {
+        return Err("Formato non ammesso. Usa xml, xlsx, xls o html.".into());
+    }
+    Ok(nome.to_string())
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PrezziarioLibreriaInfo {
+    file_name: String,
+    path: String,
+    copied: bool,
+}
+
+#[tauri::command]
+fn list_prezziari_libreria(app: tauri::AppHandle) -> Result<Vec<PrezziarioLibreriaInfo>, String> {
+    let dir = prezziari_libreria_dir(&app)?;
+    let mut out: Vec<PrezziarioLibreriaInfo> = Vec::new();
+    let entries = fs::read_dir(&dir).map_err(|e| format!("Errore lettura cartella prezzari: {}", e))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() || !estensione_prezziario_ok(&path) {
+            continue;
+        }
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        if file_name.is_empty() {
+            continue;
+        }
+        out.push(PrezziarioLibreriaInfo {
+            file_name,
+            path: path.to_string_lossy().to_string(),
+            copied: false,
+        });
+    }
+    out.sort_by(|a, b| {
+        a.file_name
+            .to_lowercase()
+            .cmp(&b.file_name.to_lowercase())
+    });
+    Ok(out)
+}
+
+#[tauri::command]
+fn salva_prezziario_in_libreria(
+    app: tauri::AppHandle,
+    source_path: String,
+) -> Result<PrezziarioLibreriaInfo, String> {
+    let source = PathBuf::from(source_path.trim());
+    if !source.is_file() {
+        return Err(format!(
+            "Errore lettura file: {}",
+            source.display()
+        ));
+    }
+    if !estensione_prezziario_ok(&source) {
+        return Err("Formato non ammesso. Usa xml, xlsx, xls o html.".into());
+    }
+    let file_name = source
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Nome prezzario non valido.".to_string())?;
+    let file_name = nome_file_prezziario(file_name)?;
+    let dir = prezziari_libreria_dir(&app)?;
+    let dest = dir.join(&file_name);
+    let canon_dir = fs::canonicalize(&dir).map_err(|e| format!("Errore lettura file: {}", e))?;
+    let gia_dentro = fs::canonicalize(&source)
+        .ok()
+        .map(|p| p.starts_with(&canon_dir))
+        .unwrap_or(false);
+    if !gia_dentro {
+        fs::copy(&source, &dest).map_err(|e| format!("Errore copia prezzario: {}", e))?;
+    }
+    let salvato = if gia_dentro { source } else { dest };
+    Ok(PrezziarioLibreriaInfo {
+        file_name,
+        path: salvato.to_string_lossy().to_string(),
+        copied: !gia_dentro,
+    })
+}
+
+#[tauri::command]
+fn elimina_prezziario_libreria(app: tauri::AppHandle, file_name: String) -> Result<(), String> {
+    let nome = nome_file_prezziario(&file_name)?;
+    let dir = prezziari_libreria_dir(&app)?;
+    let path = dir.join(&nome);
+    if !path.is_file() {
+        return Err("Prezzario non trovato nell'elenco.".into());
+    }
+    let canon_dir = fs::canonicalize(&dir).map_err(|e| format!("Errore lettura file: {}", e))?;
+    let canon = fs::canonicalize(&path).map_err(|e| format!("Errore lettura file: {}", e))?;
+    if !canon.starts_with(&canon_dir) {
+        return Err("Nome prezzario non valido.".into());
+    }
+    fs::remove_file(&canon).map_err(|e| format!("Errore eliminazione prezzario: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[allow(unused_mut)]
@@ -368,7 +499,10 @@ pub fn run() {
             save_capitoli_template,
             load_capitoli_template,
             delete_capitoli_template,
-            open_capitoli_templates_dir
+            open_capitoli_templates_dir,
+            list_prezziari_libreria,
+            salva_prezziario_in_libreria,
+            elimina_prezziario_libreria
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
