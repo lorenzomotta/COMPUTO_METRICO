@@ -156,6 +156,15 @@
   margin: 0 0 12px;
 }
 
+#capitoli-archivio-dialog .capitoli-archivio-azioni {
+  padding-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 #capitoli-archivio-dialog .capitoli-template-picker {
   display: grid;
   gap: 8px;

@@ -480,6 +480,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const capitoliLivelliAperti = new Set();
   /** Padre della riga nuova, ancora senza nome, nell’elenco archivio. */
   let bozzaLivelloPadreId = "";
+  /** Bozza di un capitolo principale (senza padre) nell’elenco archivio. */
+  let bozzaCapitoloRadice = false;
   /** Pulsante dell’archivio premuto mentre si sta scrivendo un nome. */
   let bottoneArchivioPremuto = null;
 
@@ -1605,7 +1607,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function openArchivioCapitoliDialog() {
     capitoliTemplatePickerMode = null;
-    if (archivioCapitoli.length === 0) {
+    if (archivioCapitoli.length === 0 && !bozzaCapitoloRadice) {
       archivioCapitoli = [
         { id: createCapitoloId(), sequenza: 1, nome: "NUOVO", padreId: "" },
       ];
@@ -1693,13 +1695,31 @@ window.addEventListener("DOMContentLoaded", () => {
         );
       }
     }
+    if (bozzaCapitoloRadice) {
+      const seq =
+        ordinati
+          .filter((c) => padreIdCapitolo(c) === "")
+          .reduce((max, c) => Math.max(max, Number(c.sequenza) || 0), 0) + 1;
+      htmlRighe.push(
+        `<tr class="capitoli-archivio-riga livello-0 capitoli-riga-bozza">
+              <td>${seq}</td>
+              <td class="capitoli-nome-cella">
+                <span class="capitoli-apri-livelli-vuoto"></span>
+                <span class="capitoli-numero">${seq}</span>
+                <input id="capitolo-bozza-nome" class="capitoli-nome-inline" type="text" value="" placeholder="Scrivi il nome del capitolo" aria-label="Nome del capitolo" />
+              </td>
+              <td>0</td>
+              <td class="actions-cell"></td>
+            </tr>`,
+      );
+    }
     const rows =
       htmlRighe.length > 0
         ? htmlRighe.join("")
-        : `<tr><td colspan="4" class="empty-cell">Nessun capitolo.</td></tr>`;
+        : `<tr><td colspan="4" class="empty-cell">Nessun capitolo. Premi «Aggiungi capitolo».</td></tr>`;
     capitoliArchivioDialogEl.innerHTML = `
       <div class="ifc-riepilogo-dialog-header"><h3>Archivio CAPITOLI</h3></div>
-      <p class="bim-riepilogo-note">Il <strong>+</strong> accanto a un capitolo aggiunge il 1° livello sotto, e ti fa scrivere il nome. Il <strong>+</strong> sul 1° livello aggiunge il 2°. La matita <strong>✎</strong> serve per cambiare un nome già scritto. Se l’elenco è vuoto, parte un capitolo chiamato <strong>NUOVO</strong>.</p>
+      <p class="bim-riepilogo-note"><strong>Aggiungi capitolo</strong> crea un capitolo principale: scrivi il nome e premi Invio. Il <strong>+</strong> accanto a un capitolo aggiunge il 1° livello sotto; sul 1° livello aggiunge il 2°. La matita <strong>✎</strong> cambia un nome già scritto.</p>
       <div class="capitoli-template-bar">
         <button type="button" class="btn-action btn-secondary" data-action="salva-template-capitoli" title="Salva solo i capitoli (non il computo) come template su PC">Salva come template</button>
         <button type="button" class="btn-action btn-secondary" data-action="carica-template-capitoli" title="Carica un template di capitoli salvato">Carica da template</button>
@@ -1720,7 +1740,8 @@ window.addEventListener("DOMContentLoaded", () => {
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <div style="padding-top:12px;display:flex;justify-content:flex-end;">
+      <div class="capitoli-archivio-azioni">
+        <button type="button" class="btn-action btn-secondary" data-action="add-capitolo" title="Crea un nuovo capitolo principale">Aggiungi capitolo</button>
         <button type="button" class="btn-action btn-secondary" data-action="close-archivio-capitoli">Chiudi</button>
       </div>
     `;
@@ -1731,9 +1752,25 @@ window.addEventListener("DOMContentLoaded", () => {
         const annulla = input.dataset.annulla === "1";
         if (input.id === "capitolo-bozza-nome") {
           const nome = annulla ? "" : input.value.trim();
+          const creaRadice = bozzaCapitoloRadice;
           const padre = bozzaLivelloPadreId;
+          bozzaCapitoloRadice = false;
           bozzaLivelloPadreId = "";
-          if (nome && padre && puoMettereSotto(archivioCapitoli, "", padre)) {
+          if (nome && creaRadice) {
+            const sequenza =
+              archivioCapitoli
+                .filter((c) => padreIdCapitolo(c) === "")
+                .reduce((max, c) => Math.max(max, Number(c.sequenza) || 0), 0) + 1;
+            archivioCapitoli.push({
+              id: createCapitoloId(),
+              sequenza,
+              nome,
+              padreId: "",
+            });
+            saveArchivioCapitoliToStorage();
+            popolaSelectCapitoliVoce(voceCapitoloEl?.value || "");
+            renderVoci();
+          } else if (nome && padre && puoMettereSotto(archivioCapitoli, "", padre)) {
             const sequenza =
               archivioCapitoli
                 .filter((c) => padreIdCapitolo(c) === padre)
@@ -2011,6 +2048,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!ok) return;
     archivioCapitoli = parsed.capitoli;
     editingCapitoloId = null;
+    bozzaLivelloPadreId = "";
+    bozzaCapitoloRadice = false;
     capitoliCollapsed.clear();
     // Gli id capitolo cambiano: le voci tornano «senza capitolo» finché non le riassegni.
     voci = voci.map((v) => ({ ...v, capitoloId: "" }));
@@ -9014,6 +9053,8 @@ window.addEventListener("DOMContentLoaded", () => {
       archivioPianiMisura = [];
       archivioCapitoli = [];
       editingCapitoloId = null;
+      bozzaLivelloPadreId = "";
+      bozzaCapitoloRadice = false;
       capitoliCollapsed.clear();
       vociUnitaMisuraOptions = [...UNITA_MISURA_DEFAULT_OPTIONS];
       davanzaliSbordiByKey = {};
@@ -13125,6 +13166,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (action === "close-archivio-capitoli") {
       editingCapitoloId = null;
       bozzaLivelloPadreId = "";
+      bozzaCapitoloRadice = false;
       capitoliArchivioDialogEl.close();
       return;
     }
@@ -13141,6 +13183,13 @@ window.addEventListener("DOMContentLoaded", () => {
       openArchivioCapitoliDialog();
       return;
     }
+    if (action === "add-capitolo") {
+      editingCapitoloId = null;
+      bozzaLivelloPadreId = "";
+      bozzaCapitoloRadice = true;
+      openArchivioCapitoliDialog();
+      return;
+    }
     if (action === "add-livello-capitolo") {
       const id = String(button.dataset.id || "");
       if (!puoMettereSotto(archivioCapitoli, "", id)) {
@@ -13148,6 +13197,7 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
       editingCapitoloId = null;
+      bozzaCapitoloRadice = false;
       bozzaLivelloPadreId = id;
       capitoliLivelliAperti.add(id);
       openArchivioCapitoliDialog();
@@ -13156,6 +13206,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (action === "edit-capitolo") {
       editingCapitoloId = String(button.dataset.id || "");
       bozzaLivelloPadreId = "";
+      bozzaCapitoloRadice = false;
       openArchivioCapitoliDialog();
       return;
     }
@@ -13184,6 +13235,7 @@ window.addEventListener("DOMContentLoaded", () => {
       archivioCapitoli = archivioCapitoli.filter((c) => !idsTolti.has(c.id));
       if (idsTolti.has(editingCapitoloId)) editingCapitoloId = null;
       if (idsTolti.has(bozzaLivelloPadreId)) bozzaLivelloPadreId = "";
+      bozzaCapitoloRadice = false;
       for (const cid of daTogliere) {
         capitoliCollapsed.delete(cid);
         capitoliLivelliAperti.delete(cid);
@@ -13279,6 +13331,8 @@ window.addEventListener("DOMContentLoaded", () => {
   capitoliArchivioSidebarButtonEl.textContent = "CAPITOLI";
   capitoliArchivioSidebarButtonEl.addEventListener("click", () => {
     editingCapitoloId = null;
+    bozzaLivelloPadreId = "";
+    bozzaCapitoloRadice = false;
     openArchivioCapitoliDialog();
   });
   sidebarLeftActionsPrimariEl?.appendChild(capitoliArchivioSidebarButtonEl);
